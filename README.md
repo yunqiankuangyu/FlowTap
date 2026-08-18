@@ -1,13 +1,10 @@
-<h1 align="center">FlowTap</h1>
+<h1 align="center">⚡ FlowTap</h1>
 
-<p align="center">
-  <b>溯流叩击</b> — 键鼠自动化挂机脚本
-</p>
+<p align="center"><b>溯流叩击</b> — 键鼠自动化挂机脚本</p>
 
----
-
-<details open>
-<summary><b>🇬🇧 English</b></summary>
+<table align="center">
+<tr>
+<td><details open><summary><b>🇬🇧 English</b></summary>
 
 ### Version History
 
@@ -39,10 +36,8 @@ python main.py
 - PySide6 (v3) / CustomTkinter (v1/v2)
 - Windows 10/11
 
-</details>
-
-<details>
-<summary><b>🇨🇳 中文</b></summary>
+</details></td>
+<td><details><summary><b>🇨🇳 中文</b></summary>
 
 ### 版本演进
 
@@ -74,10 +69,8 @@ python main.py
 - PySide6 (v3) / CustomTkinter (v1/v2)
 - Windows 10/11
 
-</details>
+</details></td>
+</tr>
+</table>
 
----
-
-<p align="center">
-  <sub>Personal project. For learning purposes only.</sub>
-</p>
+<p align="center"><sub>Personal project. For learning purposes only.</sub></p>
