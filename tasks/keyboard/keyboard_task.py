@@ -33,9 +33,9 @@ def fmt_action(action):
     from vk_map import VK_NAME
     if action["type"] == "key":
         name = VK_NAME.get(action["vk"], f'[{action["vk"]}]')
-        return f"⌨ {name}"
+        return name
     elif action["type"] == "click":
-        return f"🖱 ({action['x']}, {action['y']})"
+        return f"({action['x']}, {action['y']})"
     return "?"
 
 

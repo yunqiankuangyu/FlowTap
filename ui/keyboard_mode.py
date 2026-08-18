@@ -38,7 +38,7 @@ def _make_menu_combo(items, width=80, on_select=None):
     btn = QPushButton(items[0])
     btn.setFixedWidth(width)
     btn.setFixedHeight(25)
-    btn.setFont(FONT_M)
+    btn.setFont(QFont("MiSans", 10, QFont.Bold))
     btn.setStyleSheet(f"""
         QPushButton {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 20px 2px 6px; text-align: left; }}
         QPushButton::menu-indicator {{ image: none; subcontrol-origin: padding; subcontrol-position: right center; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid {Colors.DIM}; width: 0; height: 0; }}
@@ -125,7 +125,7 @@ def build_keyboard_mode(app):
     app._preset_combo.addItems(preset_names)
     app._preset_combo.setFixedWidth(120)
     app._preset_combo.setFixedHeight(25)
-    app._preset_combo.setFont(FONT_M)
+    app._preset_combo.setFont(QFont("MiSans", 10, QFont.Bold))
     app._preset_combo.setStyleSheet(f"""
         QComboBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
         QComboBox::drop-down {{ border: none; }}
@@ -445,7 +445,7 @@ def create_card(app, task):
     spin.setValue(task.loop_interval)
     spin.setFixedWidth(55)
     spin.setFixedHeight(25)
-    spin.setFont(FONT_M)
+    spin.setFont(QFont("MiSans", 10, QFont.Bold))
     spin.setStyleSheet(f"""
         QDoubleSpinBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 0px; }}
         QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}
@@ -516,7 +516,8 @@ def _refresh_actions(app, task):
         row_layout.addWidget(num_lbl)
 
         desc = fmt_action(action)
-        desc_lbl = _make_label(desc, font=FONT_B)
+        desc_font = QFont("MiSans", 10, QFont.Bold)
+        desc_lbl = _make_label(desc, font=desc_font)
         row_layout.addWidget(desc_lbl, 1)
 
         hold_label = _make_label("持续", color=Colors.DIM)
@@ -528,8 +529,9 @@ def _refresh_actions(app, task):
         hold_spin.setSingleStep(0.1)
         hold_spin.setValue(action.get("hold", 0))
         hold_spin.setFixedHeight(18)
-        hold_spin.setFixedWidth(45)
-        hold_spin.setFont(FONT_M)
+        hold_spin.setFixedWidth(38)
+        hold_spin.setAlignment(Qt.AlignRight)
+        hold_spin.setFont(QFont("MiSans", 10, QFont.Bold))
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("hold", round(v, 2)))
         row_layout.addWidget(hold_spin)
@@ -544,8 +546,9 @@ def _refresh_actions(app, task):
         delay_spin.setSingleStep(0.1)
         delay_spin.setValue(action.get("delay", 0.5))
         delay_spin.setFixedHeight(18)
-        delay_spin.setFixedWidth(45)
-        delay_spin.setFont(FONT_M)
+        delay_spin.setFixedWidth(38)
+        delay_spin.setAlignment(Qt.AlignRight)
+        delay_spin.setFont(QFont("MiSans", 10, QFont.Bold))
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("delay", round(v, 2)))
         row_layout.addWidget(delay_spin)
