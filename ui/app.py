@@ -48,63 +48,37 @@ class App(ctk.CTk):
         while w and not isinstance(w, ctk.CTkEntry):
             w = w.master
         if not w: self.focus_set()
-
+        
     def _build_ui(self):
         from .titlebar import build_titlebar
         from .keyboard_mode import build_keyboard_mode, auto_size
-        from .mouse_mode import build_mouse_mode
         from .settings_mode import build_settings_mode
         
         build_titlebar(self)
         
-        # 模式切换标签
-        tab = ctk.CTkFrame(self, height=43, fg_color=Colors.CARD, corner_radius=0)
-        tab.pack(fill="x"); tab.pack_propagate(False)
-        self.tab_kb = ctk.CTkButton(tab, text="⌨ 键盘", font=FONT_B, fg_color=Colors.BLUE,
-                                    text_color=Colors.TEXT, hover_color=Colors.ACCENT, 
-                                    command=lambda: self._show_mode("keyboard"))
-        self.tab_kb.pack(side="left", fill="both", expand=True, padx=(2, 1), pady=4)
-        self.tab_ms = ctk.CTkButton(tab, text="🖱 鼠标", font=FONT_B, fg_color=Colors.CARD,
-                                    text_color=Colors.TEXT, hover_color=Colors.ACCENT, 
-                                    command=lambda: self._show_mode("mouse"))
-        self.tab_ms.pack(side="right", fill="both", expand=True, padx=(1, 2), pady=4)
-        
-        # 内容区域
+        # 内容区域 - titlebar 用 place 不参与 pack，content_frame 唯一 pack 子控件
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.content_frame.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        self.content_frame.pack(fill="both", expand=True, padx=5, pady=(40, 5))
         self.keyboard_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        self.mouse_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         self.settings_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         
         build_keyboard_mode(self)
-        build_mouse_mode(self)
         build_settings_mode(self)
         
         self._show_mode("keyboard")
 
     def _show_mode(self, mode):
         self.keyboard_frame.pack_forget()
-        self.mouse_frame.pack_forget()
         self.settings_frame.pack_forget()
         self.content_frame.pack_forget()
         
         if mode == "keyboard":
-            self.content_frame.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+            self.content_frame.pack(fill="both", expand=True, padx=5, pady=(40, 5))
             self.keyboard_frame.pack(fill="both", expand=True)
-            self.tab_kb.configure(fg_color=Colors.BLUE)
-            self.tab_ms.configure(fg_color=Colors.CARD)
-            self.after(150, lambda: self._auto_size())
-        elif mode == "mouse":
-            self.content_frame.pack(fill="both", expand=True, padx=5, pady=(0, 5))
-            self.mouse_frame.pack(fill="both", expand=True)
-            self.tab_kb.configure(fg_color=Colors.CARD)
-            self.tab_ms.configure(fg_color=Colors.BLUE)
             self.after(150, lambda: self._auto_size())
         elif mode == "settings":
-            self.content_frame.pack(fill="x", padx=5, pady=(0, 5))
+            self.content_frame.pack(fill="x", padx=5, pady=(40, 5))
             self.settings_frame.pack(fill="x")
-            self.tab_kb.configure(fg_color=Colors.CARD)
-            self.tab_ms.configure(fg_color=Colors.CARD)
             self.geometry("346x540")
 
     def _auto_size(self):
@@ -133,7 +107,7 @@ class App(ctk.CTk):
         except: pass
         self.destroy()
 
-    # ── 键盘模式代理方法 ──
+    # ── 混合模式代理方法 ──
     def _add_task(self):
         from .keyboard_mode import add_task
         add_task(self)

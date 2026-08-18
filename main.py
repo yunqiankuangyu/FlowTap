@@ -33,6 +33,16 @@ if __name__ == "__main__":
     
     ensure_admin()
     
+    # DPI 感知：确保坐标系统一致
+    import ctypes
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+    
     import traceback
     
     try:

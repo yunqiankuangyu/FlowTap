@@ -19,8 +19,9 @@ def build_titlebar(app):
             - _show_mode: method, 切换页面
             - _minimize_to_mini: method, 最小化到迷你模式
     """
-    bar = ctk.CTkFrame(app, height=40, fg_color=Colors.CARD, corner_radius=0)
-    bar.pack(fill="x")
+    bar = ctk.CTkFrame(app, height=40, width=346, fg_color=Colors.CARD, corner_radius=0)
+    bar.place(x=0, y=0, relwidth=1)
+    bar.configure(width=346)
     bar.pack_propagate(False)
 
     # 拖动支持

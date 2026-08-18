@@ -1,5 +1,5 @@
 """
-键盘任务模块
+键盘任务模块（支持键鼠混合动作）
 """
 import threading
 import time
@@ -11,19 +11,39 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from core import KeyboardSimulator, random_delay
+from core import KeyboardSimulator, MouseSimulator, random_delay
 
 
 class TaskStatus(Enum):
     IDLE, RUNNING, WAITING = "● 就绪", "● 运行中", "● 等待触发"
 
 
+def make_key_action(vk, delay=0.5):
+    """创建键盘动作"""
+    return {"type": "key", "vk": vk, "delay": delay}
+
+
+def make_click_action(x, y, delay=0.5):
+    """创建鼠标点击动作"""
+    return {"type": "click", "x": x, "y": y, "delay": delay}
+
+
+def fmt_action(action):
+    """格式化动作为可读字符串"""
+    from vk_map import VK_NAME
+    if action["type"] == "key":
+        name = VK_NAME.get(action["vk"], f'[{action["vk"]}]')
+        return f"⌨ {name}"
+    elif action["type"] == "click":
+        return f"🖱 ({action['x']}, {action['y']})"
+    return "?"
+
+
 @dataclass
 class KeyboardTask:
     task_id: int
     name: str
-    key_sequence: List[int] = field(default_factory=list)
-    key_interval: float = 0.5
+    actions: List[dict] = field(default_factory=list)
     loop_interval: float = 80.0
     status: TaskStatus = TaskStatus.IDLE
     done_count: int = 0
@@ -50,19 +70,29 @@ class KeyboardTask:
         self._running, self.status = False, TaskStatus.IDLE
         self._countdown_callback = None
 
+    def _execute_actions(self):
+        """执行一轮动作序列"""
+        kb_sim = KeyboardSimulator()
+        ms_sim = MouseSimulator()
+        for action in self.actions:
+            if not self._running: return False
+            try:
+                if action["type"] == "key":
+                    kb_sim.tap_key(action["vk"])
+                elif action["type"] == "click":
+                    ms_sim.click_mouse(action["x"], action["y"])
+            except: pass
+            random_delay(action.get("delay", 0.5), 0.05)
+        return True
+
     def _loop(self, callback, countdown_callback=None):
         """独立任务的主循环"""
         if getattr(self, '_loop_active', False): return
         self._loop_active = True
         try:
-            sim = KeyboardSimulator()
             while self._running:
                 self.done_count += 1
-                for vk in self.key_sequence:
-                    if not self._running: return
-                    try: sim.tap_key(vk)
-                    except: pass
-                    random_delay(self.key_interval, 0.05)
+                if not self._execute_actions(): return
                 if callback: callback()
                 # 触发依赖此任务的其他任务
                 for dep_task in self._dependents:
@@ -97,11 +127,6 @@ class KeyboardTask:
             if self._countdown_callback:
                 self._countdown_callback("● 执行中...", "#4ade80")
         if not self._running: return
-        sim = KeyboardSimulator()
         self.done_count += 1
-        for vk in self.key_sequence:
-            if not self._running: return
-            try: sim.tap_key(vk)
-            except: pass
-            random_delay(self.key_interval, 0.05)
+        self._execute_actions()
         if self._callback: self._callback()
