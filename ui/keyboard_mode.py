@@ -519,6 +519,22 @@ def _refresh_actions(app, task):
         desc_lbl = _make_label(desc, font=FONT_B)
         row_layout.addWidget(desc_lbl, 1)
 
+        hold_label = _make_label("持续", color=Colors.DIM)
+        row_layout.addWidget(hold_label)
+
+        hold_spin = QDoubleSpinBox()
+        hold_spin.setRange(0, 30)
+        hold_spin.setDecimals(1)
+        hold_spin.setSingleStep(0.1)
+        hold_spin.setValue(action.get("hold", 0))
+        hold_spin.setSuffix(" s")
+        hold_spin.setFixedHeight(18)
+        hold_spin.setFixedWidth(55)
+        hold_spin.setFont(FONT_M)
+        hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+        hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("hold", round(v, 2)))
+        row_layout.addWidget(hold_spin)
+
         delay_label = _make_label("后延", color=Colors.DIM)
         row_layout.addWidget(delay_label)
 

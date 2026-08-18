@@ -61,6 +61,16 @@ FlowTap/
 | v2 | CustomTkinter | 键鼠混合任务，统一操作流 |
 | v3 | PySide6 | 迁移 Qt，解决 CTk 渲染闪烁 |
 | v3.1 | PySide6 | Bug 修复与代码清理 |
+| v3.2 | PySide6 | 绑定位持续按住功能 |
+
+### v3.2 — 持续按住
+
+**新增**
+- **持续按住** — 每个已绑定的键位或鼠标点击可设置"持续"时间：按下后保持指定时长再释放，模拟真人按住，**不是**在持续时间内频繁连点
+- UI：每个动作行在描述和"后延"之间新增"持续"时间调整器（0~30秒，0.1秒步进）
+
+**变更**
+- `hold=0`（默认）保持原有的点击/按键行为，与旧预设完全兼容
 
 ### v3.1 — Bug 修复与代码清理
 
@@ -78,6 +88,12 @@ FlowTap/
 - 死代码：`core/keyboard/`、`core/mouse/` 子模块（与 `core/__init__.py` 重复）
 - 死代码：`ui/layer.py`、`ui/mouse_mode.py`（CustomTkinter 遗留代码，v3 未使用）
 - 新增 `.gitignore`，排除 `__pycache__/`、`settings.json`、`presets.json`、错误日志
+
+### v3 — Qt 迁移
+
+- UI 框架从 CustomTkinter 迁移到 PySide6 (Qt6)
+- 解决无边框窗口下 CTk 渲染闪烁问题
+- 自绘标题栏、拖拽调整大小、迷你模式均用 Qt 重写
 
 ## 许可
 

@@ -18,14 +18,14 @@ class TaskStatus(Enum):
     IDLE, RUNNING, WAITING = "● 就绪", "● 运行中", "● 等待触发"
 
 
-def make_key_action(vk, delay=0.5):
+def make_key_action(vk, delay=0.5, hold=0):
     """创建键盘动作"""
-    return {"type": "key", "vk": vk, "delay": delay}
+    return {"type": "key", "vk": vk, "delay": delay, "hold": hold}
 
 
-def make_click_action(x, y, delay=0.5):
+def make_click_action(x, y, delay=0.5, hold=0):
     """创建鼠标点击动作"""
-    return {"type": "click", "x": x, "y": y, "delay": delay}
+    return {"type": "click", "x": x, "y": y, "delay": delay, "hold": hold}
 
 
 def fmt_action(action):
@@ -77,10 +77,17 @@ class KeyboardTask:
         for action in self.actions:
             if not self._running: return False
             try:
+                hold = action.get("hold", 0)
                 if action["type"] == "key":
-                    kb_sim.tap_key(action["vk"])
+                    if hold > 0:
+                        kb_sim.hold_key(action["vk"], hold)
+                    else:
+                        kb_sim.tap_key(action["vk"])
                 elif action["type"] == "click":
-                    ms_sim.click_mouse(action["x"], action["y"])
+                    if hold > 0:
+                        ms_sim.hold_click(action["x"], action["y"], hold)
+                    else:
+                        ms_sim.click_mouse(action["x"], action["y"])
             except: pass
             random_delay(action.get("delay", 0.5), 0.05)
         return True

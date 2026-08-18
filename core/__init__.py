@@ -75,6 +75,14 @@ class KeyboardSimulator:
         )
         random_delay(0.05, 0.1)
 
+    def hold_key(self, vk, duration):
+        """按住一个键持续 duration 秒后释放（模拟真人按住，非连点）"""
+        scan = self.user32.MapVirtualKeyW(vk, 0)
+        self._send(self._make_keyboard_input(vk, scan))
+        if duration > 0:
+            random_delay(duration, 0.05)
+        self._send(self._make_keyboard_input(vk, scan, KEYEVENTF_KEYUP))
+
 
 class MouseSimulator:
     """鼠标输入模拟器"""
@@ -110,6 +118,19 @@ class MouseSimulator:
             self._make_mouse_input(ax, ay, flags_d),
             self._make_mouse_input(ax, ay, flags_u)
         )
+
+    def hold_click(self, x, y, duration):
+        """在指定位置按住鼠标左键持续 duration 秒后释放（模拟真人按住，非连点）"""
+        self.move_mouse(x, y)
+        random_delay(0.02, 0.17)
+        sw, sh = self.user32.GetSystemMetrics(0), self.user32.GetSystemMetrics(1)
+        ax, ay = int(x * 65535 / sw), int(y * 65535 / sh)
+        flags_d = MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE
+        flags_u = MOUSEEVENTF_LEFTUP | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE
+        self._send(self._make_mouse_input(ax, ay, flags_d))
+        if duration > 0:
+            random_delay(duration, 0.05)
+        self._send(self._make_mouse_input(ax, ay, flags_u))
 
     def move_mouse(self, x, y):
         """移动鼠标到指定位置"""

@@ -61,6 +61,16 @@ FlowTap/
 | v2 | CustomTkinter | Unified keyboard+mouse task mode |
 | v3 | PySide6 | Qt migration, solves CTk rendering flicker |
 | v3.1 | PySide6 | Bug fixes & cleanup |
+| v3.2 | PySide6 | Hold-to-press for key & mouse bindings |
+
+### v3.2 — Hold-to-Press
+
+**New**
+- **Hold duration** — Each bound key or mouse click can now set a "持续" (hold) time. The input is pressed down, held for the specified duration, then released — simulating a human hold, NOT rapid repeated clicks
+- UI: each action row shows a "持续" spinbox (0–30s, 0.1s step) between the action description and "后延"
+
+**Changed**
+- `hold=0` (default) keeps the original tap/click behavior, fully backward-compatible with existing presets
 
 ### v3.1 — Bug Fixes & Cleanup
 
@@ -78,6 +88,12 @@ FlowTap/
 - Dead code: `core/keyboard/`, `core/mouse/` submodules (duplicated by `core/__init__.py`)
 - Dead code: `ui/layer.py`, `ui/mouse_mode.py` (CustomTkinter legacy, unused in v3)
 - Added `.gitignore` for `__pycache__/`, `settings.json`, `presets.json`, error logs
+
+### v3 — Qt Migration
+
+- Migrated UI framework from CustomTkinter to PySide6 (Qt6)
+- Solved CTk rendering flicker on frameless windows
+- Custom titlebar, drag-resize, and mini mode reimplemented in Qt
 
 ## License
 
