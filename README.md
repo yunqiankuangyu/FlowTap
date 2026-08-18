@@ -74,6 +74,7 @@ FlowTap/
 - **Spinbox suffix style** — The "s" unit suffix for both "持续" and "后延" inputs is now an independent DIM-colored label, matching the "持续"/"后延" text style
 
 **Changed**
+- Main window width increased from 346px to 360px (+5%)
 - `hold=0` (default) keeps the original tap/click behavior, fully backward-compatible with existing presets
 
 ### v3.1 — Bug Fixes & Cleanup

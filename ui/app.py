@@ -24,7 +24,7 @@ class App(QMainWindow):
         Colors.apply(self._settings["theme"])
 
         self.setWindowTitle(DISGUISE_TITLE)
-        self.setFixedSize(346, 200)
+        self.setFixedSize(360, 200)
         self.setWindowFlags(
             Qt.FramelessWindowHint
             | Qt.WindowStaysOnTopHint
@@ -110,7 +110,7 @@ class App(QMainWindow):
         elif mode == "settings":
             self._central_layout.addWidget(self.content_frame)
             self.content_layout.addWidget(self.settings_frame)
-            self.setFixedSize(346, 540)
+            self.setFixedSize(360, 540)
 
     def _auto_size(self):
         from .keyboard_mode import auto_size

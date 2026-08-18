@@ -253,7 +253,7 @@ def build_keyboard_mode(app):
         if new_h == app._tracked_height:
             return
         app._tracked_height = new_h
-        app.setFixedSize(346, new_h)
+        app.setFixedSize(360, new_h)
 
     handle.mousePressEvent = on_handle_press
     handle.mouseReleaseEvent = on_handle_release
@@ -283,7 +283,7 @@ def auto_size(app):
         h = 220 + content
     h = min(h, 600)
     app._tracked_height = h
-    app.setFixedSize(346, h)
+    app.setFixedSize(360, h)
 
 
 def _task_active(t):
