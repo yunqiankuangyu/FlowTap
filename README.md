@@ -1,3 +1,7 @@
+<p align="right">
+  <a href="README.zh.md">🇨🇳 中文</a> | <b>🇬🇧 English</b>
+</p>
+
 # FlowTap
 
 Keyboard & mouse automation script — from CustomTkinter to PySide6.
