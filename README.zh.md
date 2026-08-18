@@ -35,9 +35,8 @@ python main.py
 ```
 FlowTap/
 ├── main.py              # 入口
-├── core/                # 键鼠模拟核心
-│   ├── keyboard/
-│   └── mouse/
+├── core/                # 键鼠模拟核心 (Win32 SendInput)
+│   └── __init__.py
 ├── tasks/               # 任务逻辑
 │   ├── keyboard/
 │   └── mouse/

@@ -286,9 +286,14 @@ def auto_size(app):
     app.setFixedSize(346, h)
 
 
+def _task_active(t):
+    """任务是否处于活跃状态（运行中或倒计时中）"""
+    return t._running or getattr(t, '_countdown_active', False)
+
+
 def update_all_btn(app):
     """更新全部按钮状态"""
-    running = any(t._running for t in app.keyboard_tasks)
+    running = any(_task_active(t) for t in app.keyboard_tasks)
     if running:
         app._all_btn.setText("■ 全部停止")
         app._all_btn.setStyleSheet(f"""
@@ -306,18 +311,29 @@ def update_all_btn(app):
 
 def stop_all(app):
     for t in app.keyboard_tasks:
-        if t._running:
+        if _task_active(t):
+            t._countdown_active = False
             t.stop()
+            # 同步每张任务卡片的UI
+            if hasattr(t, '_go_btn') and t._go_btn:
+                t._go_btn.setText("▶ 开始")
+                t._go_btn.setStyleSheet(f"""
+                    QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
+                    QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
+                """)
+            if hasattr(t, '_st_lbl') and t._st_lbl:
+                t._st_lbl.setText(f"已完成 {t.done_count} 次")
+                t._st_lbl.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
     update_all_btn(app)
 
 
 def toggle_all(app):
-    running = any(t._running for t in app.keyboard_tasks)
+    running = any(_task_active(t) for t in app.keyboard_tasks)
     if running:
         stop_all(app)
     else:
         for t in app.keyboard_tasks:
-            if not t._running:
+            if not _task_active(t):
                 _start_task(app, t)
         update_all_btn(app)
 
@@ -446,9 +462,13 @@ def create_card(app, task):
             dep_combo.setVisible(True)
             task.loop_interval = 10
             spin.setValue(10)
+            if hasattr(task, '_loop_label') and task._loop_label:
+                task._loop_label.setText("延迟:")
         else:
             dep_combo.setVisible(False)
             task.dependency_task_id = None
+            if hasattr(task, '_loop_label') and task._loop_label:
+                task._loop_label.setText("循环:")
 
     rel_combo.currentTextChanged.connect(on_rel_change)
     task._rel_combo = rel_combo
@@ -461,7 +481,9 @@ def create_card(app, task):
     sf_layout.addStretch()
 
     left = QHBoxLayout()
-    left.addWidget(_make_label("循环:"))
+    loop_label = _make_label("延迟:" if task.relation_type == "在任务x后" else "循环:")
+    task._loop_label = loop_label
+    left.addWidget(loop_label)
     left.addWidget(spin)
     left.addWidget(_make_label("s"))
     sf_layout.addLayout(left)
@@ -743,7 +765,10 @@ def _start_task(app, task):
         return wrapper
 
     if task.relation_type == "在任务x后":
-        task._callback = _safe_update(lambda: lbl.setText(f"已完成 {task.done_count} 次"))
+        task._callback = _safe_update(lambda: (
+            lbl.setText("● 等待下次触发..."),
+            lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+        ))
         def _make_cd_cb():
             def cb(t, c):
                 _safe_update(lambda t=t, c=c: (

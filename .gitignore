@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+settings.json
+presets.json
+error.log
+error_latest.log

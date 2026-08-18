@@ -12,8 +12,7 @@
 │   ├── settings.py            # 设置读写（opacity, theme）
 │   └── presets.py             # 预设读写
 ├── core/
-│   ├── keyboard/keyboard_sim.py  # Win32 SendInput 键盘模拟
-│   └── mouse/mouse_sim.py        # Win32 SendInput 鼠标模拟
+│   └── __init__.py            # Win32 SendInput 键盘+鼠标模拟
 ├── tasks/
 │   ├── keyboard/keyboard_task.py # 混合任务（键位+点击），支持依赖、循环
 │   └── mouse/mouse_task.py       # 纯鼠标任务（当前UI未使用）
@@ -22,9 +21,7 @@
     ├── titlebar.py           # 自绘标题栏（拖动、按钮）
     ├── keyboard_mode.py      # 主模式：任务卡片、预设、拖拽调整大小
     ├── settings_mode.py      # 设置页：透明度、主题
-    ├── mini_mode.py          # 迷你浮动窗口
-    ├── layer.py              # 废弃，未使用
-    └── mouse_mode.py         # 废弃，未使用
+    └── mini_mode.py          # 迷你浮动窗口
 ```
 
 ## UI 布局

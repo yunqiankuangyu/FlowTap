@@ -123,7 +123,7 @@ class KeyboardTask:
             for i in range(remaining, 0, -1):
                 if not self._running: return
                 if self._countdown_callback:
-                    self._countdown_callback(f"● 延时 {i}s...", "#facc15")
+                    self._countdown_callback(f"● 等待 {i}s...", "#facc15")
                 time.sleep(1)
             if self._countdown_callback:
                 self._countdown_callback("● 执行中...", "#4ade80")

@@ -35,9 +35,8 @@ python main.py
 ```
 FlowTap/
 ├── main.py              # Entry point
-├── core/                # Keyboard & mouse simulation
-│   ├── keyboard/
-│   └── mouse/
+├── core/                # Keyboard & mouse simulation (Win32 SendInput)
+│   └── __init__.py
 ├── tasks/               # Task logic
 │   ├── keyboard/
 │   └── mouse/

@@ -166,7 +166,7 @@ def update_mini_status(app):
     if not app._mini_window:
         return
 
-    running_count = sum(1 for t in app.keyboard_tasks if t._running)
+    running_count = sum(1 for t in app.keyboard_tasks if t._running or getattr(t, '_countdown_active', False))
     total_count = len(app.keyboard_tasks)
 
     if running_count > 0:
@@ -183,6 +183,8 @@ def update_mini_status(app):
         app._mini_status.setText(text)
         app._mini_status.setStyleSheet(f"color: {color}; background: transparent; padding-bottom: 6px;")
 
+    update_mini_btn(app)
+
     if app._mini_window:
         QTimer.singleShot(1000, lambda: update_mini_status(app))
 
@@ -191,7 +193,7 @@ def update_mini_btn(app):
     """同步迷你模式的全部按钮状态"""
     if not hasattr(app, '_mini_all_btn') or not app._mini_all_btn:
         return
-    running_count = sum(1 for t in app.keyboard_tasks if t._running)
+    running_count = sum(1 for t in app.keyboard_tasks if t._running or getattr(t, '_countdown_active', False))
     if running_count > 0:
         app._mini_all_btn.setText("■ 全部停止")
         app._mini_all_btn.setStyleSheet(f"""

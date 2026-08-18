@@ -76,7 +76,12 @@ def build_titlebar(app):
     btn_layout.addWidget(min_btn)
 
     # 设置按钮
-    settings_btn = make_title_btn("⚙", lambda: app._show_mode("settings"), Colors.BLUE)
+    def _toggle_settings():
+        if app._current_mode == "settings":
+            app._show_mode("keyboard")
+        else:
+            app._show_mode("settings")
+    settings_btn = make_title_btn("⚙", _toggle_settings, Colors.BLUE)
     btn_layout.addWidget(settings_btn)
 
     # 关闭按钮
