@@ -69,6 +69,10 @@ FlowTap/
 - **Hold duration** — Each bound key or mouse click can now set a "持续" (hold) time. The input is pressed down, held for the specified duration, then released — simulating a human hold, NOT rapid repeated clicks
 - UI: each action row shows a "持续" spinbox (0–30s, 0.1s step) between the action description and "后延"
 
+**Fixed**
+- **Key capture focus** — Clear button focus before capturing keys, so Space/Enter no longer triggers the "添加键位" button click (space key could not be bound and created extra capture rows)
+- **Spinbox suffix style** — The "s" unit suffix for both "持续" and "后延" inputs is now an independent DIM-colored label, matching the "持续"/"后延" text style
+
 **Changed**
 - `hold=0` (default) keeps the original tap/click behavior, fully backward-compatible with existing presets
 
