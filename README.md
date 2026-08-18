@@ -62,6 +62,12 @@ FlowTap/
 | v3 | PySide6 | Qt migration, solves CTk rendering flicker |
 | v3.1 | PySide6 | Bug fixes & cleanup |
 | v3.2 | PySide6 | Hold-to-press for key & mouse bindings |
+| v3.3 | PySide6 | Optimized partial font display |
+
+### v3.3 — Keyboard Task & UI Tweaks
+**Changed**
+- Optimized keyboard‑task execution logic for better stability
+- Adjusted partial UI font sizes for improved readability
 
 ### v3.2 — Hold-to-Press
 
