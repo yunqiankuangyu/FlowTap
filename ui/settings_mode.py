@@ -1,14 +1,16 @@
 """
-设置页面
+设置页面 (PySide6) — 对齐原版 CTk 样式
 """
-import customtkinter as ctk
-import subprocess
-import sys
-import os
-
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
+    QSlider, QFrame
+)
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 
 from config import Colors, FONT_B, FONT_M, THEMES, DEFAULT_THEME, load_settings, save_settings
 
@@ -16,86 +18,185 @@ from config import Colors, FONT_B, FONT_M, THEMES, DEFAULT_THEME, load_settings,
 def build_settings_mode(app):
     """构建设置页面"""
     s = load_settings()
+    layout = app.settings_layout
+
     # ── 透明度 ──
-    sf2 = ctk.CTkFrame(app.settings_frame, fg_color=Colors.CARD, corner_radius=11)
-    sf2.pack(fill="x", padx=11, pady=5)
-    ctk.CTkLabel(sf2, text="👁 窗口透明度", font=FONT_B, text_color=Colors.TEXT).pack(padx=11, pady=(11, 4), anchor="w")
-    row2 = ctk.CTkFrame(sf2, fg_color="transparent")
-    row2.pack(fill="x", padx=11, pady=(0, 11))
-    app._opacity_var = ctk.DoubleVar(value=s["opacity"])
-    app._opacity_lbl = ctk.CTkLabel(row2, text=f"{s['opacity']:.0%}", font=FONT_M, text_color=Colors.TEXT2, width=45)
-    app._opacity_lbl.pack(side="right")
-    opacity_slider = ctk.CTkSlider(row2, from_=0.3, to=1.0, number_of_steps=14,
-                                   variable=app._opacity_var, width=180,
-                                   command=lambda v: on_opacity_change(app, v))
-    opacity_slider.pack(side="left", fill="x", expand=True, padx=(0, 8))
+    sf2 = QFrame()
+    sf2.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
+    sf2_layout = QVBoxLayout(sf2)
+    sf2_layout.setContentsMargins(11, 11, 11, 11)
+
+    op_label = QLabel("👁 窗口透明度")
+    op_label.setFont(FONT_B)
+    op_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
+    sf2_layout.addWidget(op_label)
+
+    op_row = QWidget()
+    op_row.setStyleSheet("background: transparent;")
+    op_row_layout = QHBoxLayout(op_row)
+    op_row_layout.setContentsMargins(0, 0, 0, 0)
+
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(30)
+    slider.setMaximum(100)
+    slider.setValue(int(s["opacity"] * 100))
+    slider.setStyleSheet(f"""
+        QSlider::groove:horizontal {{ background: {Colors.ACCENT}; height: 6px; border-radius: 3px; }}
+        QSlider::handle:horizontal {{ background: {Colors.BLUE}; width: 16px; height: 16px; margin: -5px 0; border-radius: 8px; }}
+        QSlider::sub-page:horizontal {{ background: {Colors.BLUE}; border-radius: 3px; }}
+    """)
+    app._opacity_slider = slider
+
+    op_val = QLabel(f"{s['opacity']:.0%}")
+    op_val.setFont(FONT_M)
+    op_val.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+    op_val.setFixedWidth(45)
+    app._opacity_lbl = op_val
+
+    slider.valueChanged.connect(lambda v: on_opacity_change(app, v))
+
+    op_row_layout.addWidget(slider, 1)
+    op_row_layout.addWidget(op_val)
+    sf2_layout.addWidget(op_row)
+    layout.addWidget(sf2)
+
     # ── 主题 ──
-    sf3 = ctk.CTkFrame(app.settings_frame, fg_color=Colors.CARD, corner_radius=11)
-    sf3.pack(fill="x", padx=11, pady=5)
-    ctk.CTkLabel(sf3, text="🎨 色彩主题", font=FONT_B, text_color=Colors.TEXT).pack(padx=11, pady=(11, 6), anchor="w")
-    themes_row = ctk.CTkFrame(sf3, fg_color="transparent")
-    themes_row.pack(fill="x", padx=11, pady=(0, 6))
-    app._theme_var = ctk.StringVar(value=s["theme"])
+    sf3 = QFrame()
+    sf3.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
+    sf3_layout = QVBoxLayout(sf3)
+    sf3_layout.setContentsMargins(11, 11, 11, 11)
+
+    th_label = QLabel("🎨 色彩主题")
+    th_label.setFont(FONT_B)
+    th_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
+    sf3_layout.addWidget(th_label)
+
+    themes_grid = QWidget()
+    themes_grid.setStyleSheet("background: transparent;")
+    grid = QGridLayout(themes_grid)
+    grid.setContentsMargins(0, 0, 0, 0)
+    grid.setSpacing(4)
+
+    app._theme_buttons = {}
+    app._current_theme = s["theme"]
+
     for i, name in enumerate(THEMES.keys()):
         t = THEMES[name]
-        btn = ctk.CTkButton(themes_row, text=name, font=FONT_M, height=28,
-                            fg_color=t["CARD"], hover_color=t["ACCENT"],
-                            text_color=t["TEXT"], width=58,
-                            command=lambda n=name: on_theme_change(app, n))
-        btn.grid(row=i//3, column=i%3, padx=3, pady=3, sticky="ew")
-    themes_row.grid_columnconfigure((0, 1, 2), weight=1)
-    # ── 主题预览 ──
-    app._preview_frame = ctk.CTkFrame(sf3, fg_color="transparent")
-    app._preview_frame.pack(fill="x", padx=11, pady=(0, 11))
+        btn = QPushButton(name)
+        btn.setFont(FONT_M)
+        btn.setFixedHeight(30)
+        btn.setStyleSheet(f"""
+            QPushButton {{ background: {t["CARD"]}; color: {t["TEXT"]}; border: none; border-radius: 4px; }}
+            QPushButton:hover {{ background: {t["ACCENT"]}; }}
+        """)
+        btn.clicked.connect(lambda checked, n=name: on_theme_change(app, n))
+        app._theme_buttons[name] = btn
+        grid.addWidget(btn, i // 3, i % 3)
+
+    # 让三列等宽
+    grid.setColumnStretch(0, 1)
+    grid.setColumnStretch(1, 1)
+    grid.setColumnStretch(2, 1)
+
+    sf3_layout.addWidget(themes_grid)
+
+    # 主题预览
+    app._preview_frame = QWidget()
+    app._preview_frame.setStyleSheet("background: transparent;")
+    app._preview_layout = QVBoxLayout(app._preview_frame)
+    app._preview_layout.setContentsMargins(0, 0, 0, 0)
+    sf3_layout.addWidget(app._preview_frame)
     update_preview(app, s["theme"])
+
+    layout.addWidget(sf3)
+
     # ── 应用按钮 ──
-    bf = ctk.CTkFrame(app.settings_frame, fg_color="transparent")
-    bf.pack(fill="x", padx=11, pady=2)
-    ctk.CTkButton(bf, text="✓ 应用", font=("MiSans", 16, "bold"), fg_color=Colors.GREEN,
-                  text_color=Colors.TEXT, hover_color=Colors.HOVER_GREEN, height=48,
-                  command=lambda: apply_settings(app)).pack(fill="x")
+    apply_btn = QPushButton("✓ 应用")
+    apply_btn.setFont(FONT_B)
+    apply_btn.setFixedHeight(48)
+    apply_btn.setStyleSheet(f"""
+        QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 6px; }}
+        QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
+    """)
+    apply_btn.clicked.connect(lambda: apply_settings(app))
+    layout.addWidget(apply_btn)
+
+    layout.addStretch()
 
 
 def on_opacity_change(app, v):
     """透明度变化"""
-    app._opacity_lbl.configure(text=f"{v:.0%}")
-    app.attributes("-alpha", v)
-    s = load_settings(); s["opacity"] = v; save_settings(s)
+    app._opacity_lbl.setText(f"{v:.0%}")
+    app.setWindowOpacity(v / 100.0)
+    s = load_settings()
+    s["opacity"] = v / 100.0
+    save_settings(s)
 
 
 def on_theme_change(app, name):
     """主题预览"""
-    app._theme_var.set(name)
+    app._current_theme = name
     update_preview(app, name)
 
 
 def update_preview(app, theme_name):
     """更新主题预览"""
     t = THEMES.get(theme_name, {})
-    if not t or not hasattr(app, '_preview_frame'):
+    if not t or not hasattr(app, '_preview_layout'):
         return
-    for w in app._preview_frame.winfo_children():
-        w.destroy()
-    bar = ctk.CTkFrame(app._preview_frame, fg_color=t["CARD"], corner_radius=8, height=50)
-    bar.pack(fill="x", pady=(0, 4))
-    bar.pack_propagate(False)
-    ctk.CTkLabel(bar, text="主文字", font=FONT_B, text_color=t["TEXT"]).pack(side="left", padx=8, pady=8)
-    ctk.CTkLabel(bar, text="次要文字", font=FONT_M, text_color=t["TEXT2"]).pack(side="left", padx=4, pady=8)
-    ctk.CTkLabel(bar, text="弱化文字", font=FONT_M, text_color=t["DIM"]).pack(side="left", padx=4, pady=8)
-    colors_bar = ctk.CTkFrame(app._preview_frame, fg_color="transparent")
-    colors_bar.pack(fill="x")
-    for label, color in [("主色", t["BLUE"]), ("成功", t["GREEN"]), ("危险", t["RED"]), ("警告", t["YELLOW"])]:
-        ctk.CTkFrame(colors_bar, fg_color=color, corner_radius=4, height=20).pack(side="left", fill="x", expand=True, padx=2)
-    ctk.CTkLabel(app._preview_frame, text="选择后点「✓ 应用」重启生效",
-                  font=("MiSans", 10), text_color=Colors.DIM).pack(pady=(4, 0))
+
+    while app._preview_layout.count():
+        item = app._preview_layout.takeAt(0)
+        if item.widget():
+            item.widget().deleteLater()
+
+    # 文字预览条（corner_radius=8, height=50, fill="x"）
+    bar = QFrame()
+    bar.setFixedHeight(50)
+    bar.setStyleSheet(f"background: {t['CARD']}; border-radius: 8px;")
+    bar_layout = QHBoxLayout(bar)
+    bar_layout.setContentsMargins(8, 8, 8, 8)
+
+    for text, color, font in [
+        ("主文字", t["TEXT"], FONT_B),
+        ("次要文字", t["TEXT2"], FONT_M),
+        ("弱化文字", t["DIM"], FONT_M),
+    ]:
+        lbl = QLabel(text)
+        lbl.setFont(font)
+        lbl.setStyleSheet(f"color: {color}; background: transparent;")
+        bar_layout.addWidget(lbl)
+
+    app._preview_layout.addWidget(bar)
+
+    # 色条（corner_radius=4, height=20）
+    colors_row = QWidget()
+    colors_row.setStyleSheet("background: transparent;")
+    colors_layout = QHBoxLayout(colors_row)
+    colors_layout.setContentsMargins(0, 0, 0, 0)
+    colors_layout.setSpacing(2)
+
+    for color in [t["BLUE"], t["GREEN"], t["RED"], t["YELLOW"]]:
+        c = QFrame()
+        c.setFixedHeight(20)
+        c.setStyleSheet(f"background: {color}; border-radius: 4px;")
+        colors_layout.addWidget(c, 1)
+
+    app._preview_layout.addWidget(colors_row)
+
+    hint = QLabel("选择后点「✓ 应用」重启生效")
+    hint.setFont(QFont("MiSans", 12, QFont.Bold))
+    hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+    app._preview_layout.addWidget(hint)
 
 
 def apply_settings(app):
     """应用设置并重启"""
     save_settings({
-        "opacity": app._opacity_var.get(),
-        "theme": app._theme_var.get(),
+        "opacity": app._opacity_slider.value() / 100.0,
+        "theme": app._current_theme,
     })
+    import subprocess
     script = os.path.abspath(sys.argv[0])
     subprocess.Popen([sys.executable, script])
-    app.destroy()
+    QApplication.quit()

@@ -93,22 +93,23 @@ class KeyboardTask:
             while self._running:
                 self.done_count += 1
                 if not self._execute_actions(): return
-                if callback: callback()
                 # 触发依赖此任务的其他任务
                 for dep_task in self._dependents:
                     if dep_task._running:
                         threading.Thread(target=dep_task._run_once, daemon=True).start()
                 # 循环倒计时显示
-                countdown_secs = int(self.loop_interval) - 1
-                if countdown_callback and countdown_secs >= 1:
+                countdown_secs = int(self.loop_interval)
+                if countdown_secs >= 1:
                     for i in range(countdown_secs, 0, -1):
                         if not self._running: return
-                        countdown_callback(f"● 等待 {i}s...", "#facc15")
+                        if self._countdown_callback:
+                            self._countdown_callback(f"● 等待 {i}s...", "#facc15")
                         time.sleep(1)
                     if not self._running: return
                     countdown_callback("● 执行中...", "#4ade80")
                     remainder = self.loop_interval - countdown_secs
-                    random_delay(remainder, 0.01)
+                    if remainder > 0.05:
+                        random_delay(remainder, 0.01)
                 else:
                     random_delay(self.loop_interval, 0.01)
         finally:

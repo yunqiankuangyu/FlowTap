@@ -1,6 +1,7 @@
 """
 主题系统模块
 """
+from PySide6.QtGui import QFont
 
 DEFAULT_THEME = "🔵 默认蓝"
 
@@ -44,5 +45,5 @@ class Colors:
 
 
 # 字体
-FONT_B = ("MiSans", 13, "bold")
-FONT_M = ("MiSans", 13)
+FONT_B = QFont("MiSans", 13, QFont.Bold)
+FONT_M = QFont("MiSans", 13, QFont.Bold)

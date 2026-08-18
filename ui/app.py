@@ -1,11 +1,13 @@
 """
-主窗口
+主窗口 (PySide6)
 """
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QApplication
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont
 
 from config import Colors, FONT_B, FONT_M, load_settings, save_settings
 from tasks import KeyboardTask, MouseTask
@@ -14,72 +16,101 @@ from tasks import KeyboardTask, MouseTask
 DISGUISE_TITLE = "svchost"
 
 
-class App(ctk.CTk):
+class App(QMainWindow):
     def __init__(self):
         super().__init__()
         # 加载设置并应用主题
         self._settings = load_settings()
         Colors.apply(self._settings["theme"])
-        # 根据主题文字亮度自动切换 dark/light 模式
-        r, g, b = int(Colors.TEXT[1:3], 16), int(Colors.TEXT[3:5], 16), int(Colors.TEXT[5:7], 16)
-        brightness = 0.299 * r + 0.587 * g + 0.114 * b
-        ctk.set_appearance_mode("light" if brightness < 128 else "dark")
-        
-        self.title(DISGUISE_TITLE)
-        self.geometry("346x100+100+100")
-        self.configure(fg_color=Colors.ACCENT)
-        self.attributes("-topmost", True)
-        self.overrideredirect(True)
-        self.resizable(False, False)
+
+        self.setWindowTitle(DISGUISE_TITLE)
+        self.setFixedSize(346, 200)
+        self.setWindowFlags(
+            Qt.FramelessWindowHint
+            | Qt.WindowStaysOnTopHint
+        )
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
+
         if self._settings["opacity"] < 1.0:
-            self.attributes("-alpha", self._settings["opacity"])
-        
+            self.setWindowOpacity(self._settings["opacity"])
+
         self.keyboard_tasks = []
         self.mouse_task = MouseTask()
         self.next_task_id = 1
         self._current_mode = "keyboard"
         self._mini_window = None
-        
-        self.bind("<Button-1>", self._on_global_click)
-        self._build_ui()
+        self._tracked_height = 220
+        self._ready = False  # 初始化完成前禁用所有操作
 
-    def _on_global_click(self, event):
-        w = event.widget
-        while w and not isinstance(w, ctk.CTkEntry):
-            w = w.master
-        if not w: self.focus_set()
-        
+        self._build_ui()
+        self._ready = True
+
     def _build_ui(self):
         from .titlebar import build_titlebar
         from .keyboard_mode import build_keyboard_mode, auto_size
         from .settings_mode import build_settings_mode
-        
-        build_titlebar(self)
-        
-        # 内容区域 - titlebar 用 place 不参与 pack，content_frame 唯一 pack 子控件
-        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.content_frame.pack(fill="both", expand=True, padx=5, pady=(40, 5))
-        self.keyboard_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        self.settings_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        
+
+        # Central widget
+        central = QWidget()
+        central.setStyleSheet(f"background: {Colors.CARD};")
+        self.setCentralWidget(central)
+        self._central_layout = QVBoxLayout(central)
+        self._central_layout.setContentsMargins(0, 0, 0, 0)
+        self._central_layout.setSpacing(0)
+
+        # 标题栏
+        self._titlebar = build_titlebar(self)
+
+        # 内容区域
+        self.content_frame = QWidget()
+        self.content_frame.setStyleSheet(f"background: {Colors.CARD};")
+        self.content_layout = QVBoxLayout(self.content_frame)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(0)
+
+        self.keyboard_frame = QWidget()
+        self.keyboard_frame.setStyleSheet(f"background: {Colors.CARD};")
+        self.keyboard_layout = QVBoxLayout(self.keyboard_frame)
+        self.keyboard_layout.setContentsMargins(0, 0, 0, 0)
+        self.keyboard_layout.setSpacing(0)
+
+        self.settings_frame = QWidget()
+        self.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
+        self.settings_layout = QVBoxLayout(self.settings_frame)
+        self.settings_layout.setContentsMargins(10, 10, 10, 10)
+        self.settings_layout.setSpacing(8)
+
         build_keyboard_mode(self)
         build_settings_mode(self)
-        
+
         self._show_mode("keyboard")
 
     def _show_mode(self, mode):
-        self.keyboard_frame.pack_forget()
-        self.settings_frame.pack_forget()
-        self.content_frame.pack_forget()
-        
+        # Remove all from content_layout
+        while self.content_layout.count():
+            item = self.content_layout.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+
+        # Remove content_frame from central
+        while self._central_layout.count():
+            item = self._central_layout.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+
+        # Always add titlebar first
+        self._central_layout.addWidget(self._titlebar)
+
+        self._current_mode = mode
+
         if mode == "keyboard":
-            self.content_frame.pack(fill="both", expand=True, padx=5, pady=(40, 5))
-            self.keyboard_frame.pack(fill="both", expand=True)
-            self.after(150, lambda: self._auto_size())
+            self._central_layout.addWidget(self.content_frame)
+            self.content_layout.addWidget(self.keyboard_frame)
+            QTimer.singleShot(150, self._auto_size)
         elif mode == "settings":
-            self.content_frame.pack(fill="x", padx=5, pady=(40, 5))
-            self.settings_frame.pack(fill="x")
-            self.geometry("346x540")
+            self._central_layout.addWidget(self.content_frame)
+            self.content_layout.addWidget(self.settings_frame)
+            self.setFixedSize(346, 540)
 
     def _auto_size(self):
         from .keyboard_mode import auto_size
@@ -97,6 +128,11 @@ class App(ctk.CTk):
         from .keyboard_mode import update_all_btn
         update_all_btn(self)
 
+    def closeEvent(self, event):
+        """关闭按钮 → 正常退出"""
+        event.accept()
+        self.quit_app()
+
     def quit_app(self):
         try:
             from .keyboard_mode import stop_all
@@ -105,7 +141,7 @@ class App(ctk.CTk):
         try:
             if self.mouse_task._running: self.mouse_task.stop()
         except: pass
-        self.destroy()
+        QApplication.quit()
 
     # ── 混合模式代理方法 ──
     def _add_task(self):

@@ -1,6 +1,6 @@
 """
 轻松AI - 键鼠模拟器
-依赖: pip install customtkinter
+依赖: pip install PySide6
 """
 import sys
 import os
@@ -30,9 +30,9 @@ def ensure_admin():
 if __name__ == "__main__":
     if sys.platform != "win32":
         sys.exit("仅支持 Windows")
-    
+
     ensure_admin()
-    
+
     # DPI 感知：确保坐标系统一致
     import ctypes
     try:
@@ -42,23 +42,35 @@ if __name__ == "__main__":
             ctypes.windll.user32.SetProcessDPIAware()
         except Exception:
             pass
-    
+
     import traceback
-    
+
     try:
+        from PySide6.QtWidgets import QApplication
         from ui.app import App
-        App().mainloop()
+
+        app = QApplication(sys.argv)
+        app.setQuitOnLastWindowClosed(False)  # 遮罩关闭时不退出
+        window = App()
+        window.show()
+        sys.exit(app.exec())
     except Exception:
-        # 写日志文件
-        log_path = os.path.join(project_root, "error.log")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"{'='*40}\n")
-            traceback.print_exc(file=f)
+        from datetime import datetime
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        tb = traceback.format_exc()
+        # 1. 历史日志（追加，带时间戳）
+        log_hist = os.path.join(project_root, "error.log")
+        with open(log_hist, "a", encoding="utf-8") as f:
+            f.write(f"\n{'='*40}\n[{now}]\n{tb}")
+        # 2. 最新日志（覆写，只保留最近一次）
+        log_latest = os.path.join(project_root, "error_latest.log")
+        with open(log_latest, "w", encoding="utf-8") as f:
+            f.write(f"[{now}]\n{tb}")
         # 弹窗提示
         import ctypes
         ctypes.windll.user32.MessageBoxW(
             0,
-            f"轻松AI启动异常，错误日志已保存到:\n{log_path}\n\n{traceback.format_exc()}",
+            f"轻松AI启动异常，错误日志已保存到:\n{log_latest}\n\n{tb}",
             "轻松AI - 错误",
             0x10
         )
