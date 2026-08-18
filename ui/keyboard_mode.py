@@ -527,13 +527,13 @@ def _refresh_actions(app, task):
         hold_spin.setDecimals(1)
         hold_spin.setSingleStep(0.1)
         hold_spin.setValue(action.get("hold", 0))
-        hold_spin.setSuffix(" s")
         hold_spin.setFixedHeight(18)
-        hold_spin.setFixedWidth(55)
+        hold_spin.setFixedWidth(45)
         hold_spin.setFont(FONT_M)
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("hold", round(v, 2)))
         row_layout.addWidget(hold_spin)
+        row_layout.addWidget(_make_label("s", color=Colors.DIM))
 
         delay_label = _make_label("后延", color=Colors.DIM)
         row_layout.addWidget(delay_label)
@@ -543,13 +543,13 @@ def _refresh_actions(app, task):
         delay_spin.setDecimals(1)
         delay_spin.setSingleStep(0.1)
         delay_spin.setValue(action.get("delay", 0.5))
-        delay_spin.setSuffix(" s")
         delay_spin.setFixedHeight(18)
-        delay_spin.setFixedWidth(55)
+        delay_spin.setFixedWidth(45)
         delay_spin.setFont(FONT_M)
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("delay", round(v, 2)))
         row_layout.addWidget(delay_spin)
+        row_layout.addWidget(_make_label("s", color=Colors.DIM))
 
         del_btn = QPushButton("✕")
         del_btn.setFixedSize(18, 18)
@@ -585,6 +585,12 @@ def add_key_action(app, task):
 def _start_capture(app, task):
     """启动按键捕获：显示等待行 + QTimer 轮询"""
     task._capturing = True
+
+    # 清除焦点，防止空格/回车触发"添加键位"按钮的点击事件
+    from PySide6.QtWidgets import QApplication
+    fw = QApplication.focusWidget()
+    if fw:
+        fw.clearFocus()
 
     # 显示动作区域
     task._action_frame.setVisible(True)
