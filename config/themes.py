@@ -3,7 +3,7 @@
 """
 from PySide6.QtGui import QFont
 
-DEFAULT_THEME = "🔵 默认蓝"
+DEFAULT_THEME = "🧊 冰川蓝"
 
 # ─── 主题系统 ───
 THEMES = {
