@@ -429,14 +429,47 @@ def create_card(app, task):
     sf_layout = QHBoxLayout(sf)
     sf_layout.setContentsMargins(0, 0, 0, 0)
 
-    # 左：关系（带下拉箭头）
+    # 左：关系（单下拉，动态合并"独立/在任务N后"，避免双下拉撑爆行宽）
     right = QHBoxLayout()
     right.setSpacing(3)
     right.addWidget(_make_label("关系:"))
-    rel_combo = _make_menu_combo(["独立", "在任务x后"], width=72)
 
-    dep_combo = _make_menu_combo(["在任务1后", "在任务2后", "在任务3后"], width=56)
-    dep_combo.setVisible(False)
+    def _current_rel_text():
+        if task.relation_type == "在任务x后" and task.dependency_task_id:
+            return f"任务{task.dependency_task_id}后"
+        return "独立"
+
+    rel_combo = _make_menu_combo(["独立"], width=80)
+
+    def _rebuild_rel_menu():
+        """菜单弹出前重建选项，保证任务列表最新"""
+        menu = rel_combo.menu()
+        menu.clear()
+        opts = ["独立"] + [f"任务{t.task_id}后" for t in app.keyboard_tasks if t.task_id != task.task_id]
+        for o in opts:
+            menu.addAction(o)
+    rel_combo.menu().aboutToShow.connect(_rebuild_rel_menu)
+
+    def _on_rel_select(text):
+        rel_combo._current_text = text
+        rel_combo.setText(text)
+        task.relation_type = "独立" if text == "独立" else "在任务x后"
+        if text.startswith("任务") and text.endswith("后"):
+            try:
+                task.dependency_task_id = int(text[2:-1])
+            except ValueError:
+                task.dependency_task_id = None
+                task.relation_type = "独立"
+        else:
+            task.dependency_task_id = None
+        if task.relation_type == "在任务x后":
+            task.loop_interval = 10
+            spin.setValue(10)
+            task._loop_label.setText("延迟:")
+        else:
+            task._loop_label.setText("循环:")
+    rel_combo.currentTextChanged.connect(_on_rel_select)  # 兼容旧接口（_on_action 会 emit）
+    task._rel_combo = rel_combo
 
     # 右：循环间隔
     spin = QDoubleSpinBox()
@@ -475,29 +508,7 @@ def create_card(app, task):
     runs_spin.valueChanged.connect(_on_runs_change)
     task._runs_spin = runs_spin
 
-    def on_rel_change(value):
-        task.relation_type = value
-        if value == "在任务x后":
-            opts = ["无"] + [f"任务{t.task_id}" for t in app.keyboard_tasks if t.task_id != task.task_id]
-            dep_combo.clear()
-            dep_combo.addItems(opts)
-            dep_combo.setVisible(True)
-            task.loop_interval = 10
-            spin.setValue(10)
-            if hasattr(task, '_loop_label') and task._loop_label:
-                task._loop_label.setText("延迟:")
-        else:
-            dep_combo.setVisible(False)
-            task.dependency_task_id = None
-            if hasattr(task, '_loop_label') and task._loop_label:
-                task._loop_label.setText("循环:")
-
-    rel_combo.currentTextChanged.connect(on_rel_change)
-    task._rel_combo = rel_combo
-    task._dep_combo = dep_combo
-
     right.addWidget(rel_combo)
-    right.addWidget(dep_combo)
     sf_layout.addLayout(right)
 
     sf_layout.addStretch()
@@ -794,14 +805,8 @@ def _start_task(app, task):
     """启动任务（带3秒倒计时）"""
     _ensure_limit_watcher(app)
     if task.relation_type == "在任务x后":
-        dep_str = task._dep_combo.currentText() if hasattr(task, '_dep_combo') else "无"
-        if dep_str.startswith("任务"):
-            try:
-                task.dependency_task_id = int(dep_str[2:])
-            except:
-                task.dependency_task_id = None
-        else:
-            task.dependency_task_id = None
+        # 依赖ID已在下拉选择时写入 task.dependency_task_id
+        pass
 
     update_dependencies(app)
 
