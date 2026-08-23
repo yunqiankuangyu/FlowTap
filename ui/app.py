@@ -161,9 +161,16 @@ class App(QMainWindow):
             self.setFixedSize(360, 540)
 
     def _settings_scroll(self):
-        """设置页滚动容器（懒建，复用）"""
+        """设置页滚动容器（懒建，复用）：滚动内容 + 底部固定应用按钮"""
         if getattr(self, '_settings_scroller', None) is not None:
             return self._settings_scroller
+        from .settings_mode import build_settings_mode  # noqa: F401 (按钮已建在 self 上)
+
+        wrapper = QWidget()
+        w_layout = QVBoxLayout(wrapper)
+        w_layout.setContentsMargins(0, 0, 0, 10)
+        w_layout.setSpacing(8)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -176,8 +183,13 @@ class App(QMainWindow):
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
         """)
         scroll.setWidget(self.settings_frame)
-        self._settings_scroller = scroll
-        return scroll
+
+        w_layout.addWidget(scroll, 1)
+        if hasattr(self, '_settings_apply_btn'):
+            w_layout.addWidget(self._settings_apply_btn)
+
+        self._settings_scroller = wrapper
+        return wrapper
 
     def _auto_size(self):
         from .keyboard_mode import auto_size

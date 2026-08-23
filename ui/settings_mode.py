@@ -162,7 +162,7 @@ def build_settings_mode(app):
 
     layout.addWidget(sf4)
 
-    # ── 应用按钮 ──
+    # 应用按钮占位：由 app._settings_scroll 把它固定在滚动区下方
     apply_btn = QPushButton("✓ 应用")
     apply_btn.setFont(FONT_B)
     apply_btn.setFixedHeight(48)
@@ -171,9 +171,7 @@ def build_settings_mode(app):
         QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
     """)
     apply_btn.clicked.connect(lambda: apply_settings(app))
-    layout.addWidget(apply_btn)
-
-    layout.addStretch()
+    app._settings_apply_btn = apply_btn
 
 
 def on_opacity_change(app, v):
