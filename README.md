@@ -63,6 +63,13 @@ FlowTap/
 | v3.1 | PySide6 | Bug fixes & cleanup |
 | v3.2 | PySide6 | Hold-to-press for key & mouse bindings |
 | v3.3 | PySide6 | Optimized partial font display |
+| v3.4 | PySide6 | Global stop hotkey & run-count limit |
+
+### v3.4 — Global Stop Hotkey & Run Limit
+
+**New**
+- **Global stop hotkey** — Press F8 (customizable) anywhere, even while gaming, to instantly stop all tasks. Configure it in Settings → "全局停止热键"; click "修改热键" and press any key to rebind (ESC cancels). The choice is saved to `settings.json`
+- **Run-count limit** — Each task card has a new "次数" input (0 = unlimited). When the task reaches its limit it stops automatically: the button resets to "▶ 开始", the status shows "✓ 已达上限 N 次", and a floating notification pops up
 
 ### v3.3 — Keyboard Task & UI Tweaks
 **Changed**

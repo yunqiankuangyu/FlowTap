@@ -110,6 +110,58 @@ def build_settings_mode(app):
 
     layout.addWidget(sf3)
 
+    # ── 全局停止热键 ──
+    sf4 = QFrame()
+    sf4.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
+    sf4_layout = QVBoxLayout(sf4)
+    sf4_layout.setContentsMargins(11, 11, 11, 11)
+
+    hk_label = QLabel("⌨ 全局停止热键")
+    hk_label.setFont(FONT_B)
+    hk_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
+    sf4_layout.addWidget(hk_label)
+
+    hk_row = QWidget()
+    hk_row.setStyleSheet("background: transparent;")
+    hk_row_layout = QHBoxLayout(hk_row)
+    hk_row_layout.setContentsMargins(0, 0, 0, 0)
+    hk_row_layout.setSpacing(8)
+
+    from vk_map import VK_NAME
+    app._hotkey_lbl = QLabel(f"当前: {VK_NAME.get(app._stop_hotkey, hex(app._stop_hotkey))}")
+    app._hotkey_lbl.setFont(FONT_M)
+    app._hotkey_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+    hk_row_layout.addWidget(app._hotkey_lbl)
+
+    hk_row_layout.addStretch()
+
+    hk_btn = QPushButton("修改热键")
+    hk_btn.setFont(FONT_M)
+    hk_btn.setFixedHeight(28)
+    hk_btn.setFixedWidth(80)
+    hk_btn.setCursor(Qt.PointingHandCursor)
+    hk_btn.setStyleSheet(f"""
+        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+        QPushButton:hover {{ background: {Colors.ACCENT}; }}
+    """)
+    def on_capture_hotkey():
+        if app._hotkey_capturing:
+            return
+        app._hotkey_capturing = True
+        app._hotkey_lbl.setText("按下任意键... (ESC取消)")
+        app._hotkey_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+    hk_btn.clicked.connect(on_capture_hotkey)
+    hk_row_layout.addWidget(hk_btn)
+
+    sf4_layout.addWidget(hk_row)
+
+    hk_hint = QLabel("任意界面按下该键立即停止所有任务")
+    hk_hint.setFont(QFont("MiSans", 12, QFont.Bold))
+    hk_hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+    sf4_layout.addWidget(hk_hint)
+
+    layout.addWidget(sf4)
+
     # ── 应用按钮 ──
     apply_btn = QPushButton("✓ 应用")
     apply_btn.setFont(FONT_B)
@@ -137,6 +189,17 @@ def on_theme_change(app, name):
     """主题预览"""
     app._current_theme = name
     update_preview(app, name)
+
+
+def update_hotkey_label(app):
+    """热键捕获完成后更新设置页标签"""
+    from vk_map import VK_NAME
+    try:
+        if app._hotkey_lbl and app._hotkey_lbl.parent():
+            app._hotkey_lbl.setText(f"当前: {VK_NAME.get(app._stop_hotkey, hex(app._stop_hotkey))}")
+            app._hotkey_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+    except RuntimeError:
+        pass
 
 
 def update_preview(app, theme_name):

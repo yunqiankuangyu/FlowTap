@@ -49,6 +49,7 @@ class KeyboardTask:
     done_count: int = 0
     relation_type: str = "独立"  # "独立" 或 "在任务x后"
     dependency_task_id: Optional[int] = None  # 前置任务ID
+    max_runs: int = 0  # 执行次数限制，0=无限
     _running: bool = False
     _thread: Optional[threading.Thread] = field(default=None, repr=False)
     _dependents: List['KeyboardTask'] = field(default_factory=list, repr=False)
@@ -98,6 +99,11 @@ class KeyboardTask:
         self._loop_active = True
         try:
             while self._running:
+                # 次数限制：跑够自动停
+                if self.max_runs > 0 and self.done_count >= self.max_runs:
+                    self._finished_by_limit = True
+                    self.stop()
+                    return
                 self.done_count += 1
                 if not self._execute_actions(): return
                 # 触发依赖此任务的其他任务
@@ -132,9 +138,19 @@ class KeyboardTask:
                 if self._countdown_callback:
                     self._countdown_callback(f"● 等待 {i}s...", "#facc15")
                 time.sleep(1)
+            if not self._running: return
             if self._countdown_callback:
                 self._countdown_callback("● 执行中...", "#4ade80")
         if not self._running: return
+        # 次数限制：跑够自动停
+        if self.max_runs > 0 and self.done_count >= self.max_runs:
+            self._finished_by_limit = True
+            self.stop()
+            return
         self.done_count += 1
         self._execute_actions()
+        if self.max_runs > 0 and self.done_count >= self.max_runs:
+            self._finished_by_limit = True
+            self.stop()
+            return
         if self._callback: self._callback()

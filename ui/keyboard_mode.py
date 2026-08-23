@@ -453,6 +453,27 @@ def create_card(app, task):
     spin.valueChanged.connect(lambda v: setattr(task, 'loop_interval', v))
     task._loop_spin = spin
 
+    # 次数限制输入框（0=无限）
+    runs_spin = QDoubleSpinBox()
+    runs_spin.setRange(0, 9999)
+    runs_spin.setDecimals(0)
+    runs_spin.setSingleStep(1)
+    runs_spin.setValue(task.max_runs)
+    runs_spin.setFixedWidth(45)
+    runs_spin.setFixedHeight(25)
+    runs_spin.setFont(QFont("MiSans", 10, QFont.Bold))
+    runs_spin.setStyleSheet(f"""
+        QDoubleSpinBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 0px; }}
+        QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}
+    """)
+    def _on_runs_change(v):
+        task.max_runs = int(v)
+        # 修改限制时重置完成标记，允许重新开始
+        if hasattr(task, '_finished_by_limit'):
+            task._finished_by_limit = False
+    runs_spin.valueChanged.connect(_on_runs_change)
+    task._runs_spin = runs_spin
+
     def on_rel_change(value):
         task.relation_type = value
         if value == "在任务x后":
@@ -486,6 +507,13 @@ def create_card(app, task):
     left.addWidget(loop_label)
     left.addWidget(spin)
     left.addWidget(_make_label("s"))
+    left.addSpacing(6)
+    runs_label = _make_label("次数", color=Colors.DIM)
+    left.addWidget(runs_label)
+    left.addWidget(runs_spin)
+    runs_hint = _make_label("次(0=∞)", color=Colors.DIM)
+    runs_hint.setFont(QFont("MiSans", 8, QFont.Bold))
+    left.addWidget(runs_hint)
     sf_layout.addLayout(left)
 
     card_layout.addWidget(sf)
@@ -764,6 +792,7 @@ def _toggle_task(app, task, btn, lbl):
 
 def _start_task(app, task):
     """启动任务（带3秒倒计时）"""
+    _ensure_limit_watcher(app)
     if task.relation_type == "在任务x后":
         dep_str = task._dep_combo.currentText() if hasattr(task, '_dep_combo') else "无"
         if dep_str.startswith("任务"):
@@ -858,6 +887,39 @@ def update_dependencies(app):
                     break
 
 
+def _ensure_limit_watcher(app):
+    """启动全局监视器：检测任务因次数限制自动完成，同步UI（只挂一次）"""
+    if getattr(app, '_limit_watcher', None) is not None:
+        return
+    timer = QTimer(app)
+    timer.timeout.connect(lambda: _check_limit_finished(app))
+    timer.start(300)
+    app._limit_watcher = timer
+
+
+def _check_limit_finished(app):
+    """检查是否有任务因次数限制跑满自动停了，同步按钮和状态"""
+    for t in list(app.keyboard_tasks):
+        if getattr(t, '_finished_by_limit', False) and not t._running:
+            t._finished_by_limit = False
+            btn = getattr(t, '_go_btn', None)
+            lbl = getattr(t, '_st_lbl', None)
+            try:
+                if btn and btn.parent():
+                    btn.setText("▶ 开始")
+                    btn.setStyleSheet(f"""
+                        QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
+                        QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
+                    """)
+                if lbl and lbl.parent():
+                    lbl.setText(f"✓ 已达上限 {t.done_count} 次")
+                    lbl.setStyleSheet(f"color: {Colors.BLUE}; background: transparent;")
+            except RuntimeError:
+                pass
+            update_all_btn(app)
+            show_floating_notification(app, f"{t.name} 已完成 {t.done_count} 次，自动停止")
+
+
 def del_task(app, task, card):
     """删除任务"""
     task.stop()
@@ -893,6 +955,7 @@ def load_preset(app):
         app.next_task_id += 1
         task.actions = td.get("actions", [])
         task.loop_interval = td.get("loop_interval", 80)
+        task.max_runs = td.get("max_runs", 0)
         app.keyboard_tasks.append(task)
         create_card(app, task)
 
@@ -914,6 +977,7 @@ def save_preset_dialog(app):
                 "name": t.name,
                 "actions": t.actions,
                 "loop_interval": t.loop_interval,
+                "max_runs": t.max_runs,
             }
             for t in app.keyboard_tasks
         ]

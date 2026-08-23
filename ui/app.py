@@ -15,6 +15,8 @@ from tasks import KeyboardTask, MouseTask
 # 伪装标题
 DISGUISE_TITLE = "svchost"
 
+DEFAULT_STOP_HOTKEY = 0x77  # F8
+
 
 class App(QMainWindow):
     def __init__(self):
@@ -42,13 +44,58 @@ class App(QMainWindow):
         self._tracked_height = 220
         self._ready = False  # 初始化完成前禁用所有操作
 
+        # 全局停止热键（_build_ui 的设置页要用，必须先初始化）
+        self._stop_hotkey = self._settings.get("stop_hotkey", DEFAULT_STOP_HOTKEY)
+
         self._build_ui()
         self._ready = True
 
+        # 全局停止热键
+        self._hotkey_capturing = False
+        self._start_hotkey_poller()
+
+    def _start_hotkey_poller(self):
+        """QTimer轮询全局热键（Qt主线程事件循环内调GetAsyncKeyState）"""
+        import ctypes
+        self._hotkey_timer = QTimer(self)
+        self._hotkey_timer.timeout.connect(self._poll_hotkey)
+        self._hotkey_timer.start(50)
+
+    def _poll_hotkey(self):
+        """检测全局热键：捕获模式=抓新键，否则触发全部停止"""
+        import ctypes
+        u32 = ctypes.windll.user32
+        if self._hotkey_capturing:
+            for vk in range(0x08, 0x100):
+                if u32.GetAsyncKeyState(vk) & 0x0001:
+                    self._hotkey_capturing = False
+                    if vk not in (0x1B,):  # ESC取消
+                        self._stop_hotkey = vk
+                        s = load_settings()
+                        s["stop_hotkey"] = vk
+                        save_settings(s)
+                    from .settings_mode import update_hotkey_label
+                    try: update_hotkey_label(self)
+                    except: pass
+                    return
+            return
+        if u32.GetAsyncKeyState(self._stop_hotkey) & 0x0001:
+            from .keyboard_mode import stop_all, show_floating_notification
+            stop_all(self)
+            if self.mouse_task._running:
+                self.mouse_task.stop()
+            show_floating_notification(self, f"⏹ 已全部停止 ({self._stop_hotkey_name()})")
+
+    def _stop_hotkey_name(self):
+        from vk_map import VK_NAME
+        return VK_NAME.get(self._stop_hotkey, hex(self._stop_hotkey))
+
     def _build_ui(self):
         from .titlebar import build_titlebar
-        from .keyboard_mode import build_keyboard_mode, auto_size
+        from .keyboard_mode import build_keyboard_mode, auto_size, show_floating_notification
         from .settings_mode import build_settings_mode
+
+        self._show_floating_notification = show_floating_notification
 
         # Central widget
         central = QWidget()
