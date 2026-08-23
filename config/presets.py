@@ -3,9 +3,13 @@
 """
 import json
 import os
+import sys
 
-_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PRESETS_FILE = os.path.join(_BASE_DIR, "presets.json")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config.settings import _app_dir
+
+PRESETS_FILE = os.path.join(_app_dir(), "presets.json")
 
 
 def load_presets():

@@ -11,6 +11,11 @@ import os
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
+# PyInstaller 打包后日志要写到 exe 所在目录，不是临时解压目录
+if getattr(sys, "frozen", False):
+    project_root = os.path.dirname(os.path.abspath(sys.argv[0]))
+    sys.path.insert(0, project_root)
+
 # 设置环境变量，让Python知道这是一个包
 os.environ['QINGSONG_AI_ROOT'] = project_root
 
@@ -20,6 +25,10 @@ def ensure_admin():
     import ctypes
     if sys.platform != "win32": return
     if ctypes.windll.shell32.IsUserAnAdmin(): return
+    if getattr(sys, "frozen", False):
+        # exe：直接以管理员重启自身
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.argv[0], None, None, 0)
+        sys.exit(0)
     script = os.path.abspath(sys.argv[0])
     python_dir = os.path.dirname(sys.executable)
     pythonw = os.path.join(python_dir, "pythonw.exe")

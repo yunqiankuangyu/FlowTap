@@ -3,16 +3,24 @@
 """
 import json
 import os
-
 import sys
-import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.themes import DEFAULT_THEME
 
 # 配置文件路径（与主程序同目录）
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SETTINGS_FILE = os.path.join(_BASE_DIR, "settings.json")
+
+
+def _app_dir():
+    """exe 或脚本所在目录（PyInstaller 打包后 __file__ 在临时目录，必须用 argv[0]）"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return _BASE_DIR
+
+
+SETTINGS_FILE = os.path.join(_app_dir(), "settings.json")
 
 
 def load_settings():

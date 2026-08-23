@@ -258,6 +258,10 @@ def apply_settings(app):
         "theme": app._current_theme,
     })
     import subprocess
-    script = os.path.abspath(sys.argv[0])
-    subprocess.Popen([sys.executable, script])
+    if getattr(sys, "frozen", False):
+        # exe：直接重启自身
+        subprocess.Popen([sys.argv[0]])
+    else:
+        script = os.path.abspath(sys.argv[0])
+        subprocess.Popen([sys.executable, script])
     QApplication.quit()
