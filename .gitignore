@@ -5,3 +5,6 @@ settings.json
 presets.json
 error.log
 error_latest.log
+build/
+dist/
+*.spec
