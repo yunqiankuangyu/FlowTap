@@ -322,7 +322,7 @@ def stop_all(app):
                     QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
                 """)
             if hasattr(t, '_st_lbl') and t._st_lbl:
-                t._st_lbl.setText(f"已完成 {t.done_count} 次")
+                (t._st_set_text if hasattr(t, "_st_set_text") else t._st_lbl.setText)(f"已完成 {t.done_count} 次")
                 t._st_lbl.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
     update_all_btn(app)
 
@@ -369,6 +369,14 @@ def create_card(app, task):
     hdr.addWidget(name_e)
 
     st_lbl = _make_label(task.status.value, color=Colors.DIM)
+    st_lbl.setMaximumWidth(120)  # 防止状态文字撑爆任务卡
+    st_lbl.setToolTip(task.status.value)  # 截断时悬停看全文
+    def _st_setter(text):
+        fm = st_lbl.fontMetrics()
+        elided = fm.elidedText(text, Qt.ElideRight, 118)
+        st_lbl.setText(elided)
+        st_lbl.setToolTip(text)
+    task._st_set_text = _st_setter
     task._st_lbl = st_lbl
     hdr.addWidget(st_lbl)
 
@@ -794,7 +802,7 @@ def _toggle_task(app, task, btn, lbl):
             QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
             QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
         """)
-        lbl.setText(f"已完成 {task.done_count} 次")
+        (task._st_set_text if hasattr(task, "_st_set_text") else lbl.setText)(f"已完成 {task.done_count} 次")
         lbl.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
         update_all_btn(app)
     else:
@@ -825,13 +833,13 @@ def _start_task(app, task):
 
     if task.relation_type == "在任务x后":
         task._callback = _safe_update(lambda: (
-            lbl.setText("● 等待下次触发..."),
+            task._st_set_text("● 等待下次触发..."),
             lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
         ))
         def _make_cd_cb():
             def cb(t, c):
                 _safe_update(lambda t=t, c=c: (
-                    lbl.setText(t),
+                    task._st_set_text(t),
                     lbl.setStyleSheet(f"color: {c}; background: transparent;")
                 ))()
             return cb
@@ -842,7 +850,7 @@ def _start_task(app, task):
             QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
             QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
         """)
-        lbl.setText("● 等待前置任务")
+        task._st_set_text("● 等待前置任务")
         lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
         update_all_btn(app)
     else:
@@ -857,7 +865,7 @@ def _start_task(app, task):
             if not task._countdown_active:
                 return
             if count > 0:
-                lbl.setText(f"● 准备中 {count}...")
+                task._st_set_text(f"● 准备中 {count}...")
                 lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
                 QTimer.singleShot(1000, lambda: _tick(count - 1))
             else:
@@ -865,7 +873,7 @@ def _start_task(app, task):
                 def _make_cd_cb():
                     def cb(t, c):
                         _safe_update(lambda t=t, c=c: (
-                            lbl.setText(t),
+                            task._st_set_text(t),
                             lbl.setStyleSheet(f"color: {c}; background: transparent;")
                         ))()
                     return cb
@@ -873,7 +881,7 @@ def _start_task(app, task):
                 task.start(
                     countdown_callback=task._countdown_callback
                 )
-                lbl.setText(task.status.value)
+                task._st_set_text(task.status.value)
                 lbl.setStyleSheet(f"color: {Colors.GREEN}; background: transparent;")
                 update_all_btn(app)
 
@@ -917,7 +925,7 @@ def _check_limit_finished(app):
                         QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
                     """)
                 if lbl and lbl.parent():
-                    lbl.setText(f"✓ 已达上限 {t.done_count} 次")
+                    (t._st_set_text if hasattr(t, "_st_set_text") else lbl.setText)(f"✓ 已达上限 {t.done_count} 次")
                     lbl.setStyleSheet(f"color: {Colors.BLUE}; background: transparent;")
             except RuntimeError:
                 pass
