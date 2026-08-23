@@ -431,10 +431,11 @@ def create_card(app, task):
 
     # 左：关系（带下拉箭头）
     right = QHBoxLayout()
+    right.setSpacing(3)
     right.addWidget(_make_label("关系:"))
-    rel_combo = _make_menu_combo(["独立", "在任务x后"], width=80)
+    rel_combo = _make_menu_combo(["独立", "在任务x后"], width=72)
 
-    dep_combo = _make_menu_combo(["在任务1后", "在任务2后", "在任务3后"], width=65)
+    dep_combo = _make_menu_combo(["在任务1后", "在任务2后", "在任务3后"], width=56)
     dep_combo.setVisible(False)
 
     # 右：循环间隔
@@ -443,7 +444,7 @@ def create_card(app, task):
     spin.setDecimals(1)
     spin.setSingleStep(5)
     spin.setValue(task.loop_interval)
-    spin.setFixedWidth(55)
+    spin.setFixedWidth(48)
     spin.setFixedHeight(25)
     spin.setFont(QFont("MiSans", 10, QFont.Bold))
     spin.setStyleSheet(f"""
@@ -459,7 +460,7 @@ def create_card(app, task):
     runs_spin.setDecimals(0)
     runs_spin.setSingleStep(1)
     runs_spin.setValue(task.max_runs)
-    runs_spin.setFixedWidth(45)
+    runs_spin.setFixedWidth(38)
     runs_spin.setFixedHeight(25)
     runs_spin.setFont(QFont("MiSans", 10, QFont.Bold))
     runs_spin.setStyleSheet(f"""
@@ -502,18 +503,17 @@ def create_card(app, task):
     sf_layout.addStretch()
 
     left = QHBoxLayout()
+    left.setSpacing(3)
     loop_label = _make_label("延迟:" if task.relation_type == "在任务x后" else "循环:")
     task._loop_label = loop_label
     left.addWidget(loop_label)
     left.addWidget(spin)
     left.addWidget(_make_label("s"))
-    left.addSpacing(6)
+    left.addSpacing(4)
     runs_label = _make_label("次数", color=Colors.DIM)
     left.addWidget(runs_label)
+    runs_spin.setToolTip("执行次数上限，0 = 无限")
     left.addWidget(runs_spin)
-    runs_hint = _make_label("次(0=∞)", color=Colors.DIM)
-    runs_hint.setFont(QFont("MiSans", 8, QFont.Bold))
-    left.addWidget(runs_hint)
     sf_layout.addLayout(left)
 
     card_layout.addWidget(sf)
