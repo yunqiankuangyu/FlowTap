@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QApplication
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QApplication, QScrollArea, QFrame
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 
@@ -156,8 +156,28 @@ class App(QMainWindow):
             QTimer.singleShot(150, self._auto_size)
         elif mode == "settings":
             self._central_layout.addWidget(self.content_frame)
-            self.content_layout.addWidget(self.settings_frame)
+            # 设置页套一层滚动区，内容多时不挤压
+            self.content_layout.addWidget(self._settings_scroll())
             self.setFixedSize(360, 540)
+
+    def _settings_scroll(self):
+        """设置页滚动容器（懒建，复用）"""
+        if getattr(self, '_settings_scroller', None) is not None:
+            return self._settings_scroller
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background: {Colors.CARD}; border: none; }}
+            QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
+            QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
+            QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+        """)
+        scroll.setWidget(self.settings_frame)
+        self._settings_scroller = scroll
+        return scroll
 
     def _auto_size(self):
         from .keyboard_mode import auto_size
