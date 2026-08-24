@@ -589,7 +589,6 @@ def _rebuild_ui(app):
             w.deleteLater()
 
     # 重建全部容器（旧的已销毁，不能复用）
-    from .titlebar import build_titlebar as _bt  # noqa
     central = app.centralWidget()
     central.setStyleSheet(f"background: {Colors.CARD};")
 
@@ -611,7 +610,10 @@ def _rebuild_ui(app):
     app.settings_layout.setContentsMargins(10, 10, 10, 10)
     app.settings_layout.setSpacing(8)
 
-    # 中央布局重挂
+    # 中央布局重挂：QWidget 不允许二次 setLayout，必须先卸载旧布局
+    old_central_layout = central.layout()
+    if old_central_layout is not None:
+        QWidget().setLayout(old_central_layout)  # 转移给临时 widget 丢弃
     app._central_layout = QVBoxLayout(central)
     app._central_layout.setContentsMargins(0, 0, 0, 0)
     app._central_layout.setSpacing(0)
@@ -620,7 +622,8 @@ def _rebuild_ui(app):
     app._titlebar = build_titlebar(app)
     build_keyboard_mode(app)
     build_settings_mode(app)
-    app._show_mode("keyboard")
+    # 留在用户当前所在页面（通常就是设置页），不踢回任务页
+    app._show_mode(getattr(app, "_current_mode", "keyboard") or "keyboard")
 
     # 恢复窗口高度和透明度
     app.setWindowOpacity(load_settings().get("opacity", 1.0))
