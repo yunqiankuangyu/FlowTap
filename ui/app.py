@@ -16,6 +16,7 @@ from tasks import KeyboardTask, MouseTask
 DISGUISE_TITLE = "svchost"
 
 DEFAULT_STOP_HOTKEY = 0x77  # F8
+DEFAULT_START_HOTKEY = 0x76  # F7
 
 
 class App(QMainWindow):
@@ -27,10 +28,10 @@ class App(QMainWindow):
 
         self.setWindowTitle(DISGUISE_TITLE)
         self.setFixedSize(360, 200)
-        self.setWindowFlags(
-            Qt.FramelessWindowHint
-            | Qt.WindowStaysOnTopHint
-        )
+        flags = Qt.FramelessWindowHint
+        if self._settings.get("always_on_top", True):
+            flags |= Qt.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WA_TranslucentBackground, False)
 
         if self._settings["opacity"] < 1.0:
@@ -46,33 +47,40 @@ class App(QMainWindow):
 
         # 全局停止热键（_build_ui 的设置页要用，必须先初始化）
         self._stop_hotkey = self._settings.get("stop_hotkey", DEFAULT_STOP_HOTKEY)
+        self._start_hotkey = self._settings.get("start_hotkey", DEFAULT_START_HOTKEY)
+        self._hotkey_capture_target = None  # 'stop' / 'start' / None
 
         self._build_ui()
         self._ready = True
 
-        # 全局停止热键
+        # 全局热键
         self._hotkey_capturing = False
         self._start_hotkey_poller()
 
     def _start_hotkey_poller(self):
         """QTimer轮询全局热键（Qt主线程事件循环内调GetAsyncKeyState）"""
-        import ctypes
         self._hotkey_timer = QTimer(self)
         self._hotkey_timer.timeout.connect(self._poll_hotkey)
         self._hotkey_timer.start(50)
 
     def _poll_hotkey(self):
-        """检测全局热键：捕获模式=抓新键，否则触发全部停止"""
+        """检测全局热键：捕获模式=抓新键，否则触发开始/停止"""
         import ctypes
         u32 = ctypes.windll.user32
         if self._hotkey_capturing:
             for vk in range(0x08, 0x100):
                 if u32.GetAsyncKeyState(vk) & 0x0001:
                     self._hotkey_capturing = False
-                    if vk not in (0x1B,):  # ESC取消
-                        self._stop_hotkey = vk
+                    if vk != 0x1B:  # ESC取消
+                        target = self._hotkey_capture_target
+                        if target == "stop":
+                            self._stop_hotkey = vk
+                            key = "stop_hotkey"
+                        else:
+                            self._start_hotkey = vk
+                            key = "start_hotkey"
                         s = load_settings()
-                        s["stop_hotkey"] = vk
+                        s[key] = vk
                         save_settings(s)
                     from .settings_mode import update_hotkey_label
                     try: update_hotkey_label(self)
@@ -85,10 +93,19 @@ class App(QMainWindow):
             if self.mouse_task._running:
                 self.mouse_task.stop()
             show_floating_notification(self, f"⏹ 已全部停止 ({self._stop_hotkey_name()})")
+        elif u32.GetAsyncKeyState(self._start_hotkey) & 0x0001:
+            from .keyboard_mode import toggle_all, show_floating_notification, update_all_btn
+            running = any(t._running or getattr(t, '_countdown_active', False) for t in self.keyboard_tasks)
+            toggle_all(self)
+            show_floating_notification(self, f"▶ 全部开始 ({self._start_hotkey_name()})" if not running else f"⏹ 已全部停止 ({self._start_hotkey_name()})")
 
     def _stop_hotkey_name(self):
         from vk_map import VK_NAME
         return VK_NAME.get(self._stop_hotkey, hex(self._stop_hotkey))
+
+    def _start_hotkey_name(self):
+        from vk_map import VK_NAME
+        return VK_NAME.get(self._start_hotkey, hex(self._start_hotkey))
 
     def _build_ui(self):
         from .titlebar import build_titlebar

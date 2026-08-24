@@ -209,46 +209,232 @@ def build_settings_mode(app):
 
     # ══════════ 功能设置 ══════════
 
-    # 全局停止热键
-    v = _make_section(fn_layout, "⌨ 全局停止热键")
-    hk_row = QWidget()
-    hk_row.setStyleSheet("background: transparent;")
-    hk_row_layout = QHBoxLayout(hk_row)
-    hk_row_layout.setContentsMargins(0, 0, 0, 0)
-    hk_row_layout.setSpacing(8)
-
     from vk_map import VK_NAME
-    app._hotkey_lbl = QLabel(f"当前: {VK_NAME.get(app._stop_hotkey, hex(app._stop_hotkey))}")
-    app._hotkey_lbl.setFont(_FM)
-    app._hotkey_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
-    hk_row_layout.addWidget(app._hotkey_lbl)
+    from PySide6.QtWidgets import QDoubleSpinBox
 
-    hk_row_layout.addStretch()
+    def _make_hotkey_row(label_text, current_vk, capture_key):
+        """一行热键显示 + 修改按钮"""
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        rl = QHBoxLayout(row)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setSpacing(8)
+        lbl = QLabel(f"当前: {VK_NAME.get(current_vk, hex(current_vk))}")
+        lbl.setFont(_FM)
+        lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+        rl.addWidget(lbl)
+        rl.addStretch()
+        btn = QPushButton("修改热键")
+        btn.setFont(_FM)
+        btn.setFixedHeight(28)
+        btn.setFixedWidth(80)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(f"""
+            QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+            QPushButton:hover {{ background: {Colors.ACCENT}; }}
+        """)
+        def on_capture():
+            if app._hotkey_capturing:
+                return
+            app._hotkey_capturing = True
+            app._hotkey_capture_target = capture_key
+            lbl.setText("按下任意键... (ESC取消)")
+            lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+        btn.clicked.connect(on_capture)
+        rl.addWidget(btn)
+        setattr(app, f'_{"stop" if capture_key == "stop" else "start"}hotkey_lbl', lbl)
+        return row, lbl
 
-    hk_btn = QPushButton("修改热键")
-    hk_btn.setFont(_FM)
-    hk_btn.setFixedHeight(28)
-    hk_btn.setFixedWidth(80)
-    hk_btn.setCursor(Qt.PointingHandCursor)
-    hk_btn.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {Colors.ACCENT}; }}
-    """)
-    def on_capture_hotkey():
-        if app._hotkey_capturing:
-            return
-        app._hotkey_capturing = True
-        app._hotkey_lbl.setText("按下任意键... (ESC取消)")
-        app._hotkey_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
-    hk_btn.clicked.connect(on_capture_hotkey)
-    hk_row_layout.addWidget(hk_btn)
+    # 全局热键（开始 + 停止）
+    v = _make_section(fn_layout, "⌨ 全局热键")
 
-    v.addWidget(hk_row)
+    stop_row, stop_lbl = _make_hotkey_row("停止", app._stop_hotkey, "stop")
+    v.addWidget(stop_row)
 
-    hk_hint = QLabel("任意界面按下该键立即停止所有任务")
+    start_row, start_lbl = _make_hotkey_row("开始", app._start_hotkey, "start")
+    v.addWidget(start_row)
+
+    hk_hint = QLabel("任意界面按下热键立即开始/停止全部任务")
     hk_hint.setFont(QFont("MiSans", 10, QFont.Bold))
     hk_hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
     v.addWidget(hk_hint)
+
+    # 任务默认参数
+    v = _make_section(fn_layout, "📋 新建任务默认值")
+
+    defaults_grid = QWidget()
+    defaults_grid.setStyleSheet("background: transparent;")
+    dg = QHBoxLayout(defaults_grid)
+    dg.setContentsMargins(0, 0, 0, 0)
+    dg.setSpacing(6)
+
+    spin_style = f"""
+        QDoubleSpinBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 0px; }}
+        QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}
+    """
+
+    dg.addWidget(QLabel("循环间隔"))
+    loop_spin = QDoubleSpinBox()
+    loop_spin.setRange(1, 999); loop_spin.setDecimals(1); loop_spin.setSingleStep(5)
+    loop_spin.setValue(s.get("default_loop", 80))
+    loop_spin.setFixedWidth(55); loop_spin.setFixedHeight(25)
+    loop_spin.setFont(_FM); loop_spin.setStyleSheet(spin_style)
+    app._default_loop_spin = loop_spin
+    dg.addWidget(loop_spin)
+    dg.addWidget(QLabel("s"))
+
+    dg.addStretch()
+
+    dg.addWidget(QLabel("动作后延"))
+    delay_spin = QDoubleSpinBox()
+    delay_spin.setRange(0, 30); delay_spin.setDecimals(1); delay_spin.setSingleStep(0.1)
+    delay_spin.setValue(s.get("default_delay", 0.5))
+    delay_spin.setFixedWidth(45); delay_spin.setFixedHeight(25)
+    delay_spin.setFont(_FM); delay_spin.setStyleSheet(spin_style)
+    app._default_delay_spin = delay_spin
+    dg.addWidget(delay_spin)
+    dg.addWidget(QLabel("s"))
+
+    for w in defaults_grid.findChildren(QLabel):
+        w.setFont(_FM)
+        w.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+    v.addWidget(defaults_grid)
+
+    hint = QLabel("新建任务时使用的初始循环间隔和动作后延")
+    hint.setFont(QFont("MiSans", 10, QFont.Bold))
+    hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+    v.addWidget(hint)
+
+    # 启动倒计时
+    v = _make_section(fn_layout, "⏱ 启动倒计时")
+
+    cd_row = QWidget()
+    cd_row.setStyleSheet("background: transparent;")
+    cd_layout = QHBoxLayout(cd_row)
+    cd_layout.setContentsMargins(0, 0, 0, 0)
+    cd_layout.setSpacing(6)
+    cd_layout.addWidget(QLabel("点击开始后等待"))
+    cd_spin = QDoubleSpinBox()
+    cd_spin.setRange(0, 10); cd_spin.setDecimals(0); cd_spin.setSingleStep(1)
+    cd_spin.setValue(s.get("start_countdown", 3))
+    cd_spin.setFixedWidth(40); cd_spin.setFixedHeight(25)
+    cd_spin.setFont(_FM); cd_spin.setStyleSheet(spin_style)
+    app._countdown_spin = cd_spin
+    cd_layout.addWidget(cd_spin)
+    cd_layout.addWidget(QLabel("秒"))
+    cd_layout.addStretch()
+    for w in cd_row.findChildren(QLabel):
+        w.setFont(_FM)
+        w.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+    v.addWidget(cd_row)
+
+    # 窗口行为
+    v = _make_section(fn_layout, "🪟 窗口行为")
+
+    def _make_toggle(label_text, checked, key):
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        rl = QHBoxLayout(row)
+        rl.setContentsMargins(0, 0, 0, 0)
+        lbl = QLabel(label_text)
+        lbl.setFont(_FM)
+        lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+        rl.addWidget(lbl)
+        rl.addStretch()
+        btn = QPushButton("开" if checked else "关")
+        btn.setFont(_FM)
+        btn.setFixedSize(44, 24)
+        btn.setCursor(Qt.PointingHandCursor)
+
+        def _style(on):
+            color = Colors.GREEN if on else Colors.DIM
+            hover = Colors.HOVER_GREEN if on else Colors.ACCENT
+            return f"""
+                QPushButton {{ background: {color}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+                QPushButton:hover {{ background: {hover}; }}
+            """
+        btn.setStyleSheet(_style(checked))
+
+        def toggle():
+            now_on = btn.text() == "关"
+            btn.setText("开" if now_on else "关")
+            btn.setStyleSheet(_style(now_on))
+            s3 = load_settings()
+            s3[key] = now_on
+            save_settings(s3)
+            if key == "always_on_top":
+                flags = app.windowFlags()
+                if now_on:
+                    flags |= Qt.WindowStaysOnTopHint
+                else:
+                    flags &= ~Qt.WindowStaysOnTopHint
+                app.setWindowFlags(flags)
+                app.show()
+        btn.clicked.connect(toggle)
+        rl.addWidget(btn)
+        return row, btn
+
+    top_row, _ = _make_toggle("窗口置顶", s.get("always_on_top", True), "always_on_top")
+    v.addWidget(top_row)
+
+    remember_row, _ = _make_toggle("记住窗口高度", s.get("remember_height", True), "remember_height")
+    v.addWidget(remember_row)
+
+    # 预设导入/导出
+    v = _make_section(fn_layout, "💾 预设备份")
+
+    pe_row = QWidget()
+    pe_row.setStyleSheet("background: transparent;")
+    pe_layout = QHBoxLayout(pe_row)
+    pe_layout.setContentsMargins(0, 0, 0, 0)
+    pe_layout.setSpacing(6)
+
+    def _btn(text, handler):
+        b = QPushButton(text)
+        b.setFont(_FM)
+        b.setFixedHeight(30)
+        b.setCursor(Qt.PointingHandCursor)
+        b.setStyleSheet(f"""
+            QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+            QPushButton:hover {{ background: {Colors.ACCENT}; }}
+        """)
+        b.clicked.connect(handler)
+        return b
+
+    from PySide6.QtWidgets import QFileDialog
+    import json as _json
+
+    def export_presets():
+        from config.presets import load_presets
+        path, _ = QFileDialog.getSaveFileName(app, "导出预设", "FlowTap预设.json", "JSON (*.json)")
+        if not path:
+            return
+        with open(path, "w", encoding="utf-8") as f:
+            _json.dump({"flowtap_presets": load_presets()}, f, ensure_ascii=False, indent=2)
+        show_notification(app, "✓ 预设已导出")
+
+    def import_presets():
+        from config.presets import load_presets, save_presets
+        path, _ = QFileDialog.getOpenFileName(app, "导入预设", "", "JSON (*.json)")
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            incoming = data.get("flowtap_presets", data if isinstance(data, dict) else {})
+            if not isinstance(incoming, dict):
+                raise ValueError
+            merged = load_presets()
+            merged.update(incoming)
+            save_presets(merged)
+            show_notification(app, f"✓ 已导入 {len(incoming)} 个预设")
+        except Exception:
+            show_notification(app, "✕ 导入失败：文件格式无效")
+
+    pe_layout.addWidget(_btn("导出全部预设", export_presets))
+    pe_layout.addWidget(_btn("导入预设", import_presets))
+    pe_layout.addStretch()
+    v.addWidget(pe_row)
 
     fn_layout.addStretch()
 
@@ -299,9 +485,14 @@ def update_hotkey_label(app):
     """热键捕获完成后更新设置页标签"""
     from vk_map import VK_NAME
     try:
-        if app._hotkey_lbl and app._hotkey_lbl.parent():
-            app._hotkey_lbl.setText(f"当前: {VK_NAME.get(app._stop_hotkey, hex(app._stop_hotkey))}")
-            app._hotkey_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+        stop_lbl = getattr(app, '_stophotkey_lbl', None)
+        if stop_lbl and stop_lbl.parent():
+            stop_lbl.setText(f"当前: {VK_NAME.get(app._stop_hotkey, hex(app._stop_hotkey))}")
+            stop_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+        start_lbl = getattr(app, '_starthotkey_lbl', None)
+        if start_lbl and start_lbl.parent():
+            start_lbl.setText(f"当前: {VK_NAME.get(app._start_hotkey, hex(app._start_hotkey))}")
+            start_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
     except RuntimeError:
         pass
 
@@ -372,3 +563,9 @@ def apply_settings(app):
         script = os.path.abspath(sys.argv[0])
         subprocess.Popen([sys.executable, script])
     QApplication.quit()
+
+
+def show_notification(app, text):
+    """浮动通知（转发 keyboard_mode 实现）"""
+    from .keyboard_mode import show_floating_notification
+    show_floating_notification(app, text)

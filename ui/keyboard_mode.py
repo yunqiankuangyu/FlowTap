@@ -254,6 +254,11 @@ def build_keyboard_mode(app):
             return
         app._tracked_height = new_h
         app.setFixedSize(360, new_h)
+        from config import load_settings, save_settings
+        if load_settings().get("remember_height", True):
+            s = load_settings()
+            s["window_height"] = new_h
+            save_settings(s)
 
     handle.mousePressEvent = on_handle_press
     handle.mouseReleaseEvent = on_handle_release
@@ -271,19 +276,29 @@ def build_keyboard_mode(app):
 
 def auto_size(app):
     """自动调整窗口高度"""
+    from config import load_settings, save_settings
+    remember = load_settings().get("remember_height", True)
     count = len(app.keyboard_tasks)
     if count == 0:
-        h = 220
+        if remember:
+            h = load_settings().get("window_height", 220)
+        else:
+            h = 220
     else:
         content = 0
         for t in app.keyboard_tasks:
             content += 135 + 10
             if t.actions:
                 content += 34
-        h = 220 + content
-    h = min(h, 600)
+        base = load_settings().get("window_height", 220) if remember else 220
+        h = base + content
+    h = max(220, min(600, h))
     app._tracked_height = h
     app.setFixedSize(360, h)
+    if remember:
+        s = load_settings()
+        s["window_height"] = h
+        save_settings(s)
 
 
 def _task_active(t):
@@ -339,7 +354,8 @@ def toggle_all(app):
 
 
 def add_task(app):
-    task = KeyboardTask(app.next_task_id, f"任务{app.next_task_id}")
+    from config import load_settings as _ls
+    task = KeyboardTask(app.next_task_id, f"任务{app.next_task_id}", loop_interval=_ls().get("default_loop", 80))
     app.next_task_id += 1
     app.keyboard_tasks.append(task)
     create_card(app, task)
@@ -677,7 +693,8 @@ def _start_capture(app, task):
             if u32.GetAsyncKeyState(vk) & 0x0001:
                 task._capturing = False
                 poll_timer.stop()
-                task.actions.append(make_key_action(vk))
+                from config import load_settings as _ls
+                task.actions.append(make_key_action(vk, delay=_ls().get("default_delay", 0.5)))
                 QTimer.singleShot(0, lambda: _refresh_actions(app, task))
                 return
 
@@ -758,7 +775,8 @@ def add_click_action(app, task):
             import ctypes.wintypes
             p = ctypes.wintypes.POINT()
             u32.GetCursorPos(ctypes.byref(p))
-            task.actions.append(make_click_action(p.x, p.y))
+            from config import load_settings as _ls
+            task.actions.append(make_click_action(p.x, p.y, delay=_ls().get("default_delay", 0.5)))
             cleanup(accepted=True)
             return
 
@@ -885,7 +903,8 @@ def _start_task(app, task):
                 lbl.setStyleSheet(f"color: {Colors.GREEN}; background: transparent;")
                 update_all_btn(app)
 
-        _tick(3)
+        from config import load_settings
+        _tick(load_settings().get("start_countdown", 3))
 
 
 def update_dependencies(app):
