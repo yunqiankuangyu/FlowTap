@@ -298,10 +298,8 @@ def auto_size(app):
     h = max(220, min(600, h))
     app._tracked_height = h
     app.setFixedSize(360, h)
-    if remember:
-        s = load_settings()
-        s["window_height"] = h
-        save_settings(s)
+    # 注意：这里不回写 window_height——该值只代表"用户拖动的基准高度"，
+    # auto_size 是它的消费者不是生产者，否则会滚雪球越算越高。
 
 
 def _task_active(t):
