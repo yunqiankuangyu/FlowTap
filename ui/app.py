@@ -221,7 +221,7 @@ class App(QMainWindow):
 
         wrapper = QWidget()
         w_layout = QVBoxLayout(wrapper)
-        w_layout.setContentsMargins(0, 0, 0, 10)
+        w_layout.setContentsMargins(0, 0, 0, 2)
         w_layout.setSpacing(8)
 
         scroll = QScrollArea()

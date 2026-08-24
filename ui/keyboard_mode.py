@@ -222,7 +222,7 @@ def _build_drag_handle(app):
     import ctypes
     import ctypes.wintypes
 
-    HANDLE_H = 12
+    HANDLE_H = 8
     handle = QWidget()
     handle.setFixedHeight(HANDLE_H)
     handle.setMinimumHeight(HANDLE_H)
