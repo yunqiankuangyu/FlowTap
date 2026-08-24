@@ -15,6 +15,10 @@ from PySide6.QtGui import QFont
 
 from config import Colors, FONT_B, FONT_M, THEMES, DEFAULT_THEME, load_settings, save_settings
 
+# 设置页专用字体：比全局小 3px
+_FB = QFont("MiSans", 10, QFont.Bold)
+_FM = QFont("MiSans", 10, QFont.Bold)
+
 # 分页定义：页名 -> 该页包含的 section 构建函数名
 PAGE_APPEARANCE = "外观设置"
 PAGE_FUNCTION = "功能设置"
@@ -29,7 +33,7 @@ def _make_section(parent_layout, title):
 
     if title:
         lbl = QLabel(title)
-        lbl.setFont(FONT_B)
+        lbl.setFont(_FB)
         lbl.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
         v.addWidget(lbl)
     parent_layout.addWidget(frame)
@@ -47,11 +51,10 @@ def build_settings_mode(app):
     nav_row.setStyleSheet("background: transparent;")
     nav = QHBoxLayout(nav_row)
     nav.setContentsMargins(0, 0, 0, 2)
-    nav.addStretch()
 
     page_combo = QPushButton(PAGE_APPEARANCE)
-    page_combo.setFixedSize(110, 28)
-    page_combo.setFont(QFont("MiSans", 11, QFont.Bold))
+    page_combo.setFixedHeight(28)
+    page_combo.setFont(QFont("MiSans", 8, QFont.Bold))
     page_combo.setCursor(Qt.PointingHandCursor)
     page_combo.setStyleSheet(f"""
         QPushButton {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 20px 2px 8px; text-align: left; }}
@@ -81,7 +84,7 @@ def build_settings_mode(app):
     appearance_page.setStyleSheet("background: transparent;")
     ap_layout = QVBoxLayout(appearance_page)
     ap_layout.setContentsMargins(0, 0, 0, 0)
-    ap_layout.setSpacing(10)
+    ap_layout.setSpacing(5)
     app._page_appearance = appearance_page
 
     # ── 功能页容器 ──
@@ -114,7 +117,7 @@ def build_settings_mode(app):
     app._opacity_slider = slider
 
     op_val = QLabel(f"{s['opacity']:.0%}")
-    op_val.setFont(FONT_M)
+    op_val.setFont(_FM)
     op_val.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
     op_val.setFixedWidth(45)
     app._opacity_lbl = op_val
@@ -140,7 +143,7 @@ def build_settings_mode(app):
     for i, name in enumerate(THEMES.keys()):
         t = THEMES[name]
         btn = QPushButton(name)
-        btn.setFont(FONT_M)
+        btn.setFont(_FM)
         btn.setFixedHeight(30)
         btn.setStyleSheet(f"""
             QPushButton {{ background: {t["CARD"]}; color: {t["TEXT"]}; border: none; border-radius: 4px; }}
@@ -162,13 +165,52 @@ def build_settings_mode(app):
     v.addWidget(app._preview_frame)
     update_preview(app, s["theme"])
 
+    # 窗口标题（外观页：改标题属于外观个性化）
+    v2 = _make_section(ap_layout, "🏷 窗口标题")
+
+    ti_row = QWidget()
+    ti_row.setStyleSheet("background: transparent;")
+    ti_row_layout = QHBoxLayout(ti_row)
+    ti_row_layout.setContentsMargins(0, 0, 0, 0)
+    ti_row_layout.setSpacing(6)
+
+    app._title_edit = QLineEdit(s.get("window_title", ""))
+    app._title_edit.setPlaceholderText("⚡ 工具（默认）")
+    app._title_edit.setFixedHeight(28)
+    app._title_edit.setFont(QFont("MiSans", 8, QFont.Bold))
+    app._title_edit.setStyleSheet(f"""
+        QLineEdit {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
+    """)
+    ti_row_layout.addWidget(app._title_edit, 1)
+
+    def _apply_title():
+        text = app._title_edit.text().strip()
+        s2 = load_settings()
+        s2["window_title"] = text
+        save_settings(s2)
+        app._title_label.setText(text or "⚡ 工具")
+        from .keyboard_mode import show_floating_notification
+        show_floating_notification(app, "✓ 标题已更新" if text else "✓ 已恢复默认标题")
+    ti_apply_btn = QPushButton("应用")
+    ti_apply_btn.setFont(_FM)
+    ti_apply_btn.setFixedHeight(28)
+    ti_apply_btn.setFixedWidth(52)
+    ti_apply_btn.setCursor(Qt.PointingHandCursor)
+    ti_apply_btn.setStyleSheet(f"""
+        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+        QPushButton:hover {{ background: {Colors.ACCENT}; }}
+    """)
+    ti_apply_btn.clicked.connect(_apply_title)
+    ti_row_layout.addWidget(ti_apply_btn)
+
+    v2.addWidget(ti_row)
+
     ap_layout.addStretch()
 
     # ══════════ 功能设置 ══════════
 
     # 全局停止热键
     v = _make_section(fn_layout, "⌨ 全局停止热键")
-
     hk_row = QWidget()
     hk_row.setStyleSheet("background: transparent;")
     hk_row_layout = QHBoxLayout(hk_row)
@@ -177,14 +219,14 @@ def build_settings_mode(app):
 
     from vk_map import VK_NAME
     app._hotkey_lbl = QLabel(f"当前: {VK_NAME.get(app._stop_hotkey, hex(app._stop_hotkey))}")
-    app._hotkey_lbl.setFont(FONT_M)
+    app._hotkey_lbl.setFont(_FM)
     app._hotkey_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
     hk_row_layout.addWidget(app._hotkey_lbl)
 
     hk_row_layout.addStretch()
 
     hk_btn = QPushButton("修改热键")
-    hk_btn.setFont(FONT_M)
+    hk_btn.setFont(_FM)
     hk_btn.setFixedHeight(28)
     hk_btn.setFixedWidth(80)
     hk_btn.setCursor(Qt.PointingHandCursor)
@@ -204,49 +246,9 @@ def build_settings_mode(app):
     v.addWidget(hk_row)
 
     hk_hint = QLabel("任意界面按下该键立即停止所有任务")
-    hk_hint.setFont(QFont("MiSans", 12, QFont.Bold))
+    hk_hint.setFont(QFont("MiSans", 9, QFont.Bold))
     hk_hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
     v.addWidget(hk_hint)
-
-    # 窗口标题
-    v = _make_section(fn_layout, "🏷 窗口标题")
-
-    ti_row = QWidget()
-    ti_row.setStyleSheet("background: transparent;")
-    ti_row_layout = QHBoxLayout(ti_row)
-    ti_row_layout.setContentsMargins(0, 0, 0, 0)
-    ti_row_layout.setSpacing(6)
-
-    app._title_edit = QLineEdit(s.get("window_title", ""))
-    app._title_edit.setPlaceholderText("⚡ 工具（默认）")
-    app._title_edit.setFixedHeight(28)
-    app._title_edit.setFont(QFont("MiSans", 11, QFont.Bold))
-    app._title_edit.setStyleSheet(f"""
-        QLineEdit {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
-    """)
-    ti_row_layout.addWidget(app._title_edit, 1)
-
-    def _apply_title():
-        text = app._title_edit.text().strip()
-        s2 = load_settings()
-        s2["window_title"] = text
-        save_settings(s2)
-        app._title_label.setText(text or "⚡ 工具")
-        from .keyboard_mode import show_floating_notification
-        show_floating_notification(app, "✓ 标题已更新" if text else "✓ 已恢复默认标题")
-    ti_apply_btn = QPushButton("应用")
-    ti_apply_btn.setFont(FONT_M)
-    ti_apply_btn.setFixedHeight(28)
-    ti_apply_btn.setFixedWidth(52)
-    ti_apply_btn.setCursor(Qt.PointingHandCursor)
-    ti_apply_btn.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {Colors.ACCENT}; }}
-    """)
-    ti_apply_btn.clicked.connect(_apply_title)
-    ti_row_layout.addWidget(ti_apply_btn)
-
-    v.addWidget(ti_row)
 
     fn_layout.addStretch()
 
@@ -258,7 +260,7 @@ def build_settings_mode(app):
 
     # 应用按钮占位：由 app._settings_scroll 把它固定在滚动区下方
     apply_btn = QPushButton("✓ 应用")
-    apply_btn.setFont(FONT_B)
+    apply_btn.setFont(_FB)
     apply_btn.setFixedHeight(48)
     apply_btn.setStyleSheet(f"""
         QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 6px; }}
@@ -323,9 +325,9 @@ def update_preview(app, theme_name):
     bar_layout.setContentsMargins(8, 8, 8, 8)
 
     for text, color, font in [
-        ("主文字", t["TEXT"], FONT_B),
-        ("次要文字", t["TEXT2"], FONT_M),
-        ("弱化文字", t["DIM"], FONT_M),
+        ("主文字", t["TEXT"], _FB),
+        ("次要文字", t["TEXT2"], _FM),
+        ("弱化文字", t["DIM"], _FM),
     ]:
         lbl = QLabel(text)
         lbl.setFont(font)
@@ -350,7 +352,7 @@ def update_preview(app, theme_name):
     app._preview_layout.addWidget(colors_row)
 
     hint = QLabel("选择后点「✓ 应用」重启生效")
-    hint.setFont(QFont("MiSans", 12, QFont.Bold))
+    hint.setFont(QFont("MiSans", 9, QFont.Bold))
     hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
     app._preview_layout.addWidget(hint)
 
