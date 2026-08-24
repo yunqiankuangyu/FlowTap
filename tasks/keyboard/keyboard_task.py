@@ -23,6 +23,11 @@ def make_key_action(vk, delay=0.5, hold=0):
     return {"type": "key", "vk": vk, "delay": delay, "hold": hold}
 
 
+def make_combo_action(vks, delay=0.5, hold=0):
+    """创建组合键动作（多个键同时按住）"""
+    return {"type": "combo", "vks": list(vks), "delay": delay, "hold": hold}
+
+
 def make_click_action(x, y, delay=0.5, hold=0):
     """创建鼠标点击动作"""
     return {"type": "click", "x": x, "y": y, "delay": delay, "hold": hold}
@@ -34,6 +39,8 @@ def fmt_action(action):
     if action["type"] == "key":
         name = VK_NAME.get(action["vk"], f'[{action["vk"]}]')
         return name
+    elif action["type"] == "combo":
+        return "+".join(VK_NAME.get(vk, f"[{vk}]") for vk in action["vks"])
     elif action["type"] == "click":
         return f"({action['x']}, {action['y']})"
     return "?"
@@ -84,6 +91,18 @@ class KeyboardTask:
                         kb_sim.hold_key(action["vk"], hold)
                     else:
                         kb_sim.tap_key(action["vk"])
+                elif action["type"] == "combo":
+                    vks = action["vks"]
+                    if not vks:
+                        continue
+                    if hold > 0:
+                        kb_sim.combo_press(vks)
+                        random_delay(hold, 0.05)
+                        kb_sim.combo_release(vks)
+                    else:
+                        kb_sim.combo_press(vks)
+                        random_delay(0.05, 0.02)
+                        kb_sim.combo_release(vks)
                 elif action["type"] == "click":
                     if hold > 0:
                         ms_sim.hold_click(action["x"], action["y"], hold)

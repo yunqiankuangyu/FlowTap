@@ -649,7 +649,7 @@ def add_key_action(app, task):
 
 
 def _start_capture(app, task):
-    """启动按键捕获：显示等待行 + QTimer 轮询"""
+    """启动按键捕获（支持任意组合键）：按住的键实时入集合，全部松开即确认"""
     task._capturing = True
 
     # 清除焦点，防止空格/回车触发"添加键位"按钮的点击事件
@@ -670,7 +670,7 @@ def _start_capture(app, task):
     num_lbl = _make_label("…", color=Colors.DIM)
     num_lbl.setFixedWidth(22)
     wl.addWidget(num_lbl)
-    desc_lbl = _make_label("⏳ 按下任意键...", font=FONT_B)
+    desc_lbl = _make_label("⏳ 按下并保持按键，全部松开完成绑定", font=FONT_B)
     desc_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
     wl.addWidget(desc_lbl, 1)
     task._action_layout.addWidget(waiting_row)
@@ -681,22 +681,40 @@ def _start_capture(app, task):
     for vk in range(0x08, 0x100):
         u32.GetAsyncKeyState(vk)
 
+    pressed = set()   # 当前按住的键集合
+    combo = []        # 参与组合的键（按按下顺序）
+
+    def _combo_text():
+        from vk_map import VK_NAME
+        names = [VK_NAME.get(vk, f"[{vk}]") for vk in combo]
+        return "+".join(names) if names else "..."
+
     poll_timer = QTimer()
+
     def poll_keys():
         if not task._capturing:
             poll_timer.stop()
             return
+        # 实时跟踪按下/松开
         for vk in range(0x08, 0x100):
-            if not task._capturing:
-                poll_timer.stop()
-                return
-            if u32.GetAsyncKeyState(vk) & 0x0001:
-                task._capturing = False
-                poll_timer.stop()
-                from config import load_settings as _ls
-                task.actions.append(make_key_action(vk, delay=_ls().get("default_delay", 0.5)))
-                QTimer.singleShot(0, lambda: _refresh_actions(app, task))
-                return
+            down = bool(u32.GetAsyncKeyState(vk) & 0x8000)
+            if down and vk not in pressed:
+                pressed.add(vk)
+                if vk not in combo:
+                    combo.append(vk)
+                desc_lbl.setText(f"⏳ {_combo_text()} （全部松开完成）")
+            elif not down and vk in pressed:
+                pressed.discard(vk)
+        # 有过按键且现在全部松开 → 确认组合
+        if combo and not pressed:
+            task._capturing = False
+            poll_timer.stop()
+            from config import load_settings as _ls
+            if len(combo) == 1:
+                task.actions.append(make_key_action(combo[0], delay=_ls().get("default_delay", 0.5)))
+            else:
+                task.actions.append(make_combo_action(list(combo), delay=_ls().get("default_delay", 0.5)))
+            QTimer.singleShot(0, lambda: _refresh_actions(app, task))
 
     poll_timer.timeout.connect(poll_keys)
     poll_timer.start(15)

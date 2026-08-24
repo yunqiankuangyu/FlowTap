@@ -83,6 +83,20 @@ class KeyboardSimulator:
             random_delay(duration, 0.05)
         self._send(self._make_keyboard_input(vk, scan, KEYEVENTF_KEYUP))
 
+    def combo_press(self, vks):
+        """依次按下多个键（组合键按下阶段，不释放）"""
+        for vk in vks:
+            scan = self.user32.MapVirtualKeyW(vk, 0)
+            self._send(self._make_keyboard_input(vk, scan))
+            random_delay(0.03, 0.02)
+
+    def combo_release(self, vks):
+        """逆序释放组合键"""
+        for vk in reversed(vks):
+            scan = self.user32.MapVirtualKeyW(vk, 0)
+            self._send(self._make_keyboard_input(vk, scan, KEYEVENTF_KEYUP))
+            random_delay(0.03, 0.02)
+
 
 class MouseSimulator:
     """鼠标输入模拟器"""
