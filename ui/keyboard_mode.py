@@ -100,7 +100,7 @@ def _make_label(text, font=None, color=None):
 
 
 HANDLE_H = 12
-BF_H = 66
+BF_H = 60
 
 
 def build_keyboard_mode(app):
@@ -185,7 +185,7 @@ def build_keyboard_mode(app):
         bf.sizePolicy().verticalPolicy()  # Fixed
     )
     bf_layout = QHBoxLayout(bf)
-    bf_layout.setContentsMargins(0, 11, 0, 0)
+    bf_layout.setContentsMargins(0, 6, 0, 0)
     bf_layout.setSpacing(3)
 
     new_btn = _make_btn("＋ 新建任务", bg=Colors.GREEN, hover=Colors.HOVER_GREEN, font=FONT_B, height=43)
