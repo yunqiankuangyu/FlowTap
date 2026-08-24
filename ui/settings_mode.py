@@ -580,6 +580,8 @@ def _rebuild_ui(app):
     from .keyboard_mode import build_keyboard_mode, auto_size
     from .settings_mode import build_settings_mode
 
+    app.setUpdatesEnabled(False)  # 重建期间冻结绘制，消除中间态闪烁
+
     # 清空中央布局（content_frame 整个被删了，内部框架一并销毁）
     while app._central_layout.count():
         item = app._central_layout.takeAt(0)
@@ -627,3 +629,8 @@ def _rebuild_ui(app):
 
     # 恢复窗口高度和透明度
     app.setWindowOpacity(load_settings().get("opacity", 1.0))
+    # 布局收敛后再恢复绘制，一次性呈现最终状态
+    app.centralWidget().layout().activate()
+    app.setFixedSize(app.width(), app.height())  # 锁定最终尺寸防布局漂移
+    app.setUpdatesEnabled(True)
+    app.update()
