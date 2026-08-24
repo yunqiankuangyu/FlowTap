@@ -1,5 +1,6 @@
 """
-设置页面 (PySide6) — 对齐原版 CTk 样式
+设置页面 (PySide6) — 分页：外观 / 功能
+顶部一行下拉切换，下方滚动内容 + 底部固定应用按钮
 """
 import sys
 import os
@@ -7,29 +8,94 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QSlider, QFrame
+    QSlider, QFrame, QLineEdit
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from config import Colors, FONT_B, FONT_M, THEMES, DEFAULT_THEME, load_settings, save_settings
 
+# 分页定义：页名 -> 该页包含的 section 构建函数名
+PAGE_APPEARANCE = "外观设置"
+PAGE_FUNCTION = "功能设置"
+
+
+def _make_section(parent_layout, title):
+    """通用 section 卡片骨架，返回内部 layout"""
+    frame = QFrame()
+    frame.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
+    v = QVBoxLayout(frame)
+    v.setContentsMargins(11, 11, 11, 11)
+
+    if title:
+        lbl = QLabel(title)
+        lbl.setFont(FONT_B)
+        lbl.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
+        v.addWidget(lbl)
+    parent_layout.addWidget(frame)
+    return v
+
 
 def build_settings_mode(app):
-    """构建设置页面"""
+    """构建设置页面（分页版）"""
     s = load_settings()
     layout = app.settings_layout
+    layout.setContentsMargins(10, 10, 10, 10)
 
-    # ── 透明度 ──
-    sf2 = QFrame()
-    sf2.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
-    sf2_layout = QVBoxLayout(sf2)
-    sf2_layout.setContentsMargins(11, 11, 11, 11)
+    # ── 页面切换下拉 ──
+    nav_row = QWidget()
+    nav_row.setStyleSheet("background: transparent;")
+    nav = QHBoxLayout(nav_row)
+    nav.setContentsMargins(0, 0, 0, 2)
+    nav.addStretch()
 
-    op_label = QLabel("👁 窗口透明度")
-    op_label.setFont(FONT_B)
-    op_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
-    sf2_layout.addWidget(op_label)
+    page_combo = QPushButton(PAGE_APPEARANCE)
+    page_combo.setFixedSize(110, 28)
+    page_combo.setFont(QFont("MiSans", 11, QFont.Bold))
+    page_combo.setCursor(Qt.PointingHandCursor)
+    page_combo.setStyleSheet(f"""
+        QPushButton {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 20px 2px 8px; text-align: left; }}
+        QPushButton::menu-indicator {{ image: none; subcontrol-origin: padding; subcontrol-position: right center; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid {Colors.DIM}; width: 0; height: 0; }}
+    """)
+    from PySide6.QtWidgets import QMenu
+    page_menu = QMenu(page_combo)
+    page_menu.setStyleSheet(f"""
+        QMenu {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: 1px solid {Colors.DIM}; border-radius: 4px; }}
+        QMenu::item {{ padding: 4px 14px; min-height: 24px; }}
+        QMenu::item:selected {{ background: {Colors.BLUE}; }}
+    """)
+    for name in (PAGE_APPEARANCE, PAGE_FUNCTION):
+        page_menu.addAction(name)
+    page_combo.setMenu(page_menu)
+
+    def _on_page(action):
+        page_combo.setText(action.text())
+        _show_page(app, action.text())
+    page_menu.triggered.connect(_on_page)
+
+    nav.addWidget(page_combo)
+    layout.addWidget(nav_row)
+
+    # ── 外观页容器 ──
+    appearance_page = QWidget()
+    appearance_page.setStyleSheet("background: transparent;")
+    ap_layout = QVBoxLayout(appearance_page)
+    ap_layout.setContentsMargins(0, 0, 0, 0)
+    ap_layout.setSpacing(10)
+    app._page_appearance = appearance_page
+
+    # ── 功能页容器 ──
+    function_page = QWidget()
+    function_page.setStyleSheet("background: transparent;")
+    fn_layout = QVBoxLayout(function_page)
+    fn_layout.setContentsMargins(0, 0, 0, 0)
+    fn_layout.setSpacing(10)
+    app._page_function = function_page
+
+    # ══════════ 外观设置 ══════════
+
+    # 透明度
+    v = _make_section(ap_layout, "👁 窗口透明度")
 
     op_row = QWidget()
     op_row.setStyleSheet("background: transparent;")
@@ -53,23 +119,14 @@ def build_settings_mode(app):
     op_val.setFixedWidth(45)
     app._opacity_lbl = op_val
 
-    slider.valueChanged.connect(lambda v: on_opacity_change(app, v))
+    slider.valueChanged.connect(lambda val: on_opacity_change(app, val))
 
     op_row_layout.addWidget(slider, 1)
     op_row_layout.addWidget(op_val)
-    sf2_layout.addWidget(op_row)
-    layout.addWidget(sf2)
+    v.addWidget(op_row)
 
-    # ── 主题 ──
-    sf3 = QFrame()
-    sf3.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
-    sf3_layout = QVBoxLayout(sf3)
-    sf3_layout.setContentsMargins(11, 11, 11, 11)
-
-    th_label = QLabel("🎨 色彩主题")
-    th_label.setFont(FONT_B)
-    th_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
-    sf3_layout.addWidget(th_label)
+    # 主题
+    v = _make_section(ap_layout, "🎨 色彩主题")
 
     themes_grid = QWidget()
     themes_grid.setStyleSheet("background: transparent;")
@@ -93,33 +150,24 @@ def build_settings_mode(app):
         app._theme_buttons[name] = btn
         grid.addWidget(btn, i // 3, i % 3)
 
-    # 让三列等宽
     grid.setColumnStretch(0, 1)
     grid.setColumnStretch(1, 1)
     grid.setColumnStretch(2, 1)
+    v.addWidget(themes_grid)
 
-    sf3_layout.addWidget(themes_grid)
-
-    # 主题预览
     app._preview_frame = QWidget()
     app._preview_frame.setStyleSheet("background: transparent;")
     app._preview_layout = QVBoxLayout(app._preview_frame)
     app._preview_layout.setContentsMargins(0, 0, 0, 0)
-    sf3_layout.addWidget(app._preview_frame)
+    v.addWidget(app._preview_frame)
     update_preview(app, s["theme"])
 
-    layout.addWidget(sf3)
+    ap_layout.addStretch()
 
-    # ── 全局停止热键 ──
-    sf4 = QFrame()
-    sf4.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
-    sf4_layout = QVBoxLayout(sf4)
-    sf4_layout.setContentsMargins(11, 11, 11, 11)
+    # ══════════ 功能设置 ══════════
 
-    hk_label = QLabel("⌨ 全局停止热键")
-    hk_label.setFont(FONT_B)
-    hk_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
-    sf4_layout.addWidget(hk_label)
+    # 全局停止热键
+    v = _make_section(fn_layout, "⌨ 全局停止热键")
 
     hk_row = QWidget()
     hk_row.setStyleSheet("background: transparent;")
@@ -153,27 +201,16 @@ def build_settings_mode(app):
     hk_btn.clicked.connect(on_capture_hotkey)
     hk_row_layout.addWidget(hk_btn)
 
-    sf4_layout.addWidget(hk_row)
+    v.addWidget(hk_row)
 
     hk_hint = QLabel("任意界面按下该键立即停止所有任务")
     hk_hint.setFont(QFont("MiSans", 12, QFont.Bold))
     hk_hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
-    sf4_layout.addWidget(hk_hint)
+    v.addWidget(hk_hint)
 
-    layout.addWidget(sf4)
+    # 窗口标题
+    v = _make_section(fn_layout, "🏷 窗口标题")
 
-    # ── 标题自定义 ──
-    sf5 = QFrame()
-    sf5.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
-    sf5_layout = QVBoxLayout(sf5)
-    sf5_layout.setContentsMargins(11, 11, 11, 11)
-
-    ti_label = QLabel("🏷 窗口标题")
-    ti_label.setFont(FONT_B)
-    ti_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
-    sf5_layout.addWidget(ti_label)
-
-    from PySide6.QtWidgets import QLineEdit
     ti_row = QWidget()
     ti_row.setStyleSheet("background: transparent;")
     ti_row_layout = QHBoxLayout(ti_row)
@@ -209,8 +246,15 @@ def build_settings_mode(app):
     ti_apply_btn.clicked.connect(_apply_title)
     ti_row_layout.addWidget(ti_apply_btn)
 
-    sf5_layout.addWidget(ti_row)
-    layout.addWidget(sf5)
+    v.addWidget(ti_row)
+
+    fn_layout.addStretch()
+
+    # 挂到布局（初始显示外观页）
+    layout.addWidget(appearance_page)
+    layout.addWidget(function_page)
+    function_page.hide()
+    app._settings_page_combo = page_combo
 
     # 应用按钮占位：由 app._settings_scroll 把它固定在滚动区下方
     apply_btn = QPushButton("✓ 应用")
@@ -222,6 +266,16 @@ def build_settings_mode(app):
     """)
     apply_btn.clicked.connect(lambda: apply_settings(app))
     app._settings_apply_btn = apply_btn
+
+
+def _show_page(app, name):
+    """切换分页显示"""
+    if name == PAGE_APPEARANCE:
+        app._page_appearance.show()
+        app._page_function.hide()
+    else:
+        app._page_appearance.hide()
+        app._page_function.show()
 
 
 def on_opacity_change(app, v):
@@ -261,7 +315,7 @@ def update_preview(app, theme_name):
         if item.widget():
             item.widget().deleteLater()
 
-    # 文字预览条（corner_radius=8, height=50, fill="x"）
+    # 文字预览条
     bar = QFrame()
     bar.setFixedHeight(50)
     bar.setStyleSheet(f"background: {t['CARD']}; border-radius: 8px;")
@@ -280,7 +334,7 @@ def update_preview(app, theme_name):
 
     app._preview_layout.addWidget(bar)
 
-    # 色条（corner_radius=4, height=20）
+    # 色条
     colors_row = QWidget()
     colors_row.setStyleSheet("background: transparent;")
     colors_layout = QHBoxLayout(colors_row)
@@ -306,10 +360,11 @@ def apply_settings(app):
     save_settings({
         "opacity": app._opacity_slider.value() / 100.0,
         "theme": app._current_theme,
+        "window_title": getattr(app._title_edit, "text", lambda: "")().strip(),
+        "stop_hotkey": app._stop_hotkey,
     })
     import subprocess
     if getattr(sys, "frozen", False):
-        # exe：直接重启自身
         subprocess.Popen([sys.argv[0]])
     else:
         script = os.path.abspath(sys.argv[0])
