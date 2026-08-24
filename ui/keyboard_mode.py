@@ -206,7 +206,7 @@ def build_bottom_bar(app, buttons):
     bar.setFixedHeight(BF_H)
     bar.setMinimumHeight(BF_H)
     bar_layout = QHBoxLayout(bar)
-    bar_layout.setContentsMargins(0, 2, 0, 0)
+    bar_layout.setContentsMargins(2, 2, 2, 0)
     bar_layout.setSpacing(3)
 
     btns = []
