@@ -175,7 +175,7 @@ class App(QMainWindow):
             self._central_layout.addWidget(self.content_frame)
             # 设置页套一层滚动区，内容多时不挤压
             self.content_layout.addWidget(self._settings_scroll())
-            self.setFixedSize(360, 540)
+            # 窗口只有一个：高度保持当前值（由任务页 auto_size/拖动决定），不因切页变化
 
     def _scroll_style(self):
         """设置页滚动区样式（主题相关，可重复刷新）"""

@@ -637,7 +637,6 @@ def _rebuild_ui(app):
     if app._current_mode == "keyboard":
         from .keyboard_mode import auto_size as _as
         _as(app)   # auto_size 内部会以正确高度重新 setFixedSize(360, h)
-    elif app._current_mode == "settings":
-        app.setFixedSize(360, 540)
+    # 设置页不另设尺寸：窗口高度只有一个来源（任务页 auto_size / 拖动）
     app.setUpdatesEnabled(True)
     app.update()
