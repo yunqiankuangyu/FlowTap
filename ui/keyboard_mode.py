@@ -77,10 +77,12 @@ def _make_menu_combo(items, width=80, on_select=None):
 
 
 
-def _make_btn(text, bg=None, fg=None, hover=None, font=None, height=25):
+def _make_btn(text, bg=None, fg=None, hover=None, font=None, height=25, width=None):
     btn = QPushButton(text)
     btn.setFont(font or FONT_M)
     btn.setFixedHeight(height)
+    if width:
+        btn.setFixedWidth(width)
     btn.setCursor(QCursor(Qt.PointingHandCursor))
     bg = bg or Colors.BLUE
     fg = fg or Colors.TEXT
@@ -464,6 +466,8 @@ def create_card(app, task):
     clear_btn = _make_btn("清空", bg=Colors.DIM, hover=Colors.ACCENT, height=25)
     clear_btn.clicked.connect(lambda: clear_actions(app, task))
     af_layout.addWidget(clear_btn)
+
+    af_layout.addStretch()  # 按钮按字长自适应，靠左排列
 
     card_layout.addWidget(af)
 
