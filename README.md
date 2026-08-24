@@ -84,6 +84,9 @@ FlowTap/
 - Appearance page order: 窗口标题 → 窗口透明度 → 色彩主题
 - Settings fonts slimmed, tighter section spacing, slimmer apply button
 
+**Fixed**
+- Opacity label showed 8900% instead of 89% (percent-format multiplied the already-percent value)
+
 ### v3.4 — Global Stop Hotkey & Run Limit
 
 **New**
