@@ -565,13 +565,14 @@ def apply_settings(app):
     # 主题即时生效：重设 Colors 类属性后重建 UI（样式表都是构建时插值的）
     Colors.apply(s["theme"])
     _rebuild_ui(app)
-    show_notification(app, "✓ 设置已应用")
+    # 重建完成后再弹通知，避免通知面板随旧UI销毁而卡死常驻
+    show_notification(app, "✓ 设置已应用", duration_ms=1500)
 
 
-def show_notification(app, text):
+def show_notification(app, text, duration_ms=2000):
     """浮动通知（转发 keyboard_mode 实现）"""
     from .keyboard_mode import show_floating_notification
-    show_floating_notification(app, text)
+    show_floating_notification(app, text, duration_ms)
 
 
 def _rebuild_ui(app):
@@ -582,6 +583,7 @@ def _rebuild_ui(app):
 
     app.setUpdatesEnabled(False)  # 重建期间冻结绘制，消除中间态闪烁
     frozen_size = (app.width(), app.height())  # 记住当前尺寸，重建后原样锁回
+    app._floating_panel = None  # 旧通知面板将随旧UI销毁，清引用防定时器打在死对象上
 
     # 清空中央布局（content_frame 整个被删了，内部框架一并销毁）
     while app._central_layout.count():
@@ -621,7 +623,6 @@ def _rebuild_ui(app):
     app._central_layout.setContentsMargins(0, 0, 0, 0)
     app._central_layout.setSpacing(0)
 
-    app._settings_scroller = None  # 设置滚动容器带旧样式，强制重建
     app._titlebar = build_titlebar(app)
     build_keyboard_mode(app)
     build_settings_mode(app)

@@ -1103,7 +1103,11 @@ def show_floating_notification(app, text, duration_ms=2000):
 
 def hide_floating_notification(app):
     """隐藏悬浮通知"""
-    if hasattr(app, '_floating_panel') and app._floating_panel:
-        app._floating_panel.hide()
-        app._floating_panel.deleteLater()
+    panel = getattr(app, '_floating_panel', None)
+    if panel:
+        try:
+            panel.hide()
+            panel.deleteLater()
+        except RuntimeError:
+            pass  # 面板已随UI重建销毁
         app._floating_panel = None

@@ -177,10 +177,38 @@ class App(QMainWindow):
             self.content_layout.addWidget(self._settings_scroll())
             self.setFixedSize(360, 540)
 
+    def _scroll_style(self):
+        """设置页滚动区样式（主题相关，可重复刷新）"""
+        return f"""
+            QScrollArea {{ background: {Colors.CARD}; border: none; }}
+            QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
+            QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
+            QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+        """
+
+    def refresh_settings_scroll_style(self):
+        """主题切换时只刷新滚动区样式，不销毁重建（避免滚动条闪烁）"""
+        sc = self._settings_scroller
+        if sc is None:
+            return
+        for child in sc.findChildren(QScrollArea):
+            child.setStyleSheet(self._scroll_style())
+
     def _settings_scroll(self):
         """设置页滚动容器（懒建，复用）：滚动内容 + 底部固定应用按钮"""
         if getattr(self, '_settings_scroller', None) is not None:
-            return self._settings_scroller
+            # 容器还在：settings_frame 可能刚被重建，重新挂进去并刷新样式
+            from .settings_mode import build_settings_mode  # noqa: F401
+            sc = self._settings_scroller
+            layout_item = sc.layout().itemAt(0)
+            old_scroll = layout_item.widget() if layout_item else None
+            if old_scroll is not None and old_scroll.widget() is not self.settings_frame:
+                old_scroll.setWidget(self.settings_frame)
+                old_scroll.setStyleSheet(self._scroll_style())
+            return sc
+
         from .settings_mode import build_settings_mode  # noqa: F401 (按钮已建在 self 上)
 
         wrapper = QWidget()
@@ -191,14 +219,7 @@ class App(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{ background: {Colors.CARD}; border: none; }}
-            QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
-            QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
-            QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
-        """)
+        scroll.setStyleSheet(self._scroll_style())
         scroll.setWidget(self.settings_frame)
 
         w_layout.addWidget(scroll, 1)
