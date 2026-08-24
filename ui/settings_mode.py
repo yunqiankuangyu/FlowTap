@@ -29,7 +29,7 @@ def _make_section(parent_layout, title):
     frame = QFrame()
     frame.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
     v = QVBoxLayout(frame)
-    v.setContentsMargins(11, 11, 11, 11)
+    v.setContentsMargins(11, 6, 11, 6)
 
     if title:
         lbl = QLabel(title)
@@ -84,7 +84,7 @@ def build_settings_mode(app):
     appearance_page.setStyleSheet("background: transparent;")
     ap_layout = QVBoxLayout(appearance_page)
     ap_layout.setContentsMargins(0, 0, 0, 0)
-    ap_layout.setSpacing(5)
+    ap_layout.setSpacing(2)
     app._page_appearance = appearance_page
 
     # ── 功能页容器 ──
