@@ -453,11 +453,11 @@ def create_card(app, task):
     af_layout.setContentsMargins(0, 0, 0, 0)
     af_layout.setSpacing(3)
 
-    add_key_btn = _make_btn("⌨ 添加键位", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+    add_key_btn = _make_btn("⌨ +键位", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
     add_key_btn.clicked.connect(lambda: add_key_action(app, task))
     af_layout.addWidget(add_key_btn)
 
-    add_click_btn = _make_btn("🖱 添加点击", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+    add_click_btn = _make_btn("🖱 +点击", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
     add_click_btn.clicked.connect(lambda: add_click_action(app, task))
     af_layout.addWidget(add_click_btn)
 
