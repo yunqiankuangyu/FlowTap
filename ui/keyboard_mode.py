@@ -176,18 +176,8 @@ def build_keyboard_mode(app):
     app._task_scroll.setWidget(app._task_container)
     kf_layout.addWidget(app._task_scroll, 1)
 
-    # ── 底部按钮栏（统一构建器）──
-    bf, btns = build_bottom_bar(app, [
-        ("＋ 新建任务", Colors.GREEN, Colors.HOVER_GREEN, app._add_task),
-        ("▶ 全部开始", Colors.GREEN, Colors.HOVER_GREEN, app._toggle_all),
-    ])
-    app._all_btn = btns[1]
-
-    kf_layout.addWidget(bf)
-
-    # ── 拖动条（最底部，indicator 居中，最小高度保护）──
-    handle = _build_drag_handle(app)
-    kf_layout.addWidget(handle)
+    # 底部栏和拖动条已升级为窗口级常驻控件（见 app._show_mode），页面不含它们
+    app._all_btn = app._bottom_btns[1] if getattr(app, '_bottom_btns', None) else None
     # 初始化
     app._floating_panel = None
     app._floating_timer = None

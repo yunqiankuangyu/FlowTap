@@ -170,12 +170,35 @@ class App(QMainWindow):
         if mode == "keyboard":
             self._central_layout.addWidget(self.content_frame)
             self.content_layout.addWidget(self.keyboard_frame)
-            QTimer.singleShot(150, self._auto_size)
         elif mode == "settings":
             self._central_layout.addWidget(self.content_frame)
-            # 设置页套一层滚动区，内容多时不挤压
             self.content_layout.addWidget(self._settings_scroll())
-            # 窗口只有一个：高度保持当前值（由任务页 auto_size/拖动决定），不因切页变化
+
+        # 常驻底部栏 + 拖动条：挂在 central_layout，永远在内容区之下、窗口最底
+        # （顺序：titlebar → content → bar → handle）
+        self._ensure_bottom_bar(self._buttons_for(mode))
+        if getattr(self, '_drag_handle', None) is None:
+            from .keyboard_mode import _build_drag_handle
+            self._drag_handle = _build_drag_handle(self)
+        # 重排（takeAt 之前可能已把全部移出，这里统一按序挂回）
+        self._central_layout.addWidget(self._bottom_bar)
+        self._central_layout.addWidget(self._drag_handle)
+
+        if mode == "keyboard":
+            QTimer.singleShot(150, self._auto_size)
+        # 窗口只有一个：高度由任务页 auto_size/拖动决定，切页不变
+
+    def _buttons_for(self, mode):
+        """各页的底部栏按钮配置"""
+        if mode == "keyboard":
+            return [
+                ("＋ 新建任务", Colors.GREEN, Colors.HOVER_GREEN, self._add_task),
+                ("▶ 全部开始", Colors.GREEN, Colors.HOVER_GREEN, self._toggle_all),
+            ]
+        from .settings_mode import apply_settings
+        return [
+            ("✓ 应用", Colors.GREEN, Colors.HOVER_GREEN, lambda: apply_settings(self)),
+        ]
 
     def _scroll_style(self):
         """设置页滚动区样式（主题相关，可重复刷新）"""
@@ -196,43 +219,45 @@ class App(QMainWindow):
         for child in sc.findChildren(QScrollArea):
             child.setStyleSheet(self._scroll_style())
 
+    def _ensure_bottom_bar(self, buttons):
+        """常驻底部栏：全局只建一次；按钮集变化时原地重建按钮，栏/几何参数不动"""
+        from .keyboard_mode import build_bottom_bar
+        if getattr(self, '_bottom_bar', None) is None:
+            bar, btns = build_bottom_bar(self, buttons)
+            self._bottom_bar = bar
+            self._bottom_btns = btns
+        else:
+            # 原地换按钮：清掉旧的，按新配置重建（栏本身不动）
+            bar = self._bottom_bar
+            lay = bar.layout()
+            while lay.count():
+                it = lay.takeAt(0)
+                if it.widget():
+                    it.widget().deleteLater()
+            from .keyboard_mode import _make_btn, FONT_B
+            from config import Colors
+            self._bottom_btns = []
+            for text, bg, hover, cb in buttons:
+                btn = _make_btn(text, bg=bg, hover=hover, font=FONT_B, height=43)
+                btn.clicked.connect(cb)
+                lay.addWidget(btn)
+                self._bottom_btns.append(btn)
+        return self._bottom_bar
+
     def _settings_scroll(self):
-        """设置页滚动容器（懒建，复用）：滚动内容 + 底部固定应用按钮"""
+        """设置页滚动容器（懒建，复用）：滚动内容 + 常驻底部栏 + 常驻拖动条"""
         if getattr(self, '_settings_scroller', None) is not None:
             # 容器还在：settings_frame 可能刚被重建，重新挂进去并刷新样式
-            from .settings_mode import build_settings_mode  # noqa: F401
             sc = self._settings_scroller
             layout_item = sc.layout().itemAt(0)
             old_scroll = layout_item.widget() if layout_item else None
             if old_scroll is not None and old_scroll.widget() is not self.settings_frame:
                 old_scroll.setWidget(self.settings_frame)
                 old_scroll.setStyleSheet(self._scroll_style())
-            # 拖动条幂等维护：移除所有旧拖动条（≤12px的透明小控件），只挂一个新的
-            from .keyboard_mode import _build_drag_handle, HANDLE_H
-            layout = sc.layout()
-            while True:
-                found = False
-                for i in range(layout.count()):
-                    it = layout.itemAt(i)
-                    wd = it.widget()
-                    if wd is not None and wd is not sc and wd.height() <= HANDLE_H:
-                        layout.takeAt(i)
-                        wd.setParent(None)
-                        wd.deleteLater()
-                        found = True
-                        break
-                if not found:
-                    break
-            layout.addWidget(_build_drag_handle(self))
             return sc
-
-        from .keyboard_mode import build_bottom_bar, _build_drag_handle
-        from .settings_mode import apply_settings
 
         wrapper = QWidget()
         w_layout = QVBoxLayout(wrapper)
-        w_layout.setContentsMargins(0, 0, 0, 0)
-        w_layout.setSpacing(0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -241,17 +266,6 @@ class App(QMainWindow):
         scroll.setWidget(self.settings_frame)
 
         w_layout.addWidget(scroll, 1)
-
-        # 统一底部栏：设置页只放一个"应用"按钮（与任务页同款构建器/高度/样式）
-        bar, btns = build_bottom_bar(self, [
-            ("✓ 应用", Colors.GREEN, Colors.HOVER_GREEN, lambda: apply_settings(self)),
-        ])
-        self._settings_apply_btn = btns[0]
-        w_layout.addWidget(bar)
-
-        # 底部拖动条（与任务页同款，共享高度调整逻辑）
-        handle = _build_drag_handle(self)
-        w_layout.addWidget(handle)
 
         self._settings_scroller = wrapper
         return wrapper
