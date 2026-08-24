@@ -16,8 +16,8 @@ from PySide6.QtGui import QFont
 from config import Colors, FONT_B, FONT_M, THEMES, DEFAULT_THEME, load_settings, save_settings
 
 # 设置页专用字体：比全局小 3px
-_FB = QFont("MiSans", 10, QFont.Bold)
-_FM = QFont("MiSans", 10, QFont.Bold)
+_FB = QFont("MiSans", 11, QFont.Bold)
+_FM = QFont("MiSans", 11, QFont.Bold)
 
 # 分页定义：页名 -> 该页包含的 section 构建函数名
 PAGE_APPEARANCE = "外观设置"
@@ -54,7 +54,7 @@ def build_settings_mode(app):
 
     page_combo = QPushButton(PAGE_APPEARANCE)
     page_combo.setFixedHeight(28)
-    page_combo.setFont(QFont("MiSans", 8, QFont.Bold))
+    page_combo.setFont(QFont("MiSans", 10, QFont.Bold))
     page_combo.setCursor(Qt.PointingHandCursor)
     page_combo.setStyleSheet(f"""
         QPushButton {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 20px 2px 8px; text-align: left; }}
@@ -177,7 +177,7 @@ def build_settings_mode(app):
     app._title_edit = QLineEdit(s.get("window_title", ""))
     app._title_edit.setPlaceholderText("⚡ 工具（默认）")
     app._title_edit.setFixedHeight(28)
-    app._title_edit.setFont(QFont("MiSans", 8, QFont.Bold))
+    app._title_edit.setFont(QFont("MiSans", 10, QFont.Bold))
     app._title_edit.setStyleSheet(f"""
         QLineEdit {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
     """)
@@ -246,7 +246,7 @@ def build_settings_mode(app):
     v.addWidget(hk_row)
 
     hk_hint = QLabel("任意界面按下该键立即停止所有任务")
-    hk_hint.setFont(QFont("MiSans", 9, QFont.Bold))
+    hk_hint.setFont(QFont("MiSans", 10, QFont.Bold))
     hk_hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
     v.addWidget(hk_hint)
 
@@ -352,7 +352,7 @@ def update_preview(app, theme_name):
     app._preview_layout.addWidget(colors_row)
 
     hint = QLabel("选择后点「✓ 应用」重启生效")
-    hint.setFont(QFont("MiSans", 9, QFont.Bold))
+    hint.setFont(QFont("MiSans", 10, QFont.Bold))
     hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
     app._preview_layout.addWidget(hint)
 
