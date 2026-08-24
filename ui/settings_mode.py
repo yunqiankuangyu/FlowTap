@@ -447,7 +447,7 @@ def build_settings_mode(app):
     # 应用按钮占位：由 app._settings_scroll 把它固定在滚动区下方
     apply_btn = QPushButton("✓ 应用")
     apply_btn.setFont(_FB)
-    apply_btn.setFixedHeight(48)
+    apply_btn.setFixedHeight(36)
     apply_btn.setStyleSheet(f"""
         QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 6px; }}
         QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
