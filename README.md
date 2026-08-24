@@ -64,6 +64,35 @@ FlowTap/
 | v3.2 | PySide6 | Hold-to-press for key & mouse bindings |
 | v3.3 | PySide6 | Optimized partial font display |
 | v3.4 | PySide6 | Global stop hotkey & run-count limit |
+| v3.5 | PySide6 | Key combos, settings pages, portable exe |
+
+### v3.5 — Key Combos, Settings Pages & Portable Build
+
+**New**
+- **Arbitrary key combos** — Bind W+D style combinations: press and hold any keys (ESC included), release all to confirm. Playback presses them together, holds for the "持续" duration, releases in reverse. Single keys behave exactly as before; old presets fully compatible
+- **Settings split into two pages** — 外观设置 (window title, opacity, theme) and 功能设置 (global start F7 & stop F8 hotkeys, new-task defaults, start countdown, always-on-top, remember window height, preset import/export), switched by a dropdown
+- **Global start hotkey** — F7 (customizable) mirrors the stop hotkey
+- **Preset import/export** — Back up all presets to a JSON file and merge them back on another machine
+- **Portable exe** — Single-file Windows build; settings/presets/logs live next to the exe; auto-elevation and apply-restart work frozen
+
+**Changed**
+- Default theme is now 冰川蓝 at 90% opacity for fresh installs
+- Bottom bar & drag handle are window-level persistent widgets — pixel-identical geometry across pages, only the buttons swap (新建任务/全部开始 ↔ 应用)
+- Settings page gets the same bottom bar and drag handle as the task page
+- Window height is governed by one source (task-page auto-size + user drag); switching pages never resizes the window
+- Task-area height only grows once content exceeds the initial viewport (~3 collapsed cards), per-task growth halved
+- Appearance page order: 窗口标题 → 窗口透明度 → 色彩主题
+- Settings fonts slimmed, tighter section spacing, slimmer apply button
+
+**Fixed**
+- Apply button spawned a second window — settings now apply in-place (theme rebuilds live, no process restart)
+- Blank window after applying a theme (Qt double-layout bug)
+- Transient horizontal stretch while applying (repaints frozen during rebuild; scrollbar always-on)
+- Settings scrollbar reset flash on apply (scroll container preserved, only re-parented)
+- "✓ 设置已应用" toast stuck forever after rebuild
+- Opacity label showed 8900% instead of 89%
+- Drag handles accumulated on every visit to the settings page
+- Window height snowballed on repeated applies
 
 ### v3.4 — Global Stop Hotkey & Run Limit
 
