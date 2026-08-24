@@ -273,29 +273,33 @@ def build_keyboard_mode(app):
     # 初始化
     app._floating_panel = None
     app._floating_timer = None
-    app._tracked_height = 220
+    from .keyboard_mode import BASE_WINDOW_H
+    app._tracked_height = BASE_WINDOW_H
     app._cards = []
 
 
+# 基准窗口高度（用户可拖动调整，auto_size 只读不写）
+BASE_WINDOW_H = 220
+
+
 def auto_size(app):
-    """自动调整窗口高度"""
-    from config import load_settings, save_settings
-    remember = load_settings().get("remember_height", True)
-    count = len(app.keyboard_tasks)
-    if count == 0:
-        if remember:
-            h = load_settings().get("window_height", 220)
-        else:
-            h = 220
-    else:
-        content = 0
-        for t in app.keyboard_tasks:
-            content += 36
-            if t.actions:
-                content += 17
-        base = load_settings().get("window_height", 220) if remember else 220
-        h = base + content
-    h = max(220, min(600, h))
+    """自动调整窗口高度：内容超出基准可视区才增长，未超出就保持基准"""
+    from config import load_settings
+    settings = load_settings()
+    base = settings.get("window_height", BASE_WINDOW_H) if settings.get("remember_height", True) else BASE_WINDOW_H
+
+    # 任务内容总高
+    content = 0
+    for t in app.keyboard_tasks:
+        content += 36
+        if t.actions:
+            content += 17
+
+    # 窗口高度 = 固定框架部分(标题栏40+预设栏39+按钮栏77+拖动条12≈168) + max(内容, 最小可视区)
+    # 基准高度里预留的可视区约 52px（够放~3张折叠卡片），内容没超它就不涨窗
+    min_viewport = base - 168
+    viewport = max(min_viewport, content)
+    h = max(base, min(600, 168 + viewport))
     app._tracked_height = h
     app.setFixedSize(360, h)
     # 注意：这里不回写 window_height——该值只代表"用户拖动的基准高度"，

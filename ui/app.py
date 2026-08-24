@@ -42,7 +42,7 @@ class App(QMainWindow):
         self.next_task_id = 1
         self._current_mode = "keyboard"
         self._mini_window = None
-        self._tracked_height = 220
+        self._tracked_height = 220  # 基准高度，与 keyboard_mode.BASE_WINDOW_H 一致
         self._ready = False  # 初始化完成前禁用所有操作
 
         # 全局停止热键（_build_ui 的设置页要用，必须先初始化）
