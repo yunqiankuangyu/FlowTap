@@ -97,6 +97,47 @@ def build_settings_mode(app):
 
     # ══════════ 外观设置 ══════════
 
+    # 窗口标题（外观页：改标题属于外观个性化）
+    v2 = _make_section(ap_layout, "🏷 窗口标题")
+
+    ti_row = QWidget()
+    ti_row.setStyleSheet("background: transparent;")
+    ti_row_layout = QHBoxLayout(ti_row)
+    ti_row_layout.setContentsMargins(0, 0, 0, 0)
+    ti_row_layout.setSpacing(6)
+
+    app._title_edit = QLineEdit(s.get("window_title", ""))
+    app._title_edit.setPlaceholderText("⚡ 工具（默认）")
+    app._title_edit.setFixedHeight(28)
+    app._title_edit.setFont(QFont("MiSans", 10, QFont.Bold))
+    app._title_edit.setStyleSheet(f"""
+        QLineEdit {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
+    """)
+    ti_row_layout.addWidget(app._title_edit, 1)
+
+    def _apply_title():
+        text = app._title_edit.text().strip()
+        s2 = load_settings()
+        s2["window_title"] = text
+        save_settings(s2)
+        app._title_label.setText(text or "⚡ 工具")
+        from .keyboard_mode import show_floating_notification
+        show_floating_notification(app, "✓ 标题已更新" if text else "✓ 已恢复默认标题")
+    ti_apply_btn = QPushButton("应用")
+    ti_apply_btn.setFont(_FM)
+    ti_apply_btn.setFixedHeight(28)
+    ti_apply_btn.setFixedWidth(52)
+    ti_apply_btn.setCursor(Qt.PointingHandCursor)
+    ti_apply_btn.setStyleSheet(f"""
+        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+        QPushButton:hover {{ background: {Colors.ACCENT}; }}
+    """)
+    ti_apply_btn.clicked.connect(_apply_title)
+    ti_row_layout.addWidget(ti_apply_btn)
+
+    v2.addWidget(ti_row)
+
+
     # 透明度
     v = _make_section(ap_layout, "👁 窗口透明度")
 
@@ -164,47 +205,6 @@ def build_settings_mode(app):
     app._preview_layout.setContentsMargins(0, 0, 0, 0)
     v.addWidget(app._preview_frame)
     update_preview(app, s["theme"])
-
-    # 窗口标题（外观页：改标题属于外观个性化）
-    v2 = _make_section(ap_layout, "🏷 窗口标题")
-
-    ti_row = QWidget()
-    ti_row.setStyleSheet("background: transparent;")
-    ti_row_layout = QHBoxLayout(ti_row)
-    ti_row_layout.setContentsMargins(0, 0, 0, 0)
-    ti_row_layout.setSpacing(6)
-
-    app._title_edit = QLineEdit(s.get("window_title", ""))
-    app._title_edit.setPlaceholderText("⚡ 工具（默认）")
-    app._title_edit.setFixedHeight(28)
-    app._title_edit.setFont(QFont("MiSans", 10, QFont.Bold))
-    app._title_edit.setStyleSheet(f"""
-        QLineEdit {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
-    """)
-    ti_row_layout.addWidget(app._title_edit, 1)
-
-    def _apply_title():
-        text = app._title_edit.text().strip()
-        s2 = load_settings()
-        s2["window_title"] = text
-        save_settings(s2)
-        app._title_label.setText(text or "⚡ 工具")
-        from .keyboard_mode import show_floating_notification
-        show_floating_notification(app, "✓ 标题已更新" if text else "✓ 已恢复默认标题")
-    ti_apply_btn = QPushButton("应用")
-    ti_apply_btn.setFont(_FM)
-    ti_apply_btn.setFixedHeight(28)
-    ti_apply_btn.setFixedWidth(52)
-    ti_apply_btn.setCursor(Qt.PointingHandCursor)
-    ti_apply_btn.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {Colors.ACCENT}; }}
-    """)
-    ti_apply_btn.clicked.connect(_apply_title)
-    ti_row_layout.addWidget(ti_apply_btn)
-
-    v2.addWidget(ti_row)
-
     ap_layout.addStretch()
 
     # ══════════ 功能设置 ══════════
