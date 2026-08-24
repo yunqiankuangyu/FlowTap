@@ -84,16 +84,6 @@ FlowTap/
 - Appearance page order: 窗口标题 → 窗口透明度 → 色彩主题
 - Settings fonts slimmed, tighter section spacing, slimmer apply button
 
-**Fixed**
-- Apply button spawned a second window — settings now apply in-place (theme rebuilds live, no process restart)
-- Blank window after applying a theme (Qt double-layout bug)
-- Transient horizontal stretch while applying (repaints frozen during rebuild; scrollbar always-on)
-- Settings scrollbar reset flash on apply (scroll container preserved, only re-parented)
-- "✓ 设置已应用" toast stuck forever after rebuild
-- Opacity label showed 8900% instead of 89%
-- Drag handles accumulated on every visit to the settings page
-- Window height snowballed on repeated applies
-
 ### v3.4 — Global Stop Hotkey & Run Limit
 
 **New**
@@ -113,7 +103,6 @@ FlowTap/
 
 **Fixed**
 - **Key capture focus** — Clear button focus before capturing keys, so Space/Enter no longer triggers the "添加键位" button click (space key could not be bound and created extra capture rows)
-- **Spinbox suffix style** — The "s" unit suffix for both "持续" and "后延" inputs is now an independent DIM-colored label, matching the "持续"/"后延" text style
 
 **Changed**
 - Main window width increased from 346px to 360px (+5%)
