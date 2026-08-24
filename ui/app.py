@@ -183,6 +183,10 @@ class App(QMainWindow):
         self._central_layout.addWidget(self._bottom_bar)
         self._central_layout.addWidget(self._drag_handle)
 
+        # "全部开始/停止"按钮绑定：必须在 _ensure_bottom_bar 之后（按钮组已按当前页重建）
+        if mode == "keyboard" and len(self._bottom_btns) >= 2:
+            self._all_btn = self._bottom_btns[1]
+
         if mode == "keyboard":
             QTimer.singleShot(150, self._auto_size)
         # 窗口只有一个：高度由任务页 auto_size/拖动决定，切页不变

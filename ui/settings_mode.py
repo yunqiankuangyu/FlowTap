@@ -576,6 +576,15 @@ def _rebuild_ui(app):
     frozen_size = (app.width(), app.height())  # 记住当前尺寸，重建后原样锁回
     app._floating_panel = None  # 旧通知面板将随旧UI销毁，清引用防定时器打在死对象上
 
+    # 常驻控件（底部栏/拖动条）先脱离 central，避免随旧UI销毁
+    for attr in ('_bottom_bar', '_drag_handle'):
+        wd = getattr(app, attr, None)
+        if wd is not None:
+            try:
+                wd.setParent(None)
+            except RuntimeError:
+                pass
+
     # 清空中央布局（content_frame 整个被删了，内部框架一并销毁）
     while app._central_layout.count():
         item = app._central_layout.takeAt(0)

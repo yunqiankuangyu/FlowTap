@@ -176,8 +176,8 @@ def build_keyboard_mode(app):
     app._task_scroll.setWidget(app._task_container)
     kf_layout.addWidget(app._task_scroll, 1)
 
-    # 底部栏和拖动条已升级为窗口级常驻控件（见 app._show_mode），页面不含它们
-    app._all_btn = app._bottom_btns[1] if getattr(app, '_bottom_btns', None) else None
+    # 底部栏和拖动条是窗口级常驻控件，按钮组由 app._show_mode 按当前页管理；
+    # "全部开始/停止"按钮引用在 _show_mode('keyboard') 时绑定到 app._bottom_btns[1]
     # 初始化
     app._floating_panel = None
     app._floating_timer = None
