@@ -100,7 +100,7 @@ def _make_label(text, font=None, color=None):
 
 
 HANDLE_H = 12
-BF_H = 60
+BF_H = 52
 
 
 def build_keyboard_mode(app):
@@ -206,7 +206,7 @@ def build_bottom_bar(app, buttons):
     bar.setFixedHeight(BF_H)
     bar.setMinimumHeight(BF_H)
     bar_layout = QHBoxLayout(bar)
-    bar_layout.setContentsMargins(0, 6, 0, 0)
+    bar_layout.setContentsMargins(0, 2, 0, 0)
     bar_layout.setSpacing(3)
 
     btns = []
