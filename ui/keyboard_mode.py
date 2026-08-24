@@ -77,12 +77,16 @@ def _make_menu_combo(items, width=80, on_select=None):
 
 
 
-def _make_btn(text, bg=None, fg=None, hover=None, font=None, height=25, width=None):
+def _make_btn(text, bg=None, fg=None, hover=None, font=None, height=25, width=None, pad_x=0):
+    """按钮。pad_x: 文字两侧留白像素（自适应宽度 = 字体实测宽 + pad_x*2）"""
     btn = QPushButton(text)
     btn.setFont(font or FONT_M)
     btn.setFixedHeight(height)
     if width:
         btn.setFixedWidth(width)
+    elif pad_x:
+        fm = btn.fontMetrics()
+        btn.setFixedWidth(fm.horizontalAdvance(text) + pad_x * 2)
     btn.setCursor(QCursor(Qt.PointingHandCursor))
     bg = bg or Colors.BLUE
     fg = fg or Colors.TEXT
@@ -455,15 +459,15 @@ def create_card(app, task):
     af_layout.setContentsMargins(0, 0, 0, 0)
     af_layout.setSpacing(3)
 
-    add_key_btn = _make_btn("+ ⌨", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+    add_key_btn = _make_btn("+ ⌨", bg=Colors.BLUE, hover=Colors.ACCENT, height=25, pad_x=6)
     add_key_btn.clicked.connect(lambda: add_key_action(app, task))
     af_layout.addWidget(add_key_btn)
 
-    add_click_btn = _make_btn("+ 🖱", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+    add_click_btn = _make_btn("+ 🖱", bg=Colors.BLUE, hover=Colors.ACCENT, height=25, pad_x=6)
     add_click_btn.clicked.connect(lambda: add_click_action(app, task))
     af_layout.addWidget(add_click_btn)
 
-    clear_btn = _make_btn("清空", bg=Colors.DIM, hover=Colors.ACCENT, height=25)
+    clear_btn = _make_btn("清空", bg=Colors.DIM, hover=Colors.ACCENT, height=25, pad_x=6)
     clear_btn.clicked.connect(lambda: clear_actions(app, task))
     af_layout.addWidget(clear_btn)
 
