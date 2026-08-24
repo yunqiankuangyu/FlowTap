@@ -549,23 +549,78 @@ def update_preview(app, theme_name):
 
 
 def apply_settings(app):
-    """应用设置并重启"""
-    save_settings({
+    """实时应用设置：保存 → 重设颜色 → 重建全部UI（不重启进程）"""
+    from config import Colors
+    s = {
         "opacity": app._opacity_slider.value() / 100.0,
         "theme": app._current_theme,
         "window_title": getattr(app._title_edit, "text", lambda: "")().strip(),
         "stop_hotkey": app._stop_hotkey,
-    })
-    import subprocess
-    if getattr(sys, "frozen", False):
-        subprocess.Popen([sys.argv[0]])
-    else:
-        script = os.path.abspath(sys.argv[0])
-        subprocess.Popen([sys.executable, script])
-    QApplication.quit()
+    }
+    cur = load_settings()
+    cur.update(s)
+    save_settings(cur)
+    # 窗口标题即时生效
+    app._title_label.setText(s["window_title"] or "⚡ 工具")
+    # 主题即时生效：重设 Colors 类属性后重建 UI（样式表都是构建时插值的）
+    Colors.apply(s["theme"])
+    _rebuild_ui(app)
+    show_notification(app, "✓ 设置已应用")
 
 
 def show_notification(app, text):
     """浮动通知（转发 keyboard_mode 实现）"""
     from .keyboard_mode import show_floating_notification
     show_floating_notification(app, text)
+
+
+def _rebuild_ui(app):
+    """销毁并重建所有页面，让新主题的插值样式表生效"""
+    from .titlebar import build_titlebar
+    from .keyboard_mode import build_keyboard_mode, auto_size
+    from .settings_mode import build_settings_mode
+
+    # 清空中央布局（content_frame 整个被删了，内部框架一并销毁）
+    while app._central_layout.count():
+        item = app._central_layout.takeAt(0)
+        w = item.widget()
+        if w:
+            w.setParent(None)
+            w.deleteLater()
+
+    # 重建全部容器（旧的已销毁，不能复用）
+    from .titlebar import build_titlebar as _bt  # noqa
+    central = app.centralWidget()
+    central.setStyleSheet(f"background: {Colors.CARD};")
+
+    app.content_frame = QWidget()
+    app.content_frame.setStyleSheet(f"background: {Colors.CARD};")
+    app.content_layout = QVBoxLayout(app.content_frame)
+    app.content_layout.setContentsMargins(0, 0, 0, 0)
+    app.content_layout.setSpacing(0)
+
+    app.keyboard_frame = QWidget()
+    app.keyboard_frame.setStyleSheet(f"background: {Colors.CARD};")
+    app.keyboard_layout = QVBoxLayout(app.keyboard_frame)
+    app.keyboard_layout.setContentsMargins(0, 0, 0, 0)
+    app.keyboard_layout.setSpacing(0)
+
+    app.settings_frame = QWidget()
+    app.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
+    app.settings_layout = QVBoxLayout(app.settings_frame)
+    app.settings_layout.setContentsMargins(10, 10, 10, 10)
+    app.settings_layout.setSpacing(8)
+
+    # 中央布局重挂
+    app._central_layout = QVBoxLayout(central)
+    app._central_layout.setContentsMargins(0, 0, 0, 0)
+    app._central_layout.setSpacing(0)
+
+    app._settings_scroller = None  # 设置滚动容器带旧样式，强制重建
+    app._titlebar = build_titlebar(app)
+    build_keyboard_mode(app)
+    build_settings_mode(app)
+    app._show_mode("keyboard")
+
+    # 恢复窗口高度和透明度
+    app.setWindowOpacity(load_settings().get("opacity", 1.0))

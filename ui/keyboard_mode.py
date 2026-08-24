@@ -18,7 +18,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import Colors, FONT_B, FONT_M, load_presets, save_presets
-from tasks.keyboard.keyboard_task import KeyboardTask, TaskStatus, make_key_action, make_click_action, fmt_action
+from tasks.keyboard.keyboard_task import KeyboardTask, TaskStatus, make_key_action, make_combo_action, make_click_action, fmt_action
 from vk_map import VK_MAP, VK_NAME
 
 
@@ -208,8 +208,11 @@ def build_keyboard_mode(app):
     app._drag_indicator = indicator
 
     def position_indicator():
-        w = handle.width()
-        indicator.move((w - 40) // 2, (HANDLE_H - 3) // 2)
+        try:
+            w = handle.width()
+            indicator.move((w - 40) // 2, (HANDLE_H - 3) // 2)
+        except RuntimeError:
+            pass  # UI重建后旧handle已销毁，忽略
     handle.resizeEvent = lambda e: position_indicator()
     QTimer.singleShot(0, position_indicator)
 
