@@ -155,10 +155,15 @@ def build_keyboard_mode(app):
     app._task_scroll = QScrollArea()
     app._task_scroll.setWidgetResizable(True)
     app._task_scroll.setFrameShape(QFrame.NoFrame)
-    app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
     app._task_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     app._task_scroll.setStyleSheet(f"""
         QScrollArea {{ background: {Colors.ACCENT}; border: none; }}
+        QScrollBar:vertical {{ background: transparent; width: 6px; border-radius: 3px; margin: 0; }}
+        QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
+        QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
     """)
 
     app._task_container = QWidget()
