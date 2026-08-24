@@ -8,18 +8,18 @@ import ctypes
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QFrame, QScrollArea, QComboBox, QDoubleSpinBox,
-    QInputDialog, QDialog, QMenu
+    QInputDialog, QMenu
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QCursor, QAction
+from PySide6.QtGui import QFont, QCursor
 
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import Colors, FONT_B, FONT_M, load_presets, save_presets
-from tasks.keyboard.keyboard_task import KeyboardTask, TaskStatus, make_key_action, make_combo_action, make_click_action, fmt_action
-from vk_map import VK_MAP, VK_NAME
+from tasks.keyboard.keyboard_task import KeyboardTask, make_key_action, make_combo_action, make_click_action, fmt_action
+from vk_map import VK_NAME
 
 
 class _Signal:
@@ -477,11 +477,6 @@ def create_card(app, task):
     right = QHBoxLayout()
     right.setSpacing(3)
     right.addWidget(_make_label("关系:"))
-
-    def _current_rel_text():
-        if task.relation_type == "在任务x后" and task.dependency_task_id:
-            return f"任务{task.dependency_task_id}后"
-        return "独立"
 
     rel_combo = _make_menu_combo(["独立"], width=80)
 

@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
-from config import Colors, FONT_B, FONT_M, THEMES, DEFAULT_THEME, load_settings, save_settings
+from config import Colors, THEMES, DEFAULT_THEME, load_settings, save_settings
 
 # 设置页专用字体：比全局小 3px
 _FB = QFont("MiSans", 11, QFont.Bold)

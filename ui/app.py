@@ -7,10 +7,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QApplication, QScrollArea, QFrame
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
 
-from config import Colors, FONT_B, FONT_M, load_settings, save_settings
-from tasks import KeyboardTask, MouseTask
+from config import Colors, FONT_B, load_settings, save_settings
+from tasks import MouseTask
 
 # 伪装标题
 DISGUISE_TITLE = "svchost"
@@ -211,14 +210,6 @@ class App(QMainWindow):
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
         """
 
-    def refresh_settings_scroll_style(self):
-        """主题切换时只刷新滚动区样式，不销毁重建（避免滚动条闪烁）"""
-        sc = self._settings_scroller
-        if sc is None:
-            return
-        for child in sc.findChildren(QScrollArea):
-            child.setStyleSheet(self._scroll_style())
-
     def _ensure_bottom_bar(self, buttons):
         """常驻底部栏：全局只建一次；按钮集变化时原地重建按钮，栏/几何参数不动"""
         from .keyboard_mode import build_bottom_bar
@@ -281,10 +272,6 @@ class App(QMainWindow):
     def _update_mini_btn(self):
         from .mini_mode import update_mini_btn
         update_mini_btn(self)
-
-    def _update_all_btn(self):
-        from .keyboard_mode import update_all_btn
-        update_all_btn(self)
 
     def closeEvent(self, event):
         """关闭按钮 → 正常退出"""
