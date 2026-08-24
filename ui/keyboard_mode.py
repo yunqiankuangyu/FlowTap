@@ -290,9 +290,9 @@ def auto_size(app):
     else:
         content = 0
         for t in app.keyboard_tasks:
-            content += 135 + 10
+            content += 36
             if t.actions:
-                content += 34
+                content += 17
         base = load_settings().get("window_height", 220) if remember else 220
         h = base + content
     h = max(220, min(600, h))
