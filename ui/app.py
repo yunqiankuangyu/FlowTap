@@ -226,7 +226,8 @@ class App(QMainWindow):
             layout.addWidget(_build_drag_handle(self))
             return sc
 
-        from .settings_mode import build_settings_mode  # noqa: F401 (按钮已建在 self 上)
+        from .keyboard_mode import build_bottom_bar, _build_drag_handle
+        from .settings_mode import apply_settings
 
         wrapper = QWidget()
         w_layout = QVBoxLayout(wrapper)
@@ -240,11 +241,15 @@ class App(QMainWindow):
         scroll.setWidget(self.settings_frame)
 
         w_layout.addWidget(scroll, 1)
-        if hasattr(self, '_settings_apply_btn'):
-            w_layout.addWidget(self._settings_apply_btn)
+
+        # 统一底部栏：设置页只放一个"应用"按钮（与任务页同款构建器/高度/样式）
+        bar, btns = build_bottom_bar(self, [
+            ("✓ 应用", Colors.GREEN, Colors.HOVER_GREEN, lambda: apply_settings(self)),
+        ])
+        self._settings_apply_btn = btns[0]
+        w_layout.addWidget(bar)
 
         # 底部拖动条（与任务页同款，共享高度调整逻辑）
-        from .keyboard_mode import _build_drag_handle
         handle = _build_drag_handle(self)
         w_layout.addWidget(handle)
 

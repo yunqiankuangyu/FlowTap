@@ -176,25 +176,12 @@ def build_keyboard_mode(app):
     app._task_scroll.setWidget(app._task_container)
     kf_layout.addWidget(app._task_scroll, 1)
 
-    # ── 底部按钮栏（固定高度，最小高度保护）──
-    bf = QWidget()
-    bf.setFixedHeight(BF_H)
-    bf.setMinimumHeight(BF_H)
-    bf.setSizePolicy(
-        bf.sizePolicy().horizontalPolicy(),
-        bf.sizePolicy().verticalPolicy()  # Fixed
-    )
-    bf_layout = QHBoxLayout(bf)
-    bf_layout.setContentsMargins(0, 6, 0, 0)
-    bf_layout.setSpacing(3)
-
-    new_btn = _make_btn("＋ 新建任务", bg=Colors.GREEN, hover=Colors.HOVER_GREEN, font=FONT_B, height=43)
-    new_btn.clicked.connect(app._add_task)
-    bf_layout.addWidget(new_btn)
-
-    app._all_btn = _make_btn("▶ 全部开始", bg=Colors.GREEN, hover=Colors.HOVER_GREEN, font=FONT_B, height=43)
-    app._all_btn.clicked.connect(app._toggle_all)
-    bf_layout.addWidget(app._all_btn)
+    # ── 底部按钮栏（统一构建器）──
+    bf, btns = build_bottom_bar(app, [
+        ("＋ 新建任务", Colors.GREEN, Colors.HOVER_GREEN, app._add_task),
+        ("▶ 全部开始", Colors.GREEN, Colors.HOVER_GREEN, app._toggle_all),
+    ])
+    app._all_btn = btns[1]
 
     kf_layout.addWidget(bf)
 
@@ -215,6 +202,30 @@ BASE_WINDOW_H = 220
 
 
 HANDLE_H = 8  # 拖动条高度
+
+
+
+def build_bottom_bar(app, buttons):
+    """构建统一底部按钮栏（任务页/设置页共用）。
+
+    buttons: [(text, bg, hover, callback), ...] 水平均分
+    返回 (bar, btn_list)
+    """
+    from PySide6.QtWidgets import QWidget, QHBoxLayout
+    bar = QWidget()
+    bar.setFixedHeight(BF_H)
+    bar.setMinimumHeight(BF_H)
+    bar_layout = QHBoxLayout(bar)
+    bar_layout.setContentsMargins(0, 6, 0, 0)
+    bar_layout.setSpacing(3)
+
+    btns = []
+    for text, bg, hover, cb in buttons:
+        btn = _make_btn(text, bg=bg, hover=hover, font=FONT_B, height=43)
+        btn.clicked.connect(cb)
+        bar_layout.addWidget(btn)
+        btns.append(btn)
+    return bar, btns
 
 
 def _build_drag_handle(app):

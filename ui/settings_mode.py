@@ -444,16 +444,7 @@ def build_settings_mode(app):
     function_page.hide()
     app._settings_page_combo = page_combo
 
-    # 应用按钮占位：由 app._settings_scroll 把它固定在滚动区下方
-    apply_btn = QPushButton("✓ 应用")
-    apply_btn.setFont(_FB)
-    apply_btn.setFixedHeight(36)
-    apply_btn.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 6px; }}
-        QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-    """)
-    apply_btn.clicked.connect(lambda: apply_settings(app))
-    app._settings_apply_btn = apply_btn
+    # "✓ 应用"按钮由 app._settings_scroll 的统一底部栏创建（与任务页同款构建器）
 
 
 def _show_page(app, name):
