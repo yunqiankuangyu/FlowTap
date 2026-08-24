@@ -199,6 +199,29 @@ def build_keyboard_mode(app):
     kf_layout.addWidget(bf)
 
     # ── 拖动条（最底部，indicator 居中，最小高度保护）──
+    handle = _build_drag_handle(app)
+    kf_layout.addWidget(handle)
+    # 初始化
+    app._floating_panel = None
+    app._floating_timer = None
+    from .keyboard_mode import BASE_WINDOW_H
+    app._tracked_height = BASE_WINDOW_H
+    app._cards = []
+
+
+# 基准窗口高度（用户可拖动调整，auto_size 只读不写）
+BASE_WINDOW_H = 220
+
+
+
+def _build_drag_handle(app):
+    """构建窗口底部拖动条（任务页/设置页共用），返回 handle 控件"""
+    from PySide6.QtWidgets import QWidget, QFrame
+    from PySide6.QtCore import Qt, QTimer
+    from PySide6.QtGui import QCursor
+    import ctypes
+    import ctypes.wintypes
+
     HANDLE_H = 12
     handle = QWidget()
     handle.setFixedHeight(HANDLE_H)
@@ -208,8 +231,7 @@ def build_keyboard_mode(app):
 
     indicator = QFrame(handle)
     indicator.setFixedSize(40, 3)
-    # 水平居中 + 垂直居中
-    indicator.setStyleSheet(f"background: #555; border-radius: 2px;")
+    indicator.setStyleSheet("background: #555; border-radius: 2px;")
     app._drag_indicator = indicator
 
     def position_indicator():
@@ -221,20 +243,17 @@ def build_keyboard_mode(app):
     handle.resizeEvent = lambda e: position_indicator()
     QTimer.singleShot(0, position_indicator)
 
-    kf_layout.addWidget(handle)
-
-    # ── 拖动逻辑（Win32 API）──
     _user32 = ctypes.windll.user32
     _dpi_scale = _user32.GetDpiForSystem() / 96.0 if hasattr(_user32, 'GetDpiForSystem') else 1.0
 
     app._drag = {"active": False, "start_y": 0, "start_h": 0}
 
     def on_handle_enter(e):
-        indicator.setStyleSheet(f"background: #888; border-radius: 2px;")
+        indicator.setStyleSheet("background: #888; border-radius: 2px;")
 
     def on_handle_leave(e):
         if not app._drag["active"]:
-            indicator.setStyleSheet(f"background: #555; border-radius: 2px;")
+            indicator.setStyleSheet("background: #555; border-radius: 2px;")
 
     def on_handle_press(e):
         if e.button() == Qt.LeftButton:
@@ -244,11 +263,11 @@ def build_keyboard_mode(app):
             _user32.GetCursorPos(ctypes.byref(pt))
             app._drag["start_y"] = pt.y
             app._drag["start_h"] = app._tracked_height
-            indicator.setStyleSheet(f"background: #4fc3f7; border-radius: 2px;")
+            indicator.setStyleSheet("background: #4fc3f7; border-radius: 2px;")
 
     def on_handle_release(e):
         app._drag["active"] = False
-        indicator.setStyleSheet(f"background: #555; border-radius: 2px;")
+        indicator.setStyleSheet("background: #555; border-radius: 2px;")
 
     def on_handle_drag(e):
         if not app._drag["active"]:
@@ -274,18 +293,7 @@ def build_keyboard_mode(app):
     handle.enterEvent = lambda e: on_handle_enter(e)
     handle.leaveEvent = lambda e: on_handle_leave(e)
     handle.setMouseTracking(True)
-
-    # 初始化
-    app._floating_panel = None
-    app._floating_timer = None
-    from .keyboard_mode import BASE_WINDOW_H
-    app._tracked_height = BASE_WINDOW_H
-    app._cards = []
-
-
-# 基准窗口高度（用户可拖动调整，auto_size 只读不写）
-BASE_WINDOW_H = 220
-
+    return handle
 
 def auto_size(app):
     """自动调整窗口高度：内容超出基准可视区才增长，未超出就保持基准"""

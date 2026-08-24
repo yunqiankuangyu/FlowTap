@@ -207,6 +207,14 @@ class App(QMainWindow):
             if old_scroll is not None and old_scroll.widget() is not self.settings_frame:
                 old_scroll.setWidget(self.settings_frame)
                 old_scroll.setStyleSheet(self._scroll_style())
+            # 拖动条可能随旧UI销毁，确保存在（幂等补挂）
+            from .keyboard_mode import _build_drag_handle
+            layout = sc.layout()
+            it_last = layout.itemAt(layout.count() - 1)
+            if it_last is None or it_last.widget() is None:
+                layout.addWidget(_build_drag_handle(self))
+            elif it_last.widget().height() != 12:  # 不是拖动条（被重建吞了）
+                layout.addWidget(_build_drag_handle(self))
             return sc
 
         from .settings_mode import build_settings_mode  # noqa: F401 (按钮已建在 self 上)
@@ -225,6 +233,11 @@ class App(QMainWindow):
         w_layout.addWidget(scroll, 1)
         if hasattr(self, '_settings_apply_btn'):
             w_layout.addWidget(self._settings_apply_btn)
+
+        # 底部拖动条（与任务页同款，共享高度调整逻辑）
+        from .keyboard_mode import _build_drag_handle
+        handle = _build_drag_handle(self)
+        w_layout.addWidget(handle)
 
         self._settings_scroller = wrapper
         return wrapper
