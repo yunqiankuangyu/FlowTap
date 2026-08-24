@@ -39,10 +39,13 @@ def build_titlebar(app):
     layout.setContentsMargins(11, 0, 4, 0)
     layout.setSpacing(0)
 
-    # 标题
-    title = QLabel("⚡ 工具")
+    # 标题（可自定义，从设置读取）
+    from config import load_settings
+    custom_title = load_settings().get("window_title", "")
+    title = QLabel(custom_title or "⚡ 工具")
     title.setFont(FONT_B)
     layout.addWidget(title)
+    app._title_label = title
     layout.addStretch()
 
     # 按钮容器

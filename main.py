@@ -2,7 +2,7 @@
 轻松AI - 键鼠模拟器
 依赖: pip install PySide6
 """
-__version__ = "3.4"
+__version__ = "3.5"
 
 import sys
 import os

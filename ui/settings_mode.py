@@ -162,6 +162,56 @@ def build_settings_mode(app):
 
     layout.addWidget(sf4)
 
+    # ── 标题自定义 ──
+    sf5 = QFrame()
+    sf5.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
+    sf5_layout = QVBoxLayout(sf5)
+    sf5_layout.setContentsMargins(11, 11, 11, 11)
+
+    ti_label = QLabel("🏷 窗口标题")
+    ti_label.setFont(FONT_B)
+    ti_label.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
+    sf5_layout.addWidget(ti_label)
+
+    from PySide6.QtWidgets import QLineEdit
+    ti_row = QWidget()
+    ti_row.setStyleSheet("background: transparent;")
+    ti_row_layout = QHBoxLayout(ti_row)
+    ti_row_layout.setContentsMargins(0, 0, 0, 0)
+    ti_row_layout.setSpacing(6)
+
+    app._title_edit = QLineEdit(s.get("window_title", ""))
+    app._title_edit.setPlaceholderText("⚡ 工具（默认）")
+    app._title_edit.setFixedHeight(28)
+    app._title_edit.setFont(QFont("MiSans", 11, QFont.Bold))
+    app._title_edit.setStyleSheet(f"""
+        QLineEdit {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
+    """)
+    ti_row_layout.addWidget(app._title_edit, 1)
+
+    def _apply_title():
+        text = app._title_edit.text().strip()
+        s2 = load_settings()
+        s2["window_title"] = text
+        save_settings(s2)
+        app._title_label.setText(text or "⚡ 工具")
+        from .keyboard_mode import show_floating_notification
+        show_floating_notification(app, "✓ 标题已更新" if text else "✓ 已恢复默认标题")
+    ti_apply_btn = QPushButton("应用")
+    ti_apply_btn.setFont(FONT_M)
+    ti_apply_btn.setFixedHeight(28)
+    ti_apply_btn.setFixedWidth(52)
+    ti_apply_btn.setCursor(Qt.PointingHandCursor)
+    ti_apply_btn.setStyleSheet(f"""
+        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+        QPushButton:hover {{ background: {Colors.ACCENT}; }}
+    """)
+    ti_apply_btn.clicked.connect(_apply_title)
+    ti_row_layout.addWidget(ti_apply_btn)
+
+    sf5_layout.addWidget(ti_row)
+    layout.addWidget(sf5)
+
     # 应用按钮占位：由 app._settings_scroll 把它固定在滚动区下方
     apply_btn = QPushButton("✓ 应用")
     apply_btn.setFont(FONT_B)
