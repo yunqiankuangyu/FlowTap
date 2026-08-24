@@ -116,7 +116,7 @@ def build_settings_mode(app):
     """)
     app._opacity_slider = slider
 
-    op_val = QLabel(f"{s['opacity']:.0%}")
+    op_val = QLabel(f"{int(s['opacity'] * 100)}%")
     op_val.setFont(_FM)
     op_val.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
     op_val.setFixedWidth(45)
@@ -468,7 +468,7 @@ def _show_page(app, name):
 
 def on_opacity_change(app, v):
     """透明度变化"""
-    app._opacity_lbl.setText(f"{v:.0%}")
+    app._opacity_lbl.setText(f"{v}%")  # v 是 30-100 的整数，直接拼 %（:.0% 会乘100变8900%）
     app.setWindowOpacity(v / 100.0)
     s = load_settings()
     s["opacity"] = v / 100.0
