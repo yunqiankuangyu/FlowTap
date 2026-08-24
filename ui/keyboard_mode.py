@@ -214,6 +214,9 @@ BASE_WINDOW_H = 220
 
 
 
+HANDLE_H = 8  # 拖动条高度
+
+
 def _build_drag_handle(app):
     """构建窗口底部拖动条（任务页/设置页共用），返回 handle 控件"""
     from PySide6.QtWidgets import QWidget, QFrame
@@ -221,8 +224,6 @@ def _build_drag_handle(app):
     from PySide6.QtGui import QCursor
     import ctypes
     import ctypes.wintypes
-
-    HANDLE_H = 8
     handle = QWidget()
     handle.setFixedHeight(HANDLE_H)
     handle.setMinimumHeight(HANDLE_H)
