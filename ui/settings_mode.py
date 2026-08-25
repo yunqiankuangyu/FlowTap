@@ -41,8 +41,8 @@ def install_wheel_guard(app):
     from PySide6.QtWidgets import QDoubleSpinBox, QSlider
     for typ in (QDoubleSpinBox, QSlider):
         for obj in app.findChildren(typ):
-            if obj.focusPolicy() == Qt.WheelFocus:
-                obj.setFocusPolicy(Qt.ClickFocus)
+            # 无条件 ClickFocus：QSlider 默认 StrongFocus 会被滚轮悬停偷焦点改值
+            obj.setFocusPolicy(Qt.ClickFocus)
 
 
 def _make_section(parent_layout, title):
