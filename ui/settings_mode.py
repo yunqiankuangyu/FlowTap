@@ -54,7 +54,7 @@ def build_settings_mode(app):
     """构建设置页面（分页版）"""
     s = load_settings()
     layout = app.settings_layout
-    layout.setContentsMargins(10, 10, 10, 10)
+    layout.setContentsMargins(10, 4, 10, 4)
 
     # ── 页面切换按钮（两个等宽按钮，选中高亮）──
     nav_row = QWidget()
