@@ -140,7 +140,7 @@ class App(QMainWindow):
         self.settings_frame = QWidget()
         self.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
         self.settings_layout = QVBoxLayout(self.settings_frame)
-        self.settings_layout.setContentsMargins(10, 10, 10, 10)
+        self.settings_layout.setContentsMargins(10, 4, 10, 4)
         self.settings_layout.setSpacing(8)
 
         build_keyboard_mode(self)
