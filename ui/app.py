@@ -140,11 +140,13 @@ class App(QMainWindow):
         self.settings_frame = QWidget()
         self.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
         self.settings_layout = QVBoxLayout(self.settings_frame)
-        self.settings_layout.setContentsMargins(10, 4, 10, 4)
+        self.settings_layout.setContentsMargins(10, 0, 10, 4)
         self.settings_layout.setSpacing(8)
 
         build_keyboard_mode(self)
         build_settings_mode(self)
+        from .settings_mode import install_wheel_guard
+        install_wheel_guard(self)  # 防滚轮误调数值（任务页+设置页）
 
         self._show_mode("keyboard")
 
@@ -256,6 +258,7 @@ class App(QMainWindow):
 
         wrapper = QWidget()
         w_layout = QVBoxLayout(wrapper)
+        w_layout.setContentsMargins(0, 0, 0, 0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)

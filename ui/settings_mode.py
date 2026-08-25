@@ -34,6 +34,17 @@ def _page_btn_style(active):
     """
 
 
+def install_wheel_guard(app):
+    """防滚轮误改数值：给所有 QDoubleSpinBox/QSlider 设 ClickFocus——
+    未点击聚焦时滚轮事件直接穿透给滚动区；点击后可用滚轮调值。"""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QDoubleSpinBox, QSlider
+    for typ in (QDoubleSpinBox, QSlider):
+        for obj in app.findChildren(typ):
+            if obj.focusPolicy() == Qt.WheelFocus:
+                obj.setFocusPolicy(Qt.ClickFocus)
+
+
 def _make_section(parent_layout, title):
     """通用 section 卡片骨架，返回内部 layout"""
     frame = QFrame()
@@ -54,7 +65,7 @@ def build_settings_mode(app):
     """构建设置页面（分页版）"""
     s = load_settings()
     layout = app.settings_layout
-    layout.setContentsMargins(10, 4, 10, 4)
+    layout.setContentsMargins(10, 0, 10, 4)
 
     # ── 页面切换按钮（两个等宽按钮，选中高亮）──
     nav_row = QWidget()
@@ -450,6 +461,9 @@ def build_settings_mode(app):
     if getattr(app, "_current_mode", "") == "settings" and getattr(app, "_settings_current_page", None) == PAGE_FUNCTION:
         _show_page(app, PAGE_FUNCTION)
 
+    # 防滚轮误调数值
+    install_wheel_guard(app)
+
     # "✓ 应用"按钮由 app._settings_scroll 的统一底部栏创建（与任务页同款构建器）
 
 
@@ -624,7 +638,7 @@ def _rebuild_ui(app):
     app.settings_frame = QWidget()
     app.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
     app.settings_layout = QVBoxLayout(app.settings_frame)
-    app.settings_layout.setContentsMargins(10, 10, 10, 10)
+    app.settings_layout.setContentsMargins(10, 0, 10, 4)
     app.settings_layout.setSpacing(8)
 
     # 中央布局重挂：QWidget 不允许二次 setLayout，必须先卸载旧布局
@@ -638,6 +652,7 @@ def _rebuild_ui(app):
     app._titlebar = build_titlebar(app)
     build_keyboard_mode(app)
     build_settings_mode(app)
+    install_wheel_guard(app)  # 重建后的新控件也要装滚轮防误触
     # 留在用户当前所在页面（通常就是设置页），不踢回任务页
     app._show_mode(getattr(app, "_current_mode", "keyboard") or "keyboard")
 

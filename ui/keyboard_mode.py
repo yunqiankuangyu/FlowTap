@@ -380,6 +380,8 @@ def add_task(app):
     app.keyboard_tasks.append(task)
     create_card(app, task)
     auto_size(app)
+    from .settings_mode import install_wheel_guard
+    install_wheel_guard(app)  # 新卡片的 spinbox 防滚轮误触
 
 
 def create_card(app, task):
