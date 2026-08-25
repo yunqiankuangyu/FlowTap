@@ -24,6 +24,16 @@ PAGE_APPEARANCE = "外观设置"
 PAGE_FUNCTION = "功能设置"
 
 
+def _page_btn_style(active):
+    """分页切换按钮样式：选中蓝底，未选中灰底"""
+    from config import Colors as _C
+    bg = _C.BLUE if active else _C.ACCENT
+    return f"""
+        QPushButton {{ background: {bg}; color: {_C.TEXT}; border: none; border-radius: 4px; }}
+        QPushButton:hover {{ background: {_C.BLUE}; }}
+    """
+
+
 def _make_section(parent_layout, title):
     """通用 section 卡片骨架，返回内部 layout"""
     frame = QFrame()
@@ -46,38 +56,32 @@ def build_settings_mode(app):
     layout = app.settings_layout
     layout.setContentsMargins(10, 10, 10, 10)
 
-    # ── 页面切换下拉 ──
+    # ── 页面切换按钮（两个等宽按钮，选中高亮）──
     nav_row = QWidget()
     nav_row.setStyleSheet("background: transparent;")
     nav = QHBoxLayout(nav_row)
     nav.setContentsMargins(0, 0, 0, 2)
+    nav.setSpacing(4)
 
-    page_combo = QPushButton(PAGE_APPEARANCE)
-    page_combo.setFixedHeight(28)
-    page_combo.setFont(QFont("MiSans", 10, QFont.Bold))
-    page_combo.setCursor(Qt.PointingHandCursor)
-    page_combo.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 20px 2px 8px; text-align: left; }}
-        QPushButton::menu-indicator {{ image: none; subcontrol-origin: padding; subcontrol-position: right center; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid {Colors.DIM}; width: 0; height: 0; }}
-    """)
-    from PySide6.QtWidgets import QMenu
-    page_menu = QMenu(page_combo)
-    page_menu.setStyleSheet(f"""
-        QMenu {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: 1px solid {Colors.DIM}; border-radius: 4px; }}
-        QMenu::item {{ padding: 4px 14px; min-height: 24px; }}
-        QMenu::item:selected {{ background: {Colors.BLUE}; }}
-    """)
+    page_btns = {}
+
+    def _switch_page(name):
+        _show_page(app, name)  # _show_page 内部已同步高亮
+
     for name in (PAGE_APPEARANCE, PAGE_FUNCTION):
-        page_menu.addAction(name)
-    page_combo.setMenu(page_menu)
+        btn = QPushButton(name)
+        btn.setFixedHeight(28)
+        btn.setFont(QFont("MiSans", 10, QFont.Bold))
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(lambda checked, n=name: _switch_page(n))
+        page_btns[name] = btn
+        nav.addWidget(btn, 1)  # 等宽均分
 
-    def _on_page(action):
-        page_combo.setText(action.text())
-        _show_page(app, action.text())
-    page_menu.triggered.connect(_on_page)
+    page_btns[PAGE_APPEARANCE].setStyleSheet(_page_btn_style(True))
+    page_btns[PAGE_FUNCTION].setStyleSheet(_page_btn_style(False))
 
-    nav.addWidget(page_combo)
     layout.addWidget(nav_row)
+    app._settings_page_btns = page_btns
 
     # ── 外观页容器 ──
     appearance_page = QWidget()
@@ -438,23 +442,31 @@ def build_settings_mode(app):
 
     fn_layout.addStretch()
 
-    # 挂到布局（初始显示外观页）
+    # 挂到布局（按当前模式显示对应分页；默认外观页）
     layout.addWidget(appearance_page)
     layout.addWidget(function_page)
     function_page.hide()
-    app._settings_page_combo = page_combo
+    # 主题应用重建后恢复用户之前所在的分页
+    if getattr(app, "_current_mode", "") == "settings" and getattr(app, "_settings_current_page", None) == PAGE_FUNCTION:
+        _show_page(app, PAGE_FUNCTION)
 
     # "✓ 应用"按钮由 app._settings_scroll 的统一底部栏创建（与任务页同款构建器）
 
 
 def _show_page(app, name):
     """切换分页显示"""
+    app._settings_current_page = name
     if name == PAGE_APPEARANCE:
         app._page_appearance.show()
         app._page_function.hide()
     else:
         app._page_appearance.hide()
         app._page_function.show()
+    # 同步切换按钮高亮
+    btns = getattr(app, '_settings_page_btns', None)
+    if btns:
+        for n, b in btns.items():
+            b.setStyleSheet(_page_btn_style(n == name))
 
 
 def on_opacity_change(app, v):

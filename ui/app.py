@@ -172,6 +172,9 @@ class App(QMainWindow):
         elif mode == "settings":
             self._central_layout.addWidget(self.content_frame)
             self.content_layout.addWidget(self._settings_scroll())
+            # 恢复用户之前所在的设置分页（默认外观页）
+            from .settings_mode import _show_page, PAGE_APPEARANCE
+            _show_page(self, getattr(self, "_settings_current_page", PAGE_APPEARANCE))
 
         # 常驻底部栏 + 拖动条：挂在 central_layout，永远在内容区之下、窗口最底
         # （顺序：titlebar → content → bar → handle）
