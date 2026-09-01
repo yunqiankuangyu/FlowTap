@@ -57,15 +57,15 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
-| v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
-| v2 | CustomTkinter | Unified keyboard+mouse task mode |
-| v3 | PySide6 | Qt migration, solves CTk rendering flicker |
-| v3.1 | PySide6 | Bug fixes & cleanup |
-| v3.2 | PySide6 | Hold-to-press for key & mouse bindings |
-| v3.3 | PySide6 | Optimized partial font display |
-| v3.4 | PySide6 | Global stop hotkey & run-count limit |
-| v3.5 | PySide6 | Key combos, settings pages, portable exe |
 | v3.6 | PySide6 | Pause all tasks, collapse task cards |
+| v3.5 | PySide6 | Key combos, settings pages, portable exe |
+| v3.4 | PySide6 | Global stop hotkey & run-count limit |
+| v3.3 | PySide6 | Optimized partial font display |
+| v3.2 | PySide6 | Hold-to-press for key & mouse bindings |
+| v3.1 | PySide6 | Bug fixes & cleanup |
+| v3 | PySide6 | Qt migration, solves CTk rendering flicker |
+| v2 | CustomTkinter | Unified keyboard+mouse task mode |
+| v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
 
 ### v3.6 — Pause All & Card Collapse
 
