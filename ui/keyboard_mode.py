@@ -298,26 +298,26 @@ def _build_drag_handle(app):
     return handle
 
 def auto_size(app):
-    """自动调整窗口高度：内容超出基准可视区才增长，未超出就保持基准"""
-    from config import load_settings
-    settings = load_settings()
-    base = settings.get("window_height", BASE_WINDOW_H) if settings.get("remember_height", True) else BASE_WINDOW_H
-
-    # 任务内容总高
+    """自动调整窗口高度：完全跟随任务内容（收起卡片→窗口缩矮，展开/新建→长高）"""
+    # 卡片高度实测值：收起=11(margin)+27(hdr)+11(margin)=49；展开=margin22 + hdr27 + spacing10 为骨架109；
+    # 有动作列表再加 动作26+spacing5
     content = 0
     for t in app.keyboard_tasks:
-        content += 36
+        if getattr(t, '_collapsed', False):
+            content += 49
+            continue
+        card = 109
         if t.actions:
-            content += 17
+            card += 31  # 动作列表26 + spacing5
+        content += card
+    # 卡片间距（卡间spacing + 容器底部余量4）
+    content += 5 * max(0, len(app.keyboard_tasks) - 1)
 
-    # 窗口高度 = 固定框架部分(标题栏40+预设栏39+按钮栏77+拖动条12≈168) + max(内容, 最小可视区)
-    # 基准高度里预留的可视区约 52px（够放~3张折叠卡片），内容没超它就不涨窗
-    min_viewport = base - 168
-    viewport = max(min_viewport, content)
-    h = max(base, min(600, 168 + viewport))
+    # 真实固定框架实测：标题栏40 + 预设栏39 + 容器顶距5 + 底部栏52 + 拖动条8 = 144
+    h = max(220, min(600, 144 + content))
     app._tracked_height = h
     app.setFixedSize(360, h)
-    # 注意：这里不回写 window_height——该值只代表"用户拖动的基准高度"，
+    # 注意：这里不回写 window_height——该值只代表"用户拖动的高度"，
     # auto_size 是它的消费者不是生产者，否则会滚雪球越算越高。
 
 
@@ -341,6 +341,7 @@ def update_all_btn(app):
             QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
             QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
         """)
+    update_pause_btn(app)
     app._update_mini_btn()
 
 
@@ -373,6 +374,75 @@ def toggle_all(app):
         update_all_btn(app)
 
 
+# ── 全部暂停/继续 ──
+
+def pause_all(app):
+    """暂停所有活跃任务：进度与时间计数保持，随时可继续"""
+    for t in app.keyboard_tasks:
+        if _task_active(t) and not getattr(t, '_paused', False):
+            t.pause()
+            lbl = getattr(t, '_st_lbl', None)
+            try:
+                if lbl and lbl.parent():
+                    (t._st_set_text if hasattr(t, "_st_set_text") else lbl.setText)("⏸ 已暂停")
+                    lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+            except RuntimeError:
+                pass
+
+
+def resume_all(app):
+    """继续所有已暂停任务：从冻结的位置接着跑"""
+    for t in app.keyboard_tasks:
+        if getattr(t, '_paused', False):
+            t.resume()
+            # 状态栏立即回显当前倒计时，不等下一次 tick
+            if t._running and t._countdown_callback:
+                pass  # 下一次 tick 会刷新
+            elif getattr(t, '_countdown_active', False) and t._st_lbl:
+                t._st_set_text("● 准备中...")
+                t._st_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+
+
+def toggle_pause_all(app):
+    """有未暂停的活跃任务 → 全部暂停；全在暂停中 → 全部继续"""
+    running = [t for t in app.keyboard_tasks if _task_active(t)]
+    if not running:
+        return
+    if any(not getattr(t, '_paused', False) for t in running):
+        pause_all(app)
+    else:
+        resume_all(app)
+    update_all_btn(app)
+
+
+def update_pause_btn(app):
+    """同步底部暂停按钮：无活跃任务置灰 / 全在暂停→继续 / 否则→暂停"""
+    btn = getattr(app, '_pause_btn', None)
+    if btn is None:
+        return
+    running = [t for t in app.keyboard_tasks if _task_active(t)]
+    paused = [t for t in running if getattr(t, '_paused', False)]
+    if not running:
+        btn.setText("⏸ 全部暂停")
+        btn.setEnabled(False)
+        btn.setStyleSheet(f"""
+            QPushButton {{ background: {Colors.ACCENT}; color: {Colors.DIM}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
+        """)
+    elif len(paused) == len(running):
+        btn.setText("▶ 全部继续")
+        btn.setEnabled(True)
+        btn.setStyleSheet(f"""
+            QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
+            QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
+        """)
+    else:
+        btn.setText("⏸ 全部暂停")
+        btn.setEnabled(True)
+        btn.setStyleSheet(f"""
+            QPushButton {{ background: {Colors.YELLOW}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
+        """)
+
+
 def add_task(app):
     from config import load_settings as _ls
     task = KeyboardTask(app.next_task_id, f"任务{app.next_task_id}", loop_interval=_ls().get("default_loop", 80))
@@ -392,9 +462,22 @@ def create_card(app, task):
     card_layout.setContentsMargins(11, 11, 11, 11)
     card_layout.setSpacing(5)
 
-    # ── 第一行：名称 + 状态 + 删除 + 开始/停止 ──
+    # ── 第一行：折叠钮 + 名称 + 状态 + 删除 + 开始/停止 ──
     hdr = QHBoxLayout()
     hdr.setSpacing(4)
+
+    fold_btn = QPushButton("▼")
+    fold_btn.setFixedSize(22, 22)
+    fold_btn.setCursor(QCursor(Qt.PointingHandCursor))
+    fold_btn.setStyleSheet(f"""
+        QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 12px 'MiSans'; }}
+        QPushButton:hover {{ color: {Colors.TEXT}; }}
+    """)
+    fold_btn.setToolTip("收起/展开任务卡片")
+    fold_btn.clicked.connect(lambda: toggle_card(app, task))
+    task._fold_btn = fold_btn
+    hdr.addWidget(fold_btn)
+
     name_e = QLineEdit(task.name)
     name_e.setFont(FONT_B)
     name_e.setFixedWidth(79)
@@ -468,8 +551,7 @@ def create_card(app, task):
     af_layout.addWidget(clear_btn)
 
     card_layout.addWidget(af)
-
-    # ── 第三行：关系 + 循环间隔 ──
+    task._extra_rows = [af]  # 折叠时隐藏的附属行
     sf = QWidget()
     sf.setStyleSheet("background: transparent;")
     sf_layout = QHBoxLayout(sf)
@@ -569,10 +651,25 @@ def create_card(app, task):
     sf_layout.addLayout(left)
 
     card_layout.addWidget(sf)
+    task._extra_rows.append(sf)
 
     app._task_layout.insertWidget(app._task_layout.count() - 1, card)
     app._cards.append(card)
     _refresh_actions(app, task)
+
+
+def toggle_card(app, task):
+    """收起/展开任务卡片：收起时只保留标题行（内边距同步收紧）"""
+    collapsed = not getattr(task, '_collapsed', False)
+    task._collapsed = collapsed
+    task._fold_btn.setText("▶" if collapsed else "▼")
+    task._action_frame.setVisible(bool(task.actions) and not collapsed)
+    for w in getattr(task, '_extra_rows', []):
+        w.setVisible(not collapsed)
+    card = task._fold_btn.parentWidget() if hasattr(task, '_fold_btn') else None
+    if card:
+        card.layout().setContentsMargins(11, 11, 11, 11) if collapsed else card.layout().setContentsMargins(11, 11, 11, 11)
+    auto_size(app)
 
 
 def _refresh_actions(app, task):
@@ -646,6 +743,8 @@ def _refresh_actions(app, task):
 
         task._action_layout.addWidget(row)
         task._action_rows.append({"frame": row, "action": action, "desc_lbl": desc_lbl})
+
+    auto_size(app)  # 动作行增删后窗口高度跟手
 
 
 def _delete_action(app, task, idx):
@@ -916,6 +1015,10 @@ def _start_task(app, task):
 
         def _tick(count):
             if not task._countdown_active:
+                return
+            if getattr(task, '_paused', False):
+                # 暂停中：冻结当前秒数，恢复时从这秒继续
+                QTimer.singleShot(100, lambda: _tick(count))
                 return
             if count > 0:
                 task._st_set_text(f"● 准备中 {count}...")
