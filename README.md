@@ -67,6 +67,16 @@ FlowTap/
 | v3.5 | PySide6 | Key combos, settings pages, portable exe |
 | v3.6 | PySide6 | Pause all tasks, collapse task cards |
 
+### v3.6 — Pause All & Card Collapse
+
+**New**
+- **Pause/resume all tasks** — A new "⏸ 全部暂停" button on the bottom bar freezes all running tasks; click again to resume from where they left off. Progress and countdowns are preserved while paused (unlike "Stop" which resets everything)
+- **Collapse/expand task cards** — Each task card has a fold button (◀/▶) on the title row to collapse it down to just the header, or expand it to show the full action list. Collapsed cards save vertical space so you can see more tasks at once
+
+**Changed**
+- Collapsed card padding unified with expanded state (11px all sides) for consistent look
+- Window height calculation updated to match actual card measurements
+
 ### v3.5 — Key Combos, Settings Pages & Portable Build
 
 **New**
@@ -87,16 +97,6 @@ FlowTap/
 
 **Fixed**
 - Opacity label showed 8900% instead of 89% (percent-format multiplied the already-percent value)
-
-### v3.6 — Pause All & Card Collapse
-
-**New**
-- **Pause/resume all tasks** — A new "⏸ 全部暂停" button on the bottom bar freezes all running tasks; click again to resume from where they left off. Progress and countdowns are preserved while paused (unlike "Stop" which resets everything)
-- **Collapse/expand task cards** — Each task card has a fold button (◀/▶) on the title row to collapse it down to just the header, or expand it to show the full action list. Collapsed cards save vertical space so you can see more tasks at once
-
-**Changed**
-- Collapsed card padding unified with expanded state (11px all sides) for consistent look
-- Window height calculation updated to match actual card measurements
 
 ### v3.4 — Global Stop Hotkey & Run Limit
 
