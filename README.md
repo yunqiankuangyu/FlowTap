@@ -91,11 +91,8 @@ FlowTap/
 ### v3.6 — Collapsed Card Height Fix
 
 **Changed**
-- Collapsed task cards now use the same padding as expanded cards (11px all sides) for consistent spacing
-- Window height calculation updated to match actual UI measurements
-
-**Fixed**
-- Collapsed card height was too small and cramped
+- Collapsed task cards now use the same padding as expanded cards (11px all sides)
+- Window height calculation updated
 
 ### v3.4 — Global Stop Hotkey & Run Limit
 
