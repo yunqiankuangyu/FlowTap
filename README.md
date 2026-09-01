@@ -65,6 +65,7 @@ FlowTap/
 | v3.3 | PySide6 | Optimized partial font display |
 | v3.4 | PySide6 | Global stop hotkey & run-count limit |
 | v3.5 | PySide6 | Key combos, settings pages, portable exe |
+| v3.6 | PySide6 | Collapsed card height fix, UI polish |
 
 ### v3.5 — Key Combos, Settings Pages & Portable Build
 
@@ -86,6 +87,15 @@ FlowTap/
 
 **Fixed**
 - Opacity label showed 8900% instead of 89% (percent-format multiplied the already-percent value)
+
+### v3.6 — Collapsed Card Height Fix
+
+**Changed**
+- Collapsed task cards now use the same padding as expanded cards (11px all sides) for consistent spacing
+- Window height calculation updated to match actual UI measurements
+
+**Fixed**
+- Collapsed card height was too small and cramped
 
 ### v3.4 — Global Stop Hotkey & Run Limit
 
