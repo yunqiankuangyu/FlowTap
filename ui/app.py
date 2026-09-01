@@ -189,8 +189,11 @@ class App(QMainWindow):
         self._central_layout.addWidget(self._drag_handle)
 
         # "全部开始/停止"按钮绑定：必须在 _ensure_bottom_bar 之后（按钮组已按当前页重建）
-        if mode == "keyboard" and len(self._bottom_btns) >= 2:
+        if mode == "keyboard" and len(self._bottom_btns) >= 3:
             self._all_btn = self._bottom_btns[1]
+            self._pause_btn = self._bottom_btns[2]
+            from .keyboard_mode import update_pause_btn
+            update_pause_btn(self)  # 切页回来时恢复暂停按钮的正确状态
 
         if mode == "keyboard":
             QTimer.singleShot(150, self._auto_size)
@@ -202,6 +205,7 @@ class App(QMainWindow):
             return [
                 ("＋ 新建任务", Colors.GREEN, Colors.HOVER_GREEN, self._add_task),
                 ("▶ 全部开始", Colors.GREEN, Colors.HOVER_GREEN, self._toggle_all),
+                ("⏸ 全部暂停", Colors.YELLOW, Colors.ACCENT, self._toggle_pause),
             ]
         from .settings_mode import apply_settings
         return [
@@ -306,6 +310,10 @@ class App(QMainWindow):
     def _toggle_all(self):
         from .keyboard_mode import toggle_all
         toggle_all(self)
+
+    def _toggle_pause(self):
+        from .keyboard_mode import toggle_pause_all
+        toggle_pause_all(self)
 
     def _load_preset(self):
         from .keyboard_mode import load_preset
