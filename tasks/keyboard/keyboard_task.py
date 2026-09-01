@@ -58,6 +58,8 @@ class KeyboardTask:
     dependency_task_id: Optional[int] = None  # 前置任务ID
     max_runs: int = 0  # 执行次数限制，0=无限
     _running: bool = False
+    _paused: bool = False  # 暂停中（时间计数冻结，随时可继续）
+    _pause_cond: threading.Condition = field(default_factory=threading.Condition, repr=False)
     _thread: Optional[threading.Thread] = field(default=None, repr=False)
     _dependents: List['KeyboardTask'] = field(default_factory=list, repr=False)
     _callback: object = field(default=None, repr=False)
@@ -77,6 +79,41 @@ class KeyboardTask:
         """停止任务"""
         self._running, self.status = False, TaskStatus.IDLE
         self._countdown_callback = None
+        self.resume()  # 唤醒可能挂在暂停等待上的线程
+
+    # 暂停：运行中或倒计时中都可（倒计时中暂停会冻结 3-2-1）
+    def pause(self):
+        if self._running or getattr(self, '_countdown_active', False):
+            self._paused = True
+
+    def resume(self):
+        """继续：从冻结的位置接着跑"""
+        self._paused = False
+        with self._pause_cond:
+            self._pause_cond.notify_all()
+
+    def _pause_gate(self):
+        """暂停闸门：暂停期间在此阻塞；每次醒来看看是否仍需等待（防惊群）"""
+        while self._running and self._paused:
+            with self._pause_cond:
+                self._pause_cond.wait(timeout=0.2)
+
+    def _pause_aware_delay(self, seconds):
+        """可暂停的延迟：暂停时计时冻结，继续后剩余时间接着走"""
+        remaining = max(0.0, seconds)
+        while self._running and remaining > 1e-9:
+            self._pause_gate()
+            if not self._running:
+                return
+            if self._paused:
+                time.sleep(0.05)  # 暂停中：不计秒
+                continue
+            t0 = time.monotonic()
+            time.sleep(min(0.2, remaining))
+            if not self._running:
+                return
+            elapsed = 0.0 if self._paused else time.monotonic() - t0
+            remaining -= elapsed
 
     def _execute_actions(self):
         """执行一轮动作序列"""
@@ -109,7 +146,8 @@ class KeyboardTask:
                     else:
                         ms_sim.click_mouse(action["x"], action["y"])
             except: pass
-            random_delay(action.get("delay", 0.5), 0.05)
+            if not self._running: return False
+            self._pause_aware_delay(action.get("delay", 0.5))
         return True
 
     def _loop(self, callback, countdown_callback=None):
@@ -118,6 +156,8 @@ class KeyboardTask:
         self._loop_active = True
         try:
             while self._running:
+                self._pause_gate()  # 暂停中：冻结在下一轮开始前
+                if not self._running: return
                 # 次数限制：跑够自动停
                 if self.max_runs > 0 and self.done_count >= self.max_runs:
                     self._finished_by_limit = True
@@ -129,21 +169,27 @@ class KeyboardTask:
                 for dep_task in self._dependents:
                     if dep_task._running:
                         threading.Thread(target=dep_task._run_once, daemon=True).start()
-                # 循环倒计时显示
+                # 循环倒计时显示（暂停时秒数冻结，继续后接着倒数）
                 countdown_secs = int(self.loop_interval)
                 if countdown_secs >= 1:
-                    for i in range(countdown_secs, 0, -1):
+                    i = countdown_secs
+                    while i >= 1:
+                        if not self._running: return
+                        self._pause_gate()  # 暂停中：冻结在当前秒
                         if not self._running: return
                         if self._countdown_callback:
                             self._countdown_callback(f"● 等待 {i}s...", "#facc15")
-                        time.sleep(1)
+                        self._pause_aware_delay(1)
+                        if not self._running: return
+                        if not self._paused:  # 暂停期间秒数不前进
+                            i -= 1
                     if not self._running: return
                     countdown_callback("● 执行中...", "#4ade80")
                     remainder = self.loop_interval - countdown_secs
                     if remainder > 0.05:
-                        random_delay(remainder, 0.01)
+                        self._pause_aware_delay(remainder)
                 else:
-                    random_delay(self.loop_interval, 0.01)
+                    self._pause_aware_delay(self.loop_interval)
         finally:
             self._loop_active = False
 
@@ -151,12 +197,17 @@ class KeyboardTask:
         """被依赖触发时执行一次"""
         if not self._running: return
         if self.loop_interval > 0:
-            remaining = int(self.loop_interval)
-            for i in range(remaining, 0, -1):
+            i = int(self.loop_interval)
+            while i >= 1:
+                if not self._running: return
+                self._pause_gate()  # 暂停中：冻结在当前秒
                 if not self._running: return
                 if self._countdown_callback:
                     self._countdown_callback(f"● 等待 {i}s...", "#facc15")
-                time.sleep(1)
+                self._pause_aware_delay(1)
+                if not self._running: return
+                if not self._paused:  # 暂停期间秒数不前进
+                    i -= 1
             if not self._running: return
             if self._countdown_callback:
                 self._countdown_callback("● 执行中...", "#4ade80")
