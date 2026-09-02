@@ -2,7 +2,7 @@
 轻松AI - 键鼠模拟器
 依赖: pip install PySide6
 """
-__version__ = "3.6"
+__version__ = "3.6.1"
 
 import sys
 import os
@@ -69,6 +69,12 @@ if __name__ == "__main__":
         from datetime import datetime
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         tb = traceback.format_exc()
+        # 同时写 runtime.log（挂机崩溃也能查到）
+        try:
+            from logger import log_error
+            log_error("FATAL")
+        except Exception:
+            pass
         # 1. 历史日志（追加，带时间戳）
         log_hist = os.path.join(project_root, "error.log")
         with open(log_hist, "a", encoding="utf-8") as f:
