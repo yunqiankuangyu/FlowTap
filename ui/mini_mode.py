@@ -163,30 +163,34 @@ def toggle_all_from_mini(app):
 
 def update_mini_status(app):
     """更新迷你窗口状态显示"""
-    if not app._mini_window:
-        return
+    try:
+        if not app._mini_window:
+            return
 
-    running_count = sum(1 for t in app.keyboard_tasks if t._running or getattr(t, '_countdown_active', False))
-    total_count = len(app.keyboard_tasks)
+        running_count = sum(1 for t in app.keyboard_tasks if t._running or getattr(t, '_countdown_active', False))
+        total_count = len(app.keyboard_tasks)
 
-    if running_count > 0:
-        text = f"● 运行中 {running_count}/{total_count}"
-        color = Colors.GREEN
-    elif total_count > 0:
-        text = f"● 已停止 {total_count} 个任务"
-        color = Colors.DIM
-    else:
-        text = "● 就绪"
-        color = Colors.DIM
+        if running_count > 0:
+            text = f"● 运行中 {running_count}/{total_count}"
+            color = Colors.GREEN
+        elif total_count > 0:
+            text = f"● 已停止 {total_count} 个任务"
+            color = Colors.DIM
+        else:
+            text = "● 就绪"
+            color = Colors.DIM
 
-    if hasattr(app, '_mini_status') and app._mini_status:
-        app._mini_status.setText(text)
-        app._mini_status.setStyleSheet(f"color: {color}; background: transparent; padding-bottom: 6px;")
+        if hasattr(app, '_mini_status') and app._mini_status:
+            app._mini_status.setText(text)
+            app._mini_status.setStyleSheet(f"color: {color}; background: transparent; padding-bottom: 6px;")
 
-    update_mini_btn(app)
+        update_mini_btn(app)
 
-    if app._mini_window:
-        QTimer.singleShot(1000, lambda: update_mini_status(app))
+        if app._mini_window:
+            QTimer.singleShot(1000, lambda: update_mini_status(app))
+    except Exception as e:
+        from logger import log_error
+        log_error("mini_status", e)
 
 
 def update_mini_btn(app):

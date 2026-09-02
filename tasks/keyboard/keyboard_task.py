@@ -79,6 +79,7 @@ class KeyboardTask:
         """停止任务"""
         self._running, self.status = False, TaskStatus.IDLE
         self._countdown_callback = None
+        self._loop_active = False  # 防止异常后 _loop_active 卡死导致无法重启
         self.resume()  # 唤醒可能挂在暂停等待上的线程
 
     # 暂停：运行中或倒计时中都可（倒计时中暂停会冻结 3-2-1）
@@ -178,49 +179,72 @@ class KeyboardTask:
                         self._pause_gate()  # 暂停中：冻结在当前秒
                         if not self._running: return
                         if self._countdown_callback:
-                            self._countdown_callback(f"● 等待 {i}s...", "#facc15")
+                            try:
+                                self._countdown_callback(f"● 等待 {i}s...", "#facc15")
+                            except Exception as e:
+                                from logger import log_error
+                                log_error("task_countdown", e)
                         self._pause_aware_delay(1)
                         if not self._running: return
                         if not self._paused:  # 暂停期间秒数不前进
                             i -= 1
                     if not self._running: return
-                    countdown_callback("● 执行中...", "#4ade80")
+                    try:
+                        countdown_callback("● 执行中...", "#4ade80")
+                    except Exception as e:
+                        from logger import log_error
+                        log_error("task_countdown_exec", e)
                     remainder = self.loop_interval - countdown_secs
                     if remainder > 0.05:
                         self._pause_aware_delay(remainder)
                 else:
                     self._pause_aware_delay(self.loop_interval)
+        except Exception as e:
+            from logger import log_error
+            log_error("task_loop", e)
         finally:
             self._loop_active = False
 
     def _run_once(self):
         """被依赖触发时执行一次"""
         if not self._running: return
-        if self.loop_interval > 0:
-            i = int(self.loop_interval)
-            while i >= 1:
-                if not self._running: return
-                self._pause_gate()  # 暂停中：冻结在当前秒
+        try:
+            if self.loop_interval > 0:
+                i = int(self.loop_interval)
+                while i >= 1:
+                    if not self._running: return
+                    self._pause_gate()  # 暂停中：冻结在当前秒
+                    if not self._running: return
+                    if self._countdown_callback:
+                        try:
+                            self._countdown_callback(f"● 等待 {i}s...", "#facc15")
+                        except Exception as e:
+                            from logger import log_error
+                            log_error("run_once_cd", e)
+                    self._pause_aware_delay(1)
+                    if not self._running: return
+                    if not self._paused:  # 暂停期间秒数不前进
+                        i -= 1
                 if not self._running: return
                 if self._countdown_callback:
-                    self._countdown_callback(f"● 等待 {i}s...", "#facc15")
-                self._pause_aware_delay(1)
-                if not self._running: return
-                if not self._paused:  # 暂停期间秒数不前进
-                    i -= 1
+                    try:
+                        self._countdown_callback("● 执行中...", "#4ade80")
+                    except Exception as e:
+                        from logger import log_error
+                        log_error("run_once_exec", e)
             if not self._running: return
-            if self._countdown_callback:
-                self._countdown_callback("● 执行中...", "#4ade80")
-        if not self._running: return
-        # 次数限制：跑够自动停
-        if self.max_runs > 0 and self.done_count >= self.max_runs:
-            self._finished_by_limit = True
-            self.stop()
-            return
-        self.done_count += 1
-        self._execute_actions()
-        if self.max_runs > 0 and self.done_count >= self.max_runs:
-            self._finished_by_limit = True
-            self.stop()
-            return
-        if self._callback: self._callback()
+            # 次数限制：跑够自动停
+            if self.max_runs > 0 and self.done_count >= self.max_runs:
+                self._finished_by_limit = True
+                self.stop()
+                return
+            self.done_count += 1
+            self._execute_actions()
+            if self.max_runs > 0 and self.done_count >= self.max_runs:
+                self._finished_by_limit = True
+                self.stop()
+                return
+            if self._callback: self._callback()
+        except Exception as e:
+            from logger import log_error
+            log_error("run_once", e)

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QFrame, QScrollArea, QComboBox, QDoubleSpinBox,
     QInputDialog, QMenu
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QFont, QCursor
 
 import sys
@@ -20,6 +20,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import Colors, FONT_B, FONT_M, load_presets, save_presets
 from tasks.keyboard.keyboard_task import KeyboardTask, make_key_action, make_combo_action, make_click_action, fmt_action
 from vk_map import VK_NAME
+
+
+# ── 跨线程 UI 更新桥 ──────────────────────────────────
+# QTimer.singleShot(0, fn) 从工作线程调用时 timer 挂在工作线程
+# 的 event loop 上——工作线程没有 event loop，timer 永远不触发。
+# 用 Qt Signal + QueuedConnection 确保回调投递到主线程。
+class _UIBridge(QObject):
+    _run = Signal(object)
+
+_ui_bridge = _UIBridge()
+_ui_bridge._run.connect(lambda fn: fn(), Qt.QueuedConnection)
+
+
+def _post_to_main(fn):
+    """跨线程安全投递回调到主线程执行"""
+    _ui_bridge._run.emit(fn)
 
 
 class _Signal:
@@ -973,27 +989,17 @@ def _start_task(app, task):
     btn = task._go_btn
     lbl = task._st_lbl
 
-    def _safe_update(fn):
-        """安全更新UI（从后台线程直接调用，GIL保证原子性）"""
-        def wrapper():
-            try:
-                if lbl and lbl.parent():
-                    fn()
-            except RuntimeError:
-                pass
-        return wrapper
-
     if task.relation_type == "在任务x后":
-        task._callback = _safe_update(lambda: (
+        task._callback = lambda: _post_to_main(lambda: (
             task._st_set_text("● 等待下次触发..."),
-            lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+            task._st_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
         ))
         def _make_cd_cb():
             def cb(t, c):
-                _safe_update(lambda t=t, c=c: (
+                _post_to_main(lambda t=t, c=c: (
                     task._st_set_text(t),
-                    lbl.setStyleSheet(f"color: {c}; background: transparent;")
-                ))()
+                    task._st_lbl.setStyleSheet(f"color: {c}; background: transparent;")
+                ))
             return cb
         task._countdown_callback = _make_cd_cb()
         task.start()
@@ -1014,32 +1020,39 @@ def _start_task(app, task):
         task._countdown_active = True
 
         def _tick(count):
-            if not task._countdown_active:
-                return
-            if getattr(task, '_paused', False):
-                # 暂停中：冻结当前秒数，恢复时从这秒继续
-                QTimer.singleShot(100, lambda: _tick(count))
-                return
-            if count > 0:
-                task._st_set_text(f"● 准备中 {count}...")
-                lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
-                QTimer.singleShot(1000, lambda: _tick(count - 1))
-            else:
-                task._countdown_active = False
-                def _make_cd_cb():
-                    def cb(t, c):
-                        _safe_update(lambda t=t, c=c: (
-                            task._st_set_text(t),
-                            lbl.setStyleSheet(f"color: {c}; background: transparent;")
-                        ))()
-                    return cb
-                task._countdown_callback = _make_cd_cb()
-                task.start(
-                    countdown_callback=task._countdown_callback
-                )
-                task._st_set_text(task.status.value)
-                lbl.setStyleSheet(f"color: {Colors.GREEN}; background: transparent;")
-                update_all_btn(app)
+            try:
+                if not task._countdown_active:
+                    return
+                if getattr(task, '_paused', False):
+                    QTimer.singleShot(100, lambda: _tick(count))
+                    return
+                if count > 0:
+                    task._st_set_text(f"● 准备中 {count}...")
+                    task._st_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+                    QTimer.singleShot(1000, lambda: _tick(count - 1))
+                else:
+                    task._countdown_active = False
+                    def _make_cd_cb():
+                        def cb(t, c):
+                            try:
+                                _post_to_main(lambda t=t, c=c: (
+                                    task._st_set_text(t),
+                                    task._st_lbl.setStyleSheet(f"color: {c}; background: transparent;")
+                                ))
+                            except Exception as e:
+                                from logger import log_error
+                                log_error("countdown_cb", e)
+                        return cb
+                    task._countdown_callback = _make_cd_cb()
+                    task.start(
+                        countdown_callback=task._countdown_callback
+                    )
+                    task._st_set_text(task.status.value)
+                    task._st_lbl.setStyleSheet(f"color: {Colors.GREEN}; background: transparent;")
+                    update_all_btn(app)
+            except Exception as e:
+                from logger import log_error
+                log_error("tick", e)
 
         from config import load_settings
         _tick(load_settings().get("start_countdown", 3))
@@ -1069,25 +1082,29 @@ def _ensure_limit_watcher(app):
 
 def _check_limit_finished(app):
     """检查是否有任务因次数限制跑满自动停了，同步按钮和状态"""
-    for t in list(app.keyboard_tasks):
-        if getattr(t, '_finished_by_limit', False) and not t._running:
-            t._finished_by_limit = False
-            btn = getattr(t, '_go_btn', None)
-            lbl = getattr(t, '_st_lbl', None)
-            try:
-                if btn and btn.parent():
-                    btn.setText("▶ 开始")
-                    btn.setStyleSheet(f"""
-                        QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-                        QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-                    """)
-                if lbl and lbl.parent():
-                    (t._st_set_text if hasattr(t, "_st_set_text") else lbl.setText)(f"✓ 已达上限 {t.done_count} 次")
-                    lbl.setStyleSheet(f"color: {Colors.BLUE}; background: transparent;")
-            except RuntimeError:
-                pass
-            update_all_btn(app)
-            show_floating_notification(app, f"{t.name} 已完成 {t.done_count} 次，自动停止")
+    try:
+        for t in list(app.keyboard_tasks):
+            if getattr(t, '_finished_by_limit', False) and not t._running:
+                t._finished_by_limit = False
+                btn = getattr(t, '_go_btn', None)
+                lbl = getattr(t, '_st_lbl', None)
+                try:
+                    if btn and btn.parent():
+                        btn.setText("▶ 开始")
+                        btn.setStyleSheet(f"""
+                            QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
+                            QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
+                        """)
+                    if lbl and lbl.parent():
+                        (t._st_set_text if hasattr(t, "_st_set_text") else lbl.setText)(f"✓ 已达上限 {t.done_count} 次")
+                        lbl.setStyleSheet(f"color: {Colors.BLUE}; background: transparent;")
+                except RuntimeError:
+                    pass
+                update_all_btn(app)
+                show_floating_notification(app, f"{t.name} 已完成 {t.done_count} 次，自动停止")
+    except Exception as e:
+        from logger import log_error
+        log_error("limit_watcher", e)
 
 
 def del_task(app, task, card):

@@ -64,39 +64,43 @@ class App(QMainWindow):
 
     def _poll_hotkey(self):
         """检测全局热键：捕获模式=抓新键，否则触发开始/停止"""
-        import ctypes
-        u32 = ctypes.windll.user32
-        if self._hotkey_capturing:
-            for vk in range(0x08, 0x100):
-                if u32.GetAsyncKeyState(vk) & 0x0001:
-                    self._hotkey_capturing = False
-                    if vk != 0x1B:  # ESC取消
-                        target = self._hotkey_capture_target
-                        if target == "stop":
-                            self._stop_hotkey = vk
-                            key = "stop_hotkey"
-                        else:
-                            self._start_hotkey = vk
-                            key = "start_hotkey"
-                        s = load_settings()
-                        s[key] = vk
-                        save_settings(s)
-                    from .settings_mode import update_hotkey_label
-                    try: update_hotkey_label(self)
-                    except: pass
-                    return
-            return
-        if u32.GetAsyncKeyState(self._stop_hotkey) & 0x0001:
-            from .keyboard_mode import stop_all, show_floating_notification
-            stop_all(self)
-            if self.mouse_task._running:
-                self.mouse_task.stop()
-            show_floating_notification(self, f"⏹ 已全部停止 ({self._stop_hotkey_name()})")
-        elif u32.GetAsyncKeyState(self._start_hotkey) & 0x0001:
-            from .keyboard_mode import toggle_all, show_floating_notification, update_all_btn
-            running = any(t._running or getattr(t, '_countdown_active', False) for t in self.keyboard_tasks)
-            toggle_all(self)
-            show_floating_notification(self, f"▶ 全部开始 ({self._start_hotkey_name()})" if not running else f"⏹ 已全部停止 ({self._start_hotkey_name()})")
+        try:
+            import ctypes
+            u32 = ctypes.windll.user32
+            if self._hotkey_capturing:
+                for vk in range(0x08, 0x100):
+                    if u32.GetAsyncKeyState(vk) & 0x0001:
+                        self._hotkey_capturing = False
+                        if vk != 0x1B:  # ESC取消
+                            target = self._hotkey_capture_target
+                            if target == "stop":
+                                self._stop_hotkey = vk
+                                key = "stop_hotkey"
+                            else:
+                                self._start_hotkey = vk
+                                key = "start_hotkey"
+                            s = load_settings()
+                            s[key] = vk
+                            save_settings(s)
+                        from .settings_mode import update_hotkey_label
+                        try: update_hotkey_label(self)
+                        except: pass
+                        return
+                return
+            if u32.GetAsyncKeyState(self._stop_hotkey) & 0x0001:
+                from .keyboard_mode import stop_all, show_floating_notification
+                stop_all(self)
+                if self.mouse_task._running:
+                    self.mouse_task.stop()
+                show_floating_notification(self, f"⏹ 已全部停止 ({self._stop_hotkey_name()})")
+            elif u32.GetAsyncKeyState(self._start_hotkey) & 0x0001:
+                from .keyboard_mode import toggle_all, show_floating_notification, update_all_btn
+                running = any(t._running or getattr(t, '_countdown_active', False) for t in self.keyboard_tasks)
+                toggle_all(self)
+                show_floating_notification(self, f"▶ 全部开始 ({self._start_hotkey_name()})" if not running else f"⏹ 已全部停止 ({self._start_hotkey_name()})")
+        except Exception as e:
+            from logger import log_error
+            log_error("hotkey_poll", e)
 
     def _stop_hotkey_name(self):
         from vk_map import VK_NAME
