@@ -57,6 +57,7 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.6.1 | PySide6 | Stability fixes for long idle sessions |
 | v3.6 | PySide6 | Pause all tasks, collapse task cards |
 | v3.5 | PySide6 | Key combos, settings pages, portable exe |
 | v3.4 | PySide6 | Global stop hotkey & run-count limit |
@@ -66,6 +67,12 @@ FlowTap/
 | v3 | PySide6 | Qt migration, solves CTk rendering flicker |
 | v2 | CustomTkinter | Unified keyboard+mouse task mode |
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
+
+### v3.6.1 — Stability Fixes
+
+**Fixed**
+- **Silent crash during long idle sessions** — Fixed the program occasionally exiting without warning during extended idle runtime; added runtime logging to record exceptions
+- **Task cannot restart after abnormal stop** — Fixed the loop thread not being properly released after an abnormal stop, preventing the task from being restarted
 
 ### v3.6 — Pause All & Card Collapse
 
