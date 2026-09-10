@@ -796,9 +796,7 @@ def _refresh_actions(app, task):
         del_btn.clicked.connect(lambda checked, i=idx: _delete_action(app, task, i))
         row_layout.addWidget(del_btn)
 
-        # 拖动排序
-        EDGE = 12  # 行顶部/底部12px为插入检测区
-
+        # 拖动排序（检测区=行高30%，UI不变）
         def _drag_start(e, _idx=idx, _row=row):
             if e.button() == Qt.LeftButton:
                 from PySide6.QtGui import QDrag
@@ -826,14 +824,12 @@ def _refresh_actions(app, task):
                 _clear_hl()
                 y = e.position().y()
                 h = _row.height()
-                if y < EDGE:
-                    # 鼠标在行顶部 → 插到这行前面
+                zone = h * 0.3  # 行高30%为检测区
+                if y < zone:
                     _row.setHighlight(top=True)
-                elif y > h - EDGE:
-                    # 鼠标在行底部 → 插到这行后面
+                elif y > h - zone:
                     _row.setHighlight(bottom=True)
                 else:
-                    # 鼠标在行中间 → 高亮整行（替换位置）
                     _row.setHighlight(top=True, bottom=True)
 
         def _drop(e, _idx=idx, _row=row):
@@ -843,9 +839,10 @@ def _refresh_actions(app, task):
                     from_idx = int(e.mimeData().text())
                     y = e.position().y()
                     h = _row.height()
-                    if y < EDGE:
+                    zone = h * 0.3
+                    if y < zone:
                         to_idx = _idx
-                    elif y > h - EDGE:
+                    elif y > h - zone:
                         to_idx = _idx + 1
                     else:
                         to_idx = _idx
