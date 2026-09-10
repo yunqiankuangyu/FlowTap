@@ -58,6 +58,7 @@ FlowTap/
 | Version | Framework | Highlights |
 |---------|-----------|------------|
 | v3.7 | PySide6 | Drag-and-drop reorder for action rows |
+| v3.6.1 | PySide6 | Stability fixes for long idle sessions |
 | v3.6 | PySide6 | Pause all tasks, collapse task cards |
 | v3.5 | PySide6 | Key combos, settings pages, portable exe |
 | v3.4 | PySide6 | Global stop hotkey & run-count limit |
