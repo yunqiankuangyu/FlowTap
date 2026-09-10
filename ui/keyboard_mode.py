@@ -704,12 +704,14 @@ class DraggableRow(QFrame):
         self.update()
 
     def setDragging(self, dragging):
-        """拖动中：自身变灰"""
-        self._dragging = dragging
+        """拖动中：自身变半透明"""
+        from PySide6.QtWidgets import QGraphicsOpacityEffect
         if dragging:
-            self.setStyleSheet(f"DraggableRow {{ background: {Colors.CARD}; border-radius: 8px; opacity: 0.4; }}")
+            eff = QGraphicsOpacityEffect(self)
+            eff.setOpacity(0.25)
+            self.setGraphicsEffect(eff)
         else:
-            self.setStyleSheet(f"DraggableRow {{ background: {Colors.ACCENT}; border-radius: 8px; }}")
+            self.setGraphicsEffect(None)
 
     def paintEvent(self, event):
         super().paintEvent(event)
