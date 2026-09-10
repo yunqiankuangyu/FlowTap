@@ -543,6 +543,8 @@ def create_card(app, task):
     task._action_layout = QVBoxLayout(task._action_frame)
     task._action_layout.setContentsMargins(0, 0, 0, 0)
     task._action_layout.setSpacing(2)
+
+
     task._action_rows = []
     task._action_frame.setVisible(False)
     card_layout.addWidget(task._action_frame)
@@ -688,6 +690,36 @@ def toggle_card(app, task):
     auto_size(app)
 
 
+class DraggableRow(QFrame):
+    """可拖动的动作行，用QPainter画高亮线，不影响内部布局"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._hl_top = False
+        self._hl_bottom = False
+
+    def setHighlight(self, top=False, bottom=False):
+        self._hl_top = top
+        self._hl_bottom = bottom
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self._hl_top or self._hl_bottom:
+            from PySide6.QtGui import QPainter, QColor, QPen
+            from PySide6.QtCore import Qt
+            p = QPainter(self)
+            p.setRenderHint(QPainter.Antialiasing, False)
+            pen = QPen(QColor(Colors.BLUE), 2, Qt.SolidLine)
+            p.setPen(pen)
+            w = self.width()
+            if self._hl_top:
+                p.drawLine(8, 1, w - 8, 1)
+            if self._hl_bottom:
+                p.drawLine(8, self.height() - 2, w - 8, self.height() - 2)
+            p.end()
+
+
+
 def _refresh_actions(app, task):
     """刷新动作列表UI"""
     while task._action_layout.count():
@@ -698,22 +730,29 @@ def _refresh_actions(app, task):
     task._action_frame.setVisible(bool(task.actions))
 
     for idx, action in enumerate(task.actions):
-        row = QFrame()
-        row.setStyleSheet(f"QFrame {{ background: {Colors.ACCENT}; border-radius: 8px; }}")
+        row = DraggableRow()
+        row.setStyleSheet(f"DraggableRow {{ background: {Colors.ACCENT}; border-radius: 8px; }}")
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(6, 4, 6, 4)
         row_layout.setSpacing(4)
 
-        num_lbl = _make_label(f"{idx+1}.", color=Colors.DIM)
-        num_lbl.setFixedWidth(22)
-        row_layout.addWidget(num_lbl)
+        # ☰ 拖动排序手柄
+        drag_btn = QPushButton("☰")
+        drag_btn.setFixedSize(22, 18)
+        drag_btn.setCursor(QCursor(Qt.SizeVerCursor))
+        drag_btn.setStyleSheet(f"""
+            QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 12px 'MiSans'; }}
+            QPushButton:hover {{ color: {Colors.TEXT}; background: {Colors.ACCENT}; border-radius: 4px; }}
+        """)
+        drag_btn.setToolTip("拖动排序")
+        row_layout.addWidget(drag_btn)
 
         desc = fmt_action(action)
         desc_font = QFont("MiSans", 10, QFont.Bold)
         desc_lbl = _make_label(desc, font=desc_font)
         row_layout.addWidget(desc_lbl, 1)
 
-        hold_label = _make_label("持续", color=Colors.DIM)
+        hold_label = _make_label("持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
         row_layout.addWidget(hold_label)
 
         hold_spin = QDoubleSpinBox()
@@ -728,9 +767,9 @@ def _refresh_actions(app, task):
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("hold", round(v, 2)))
         row_layout.addWidget(hold_spin)
-        row_layout.addWidget(_make_label("s", color=Colors.DIM))
+        row_layout.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
-        delay_label = _make_label("后延", color=Colors.DIM)
+        delay_label = _make_label("后延", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
         row_layout.addWidget(delay_label)
 
         delay_spin = QDoubleSpinBox()
@@ -745,7 +784,7 @@ def _refresh_actions(app, task):
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("delay", round(v, 2)))
         row_layout.addWidget(delay_spin)
-        row_layout.addWidget(_make_label("s", color=Colors.DIM))
+        row_layout.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
         del_btn = QPushButton("✕")
         del_btn.setFixedSize(18, 18)
@@ -757,10 +796,82 @@ def _refresh_actions(app, task):
         del_btn.clicked.connect(lambda checked, i=idx: _delete_action(app, task, i))
         row_layout.addWidget(del_btn)
 
+        # 拖动排序
+        EDGE = 12  # 行顶部/底部12px为插入检测区
+
+        def _drag_start(e, _idx=idx, _row=row):
+            if e.button() == Qt.LeftButton:
+                from PySide6.QtGui import QDrag
+                from PySide6.QtCore import QMimeData
+                drag = QDrag(_row)
+                mime = QMimeData()
+                mime.setText(str(_idx))
+                drag.setMimeData(mime)
+                drag.exec_(Qt.MoveAction)
+
+        drag_btn.mousePressEvent = _drag_start
+        row.setAcceptDrops(True)
+
+        def _clear_hl():
+            for r_info in task._action_rows:
+                r_info["frame"].setHighlight()
+
+        def _drag_enter(e, _row=row, _idx=idx):
+            if e.mimeData().hasText():
+                e.acceptProposedAction()
+
+        def _drag_move(e, _row=row, _idx=idx):
+            if e.mimeData().hasText():
+                e.acceptProposedAction()
+                _clear_hl()
+                y = e.position().y()
+                h = _row.height()
+                if y < EDGE:
+                    # 鼠标在行顶部 → 插到这行前面
+                    _row.setHighlight(top=True)
+                elif y > h - EDGE:
+                    # 鼠标在行底部 → 插到这行后面
+                    _row.setHighlight(bottom=True)
+                else:
+                    # 鼠标在行中间 → 高亮整行（替换位置）
+                    _row.setHighlight(top=True, bottom=True)
+
+        def _drop(e, _idx=idx, _row=row):
+            _clear_hl()
+            if e.mimeData().hasText():
+                try:
+                    from_idx = int(e.mimeData().text())
+                    y = e.position().y()
+                    h = _row.height()
+                    if y < EDGE:
+                        to_idx = _idx
+                    elif y > h - EDGE:
+                        to_idx = _idx + 1
+                    else:
+                        to_idx = _idx
+                    if from_idx != to_idx and 0 <= from_idx < len(task.actions):
+                        action_item = task.actions.pop(from_idx)
+                        if from_idx < to_idx:
+                            to_idx -= 1
+                        task.actions.insert(to_idx, action_item)
+                        _refresh_actions(app, task)
+                except:
+                    pass
+            e.acceptProposedAction()
+
+        def _drag_leave(e, _row=row):
+            _clear_hl()
+
+        row.dragEnterEvent = _drag_enter
+        row.dragMoveEvent = _drag_move
+        row.dragLeaveEvent = _drag_leave
+        row.dropEvent = _drop
         task._action_layout.addWidget(row)
         task._action_rows.append({"frame": row, "action": action, "desc_lbl": desc_lbl})
 
-    auto_size(app)  # 动作行增删后窗口高度跟手
+    auto_size(app)
+    from .settings_mode import install_wheel_guard
+    install_wheel_guard(app)  # 新卡片的 spinbox 防滚轮误触
 
 
 def _delete_action(app, task, idx):

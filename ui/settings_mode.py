@@ -122,7 +122,7 @@ def build_settings_mode(app):
     ti_row_layout.setSpacing(6)
 
     app._title_edit = QLineEdit(s.get("window_title", ""))
-    app._title_edit.setPlaceholderText("⚡ 工具（默认）")
+    app._title_edit.setPlaceholderText("FlowTap（默认）")
     app._title_edit.setFixedHeight(28)
     app._title_edit.setFont(QFont("MiSans", 10, QFont.Bold))
     app._title_edit.setStyleSheet(f"""
@@ -135,7 +135,7 @@ def build_settings_mode(app):
         s2 = load_settings()
         s2["window_title"] = text
         save_settings(s2)
-        app._title_label.setText(text or "⚡ 工具")
+        app._title_label.setText(text or "FlowTap")
         from .keyboard_mode import show_floating_notification
         show_floating_notification(app, "✓ 标题已更新" if text else "✓ 已恢复默认标题")
     ti_apply_btn = QPushButton("应用")
@@ -578,7 +578,7 @@ def apply_settings(app):
     cur.update(s)
     save_settings(cur)
     # 窗口标题即时生效
-    app._title_label.setText(s["window_title"] or "⚡ 工具")
+    app._title_label.setText(s["window_title"] or "FlowTap")
     # 主题即时生效：重设 Colors 类属性后重建 UI（样式表都是构建时插值的）
     Colors.apply(s["theme"])
     _rebuild_ui(app)

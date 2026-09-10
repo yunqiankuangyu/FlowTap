@@ -92,12 +92,12 @@ class App(QMainWindow):
                 stop_all(self)
                 if self.mouse_task._running:
                     self.mouse_task.stop()
-                show_floating_notification(self, f"⏹ 已全部停止 ({self._stop_hotkey_name()})")
+                show_floating_notification(self, f"⏹ 已停止 ({self._stop_hotkey_name()})")
             elif u32.GetAsyncKeyState(self._start_hotkey) & 0x0001:
                 from .keyboard_mode import toggle_all, show_floating_notification, update_all_btn
                 running = any(t._running or getattr(t, '_countdown_active', False) for t in self.keyboard_tasks)
                 toggle_all(self)
-                show_floating_notification(self, f"▶ 全部开始 ({self._start_hotkey_name()})" if not running else f"⏹ 已全部停止 ({self._start_hotkey_name()})")
+                show_floating_notification(self, f"▶ 开始 ({self._start_hotkey_name()})" if not running else f"⏹ 已停止 ({self._start_hotkey_name()})")
         except Exception as e:
             from logger import log_error
             log_error("hotkey_poll", e)
