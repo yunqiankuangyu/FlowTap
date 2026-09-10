@@ -824,7 +824,7 @@ def _refresh_actions(app, task):
                 _clear_hl()
                 y = e.position().y()
                 h = _row.height()
-                zone = h * 0.3  # 行高30%为检测区
+                zone = h * 0.5  # 行高30%为检测区
                 if y < zone:
                     _row.setHighlight(top=True)
                 elif y > h - zone:
@@ -839,7 +839,7 @@ def _refresh_actions(app, task):
                     from_idx = int(e.mimeData().text())
                     y = e.position().y()
                     h = _row.height()
-                    zone = h * 0.3
+                    zone = h * 0.5
                     if y < zone:
                         to_idx = _idx
                     elif y > h - zone:
