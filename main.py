@@ -2,7 +2,7 @@
 FlowTap
 依赖: pip install PySide6
 """
-__version__ = "3.6.1"
+__version__ = "3.7"
 
 import sys
 import os
