@@ -696,11 +696,20 @@ class DraggableRow(QFrame):
         super().__init__(parent)
         self._hl_top = False
         self._hl_bottom = False
+        self._dragging = False
 
     def setHighlight(self, top=False, bottom=False):
         self._hl_top = top
         self._hl_bottom = bottom
         self.update()
+
+    def setDragging(self, dragging):
+        """拖动中：自身变灰"""
+        self._dragging = dragging
+        if dragging:
+            self.setStyleSheet(f"DraggableRow {{ background: {Colors.CARD}; border-radius: 8px; opacity: 0.4; }}")
+        else:
+            self.setStyleSheet(f"DraggableRow {{ background: {Colors.ACCENT}; border-radius: 8px; }}")
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -801,11 +810,13 @@ def _refresh_actions(app, task):
             if e.button() == Qt.LeftButton:
                 from PySide6.QtGui import QDrag
                 from PySide6.QtCore import QMimeData
+                _row.setDragging(True)
                 drag = QDrag(_row)
                 mime = QMimeData()
                 mime.setText(str(_idx))
                 drag.setMimeData(mime)
                 drag.exec_(Qt.MoveAction)
+                _row.setDragging(False)
 
         drag_btn.mousePressEvent = _drag_start
         row.setAcceptDrops(True)
