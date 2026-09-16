@@ -169,22 +169,10 @@ def build_keyboard_mode(app):
 
     # ── 滚动区（expand 填充中间剩余空间）──
     app._task_scroll = QScrollArea()
-    app._task_scroll.setWidgetResizable(False)  # 手动控制容器高度，防止卡片被拉伸
+    app._task_scroll.setWidgetResizable(True)  # 容器自动填满 viewport，卡片由 layout 管理
     app._task_scroll.setFrameShape(QFrame.NoFrame)
     app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
     app._task_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-    # 手动同步容器尺寸：用 auto_size 计算出的精确高度（不依赖 sizeHint）
-    def _sync_container(e=None):
-        if e:
-            QScrollArea.resizeEvent(app._task_scroll, e)
-        vp = app._task_scroll.viewport()
-        c = app._task_container
-        ch = getattr(app, '_content_height', 0)
-        if ch > 0 and (c.height() != ch or c.width() != vp.width()):
-            c.resize(vp.width(), ch)
-    app._task_scroll.resizeEvent = _sync_container
-    app._sync_container = _sync_container
     app._task_scroll.setStyleSheet(f"""
         QScrollArea {{ background: {Colors.ACCENT}; border: none; }}
         QScrollBar:vertical {{ background: transparent; width: 6px; border-radius: 3px; margin: 0; }}
@@ -437,8 +425,6 @@ def auto_size(app):
     for i, t in enumerate(app.keyboard_tasks):
         ch = _card_height(t)
         content += ch
-        if i < len(app._cards):
-            app._cards[i].setFixedHeight(ch)
     content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
 
     # 框架高度：标题栏 + 预设栏 + 容器间距 + 底部栏 + 拖动条
@@ -456,10 +442,6 @@ def auto_size(app):
     _dbg(f"auto_size: content={content} framework={framework} h={h} tasks={len(app.keyboard_tasks)} cards={len(app._cards)}")
     app._tracked_height = h
     app.setFixedSize(360, h)
-    # 手动同步容器尺寸（setWidgetResizable=False 时需要）
-    app._content_height = content
-    vp = app._task_scroll.viewport()
-    app._task_container.resize(vp.width(), content)
 
 
 def _task_active(t):
