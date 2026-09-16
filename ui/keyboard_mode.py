@@ -325,6 +325,11 @@ def _build_drag_handle(app):
     handle.setMouseTracking(True)
     return handle
 
+import os as _os
+def _dbg(msg):
+    with open(_os.path.join(_os.path.dirname(__file__), '_card_dbg.log'), 'a', encoding='utf-8') as f:
+        f.write(msg + '\n')
+
 def _card_height(task):
     """计算卡片应有高度：从 widget 实际固定尺寸累加，不依赖 sizeHint()"""
     def _layout_h(lay, include_hidden=False):
@@ -346,9 +351,11 @@ def _card_height(task):
 
     fold_btn = getattr(task, '_fold_btn', None)
     if not fold_btn:
+        _dbg("no fold_btn")
         return 49
     card = fold_btn.parentWidget()
     if not card:
+        _dbg("no card")
         return 49
 
     margins = card.layout().contentsMargins()
@@ -362,24 +369,31 @@ def _card_height(task):
         hdr_h = fold_btn.height() or fold_btn.maximumHeight() or 22
 
     if getattr(task, '_collapsed', False):
-        return margin_h + hdr_h
+        h = margin_h + hdr_h
+        _dbg(f"collapsed h={h} margin={margin_h} hdr={hdr_h}")
+        return h
 
     # 展开态：只计算可见子组件
     visible_h = hdr_h
+    extra_details = []
     for w in getattr(task, '_extra_rows', []):
         if w.isVisible():
             row_h = _layout_h(w.layout())
             if row_h <= 0:
                 row_h = w.height() or w.maximumHeight() or 30
             visible_h += spacing + row_h
+            extra_details.append(f"{type(w).__name__}={row_h}")
     af = getattr(task, '_action_frame', None)
+    af_h_val = 0
     if af and af.isVisible():
-        af_h = _layout_h(af.layout())
-        if af_h <= 0:
-            af_h = af.height() or af.maximumHeight() or 30
-        visible_h += spacing + af_h
+        af_h_val = _layout_h(af.layout())
+        if af_h_val <= 0:
+            af_h_val = af.height() or af.maximumHeight() or 30
+        visible_h += spacing + af_h_val
 
-    return margin_h + visible_h
+    h = margin_h + visible_h
+    _dbg(f"expand h={h} margin={margin_h} hdr={hdr_h} extras={'+'.join(extra_details)} af={af_h_val} spacing={spacing}")
+    return h
 
 
 ACTION_ROW_H = 26   # DraggableRow 行高
@@ -413,6 +427,7 @@ def auto_size(app):
     framework = titlebar_h + preset_h + container_top + layout_spacing + bar_h + handle_h
 
     h = max(220, min(600, framework + content))
+    _dbg(f"auto_size: content={content} framework={framework} h={h} tasks={len(app.keyboard_tasks)} cards={len(app._cards)}")
     app._tracked_height = h
     app.setFixedSize(360, h)
     # 手动同步容器尺寸（setWidgetResizable=False 时需要）
