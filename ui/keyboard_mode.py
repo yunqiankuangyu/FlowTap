@@ -180,11 +180,11 @@ def build_keyboard_mode(app):
             QScrollArea.resizeEvent(app._task_scroll, e)
         vp = app._task_scroll.viewport()
         c = app._task_container
-        sh = c.sizeHint().height()
-        if c.height() != sh or c.width() != vp.width():
-            c.resize(vp.width(), sh)
+        ch = getattr(app, '_content_height', 0)
+        if ch > 0 and (c.height() != ch or c.width() != vp.width()):
+            c.resize(vp.width(), ch)
     app._task_scroll.resizeEvent = _sync_container
-    app._sync_container = _sync_container  # auto_size 里也要调用
+    app._sync_container = _sync_container  # 备用引用
     app._task_scroll.setStyleSheet(f"""
         QScrollArea {{ background: {Colors.ACCENT}; border: none; }}
         QScrollBar:vertical {{ background: transparent; width: 6px; border-radius: 3px; margin: 0; }}
@@ -397,9 +397,10 @@ def auto_size(app):
     h = max(220, min(600, framework + content))
     app._tracked_height = h
     app.setFixedSize(360, h)
-    # 卡片增删后主动同步容器尺寸（窗口大小可能不变，但容器内容变了）
-    if hasattr(app, '_sync_container'):
-        app._sync_container(None)
+    # 直接用计算出的 content 高度设容器尺寸（不依赖 sizeHint，避免 layout 未完成时拿到0）
+    app._content_height = content
+    vp = app._task_scroll.viewport()
+    app._task_container.resize(vp.width(), content)
     # 注意：这里不回写 window_height——该值只代表"用户拖动的高度"，
     # auto_size 是它的消费者不是生产者，否则会滚雪球越算越高。
 
