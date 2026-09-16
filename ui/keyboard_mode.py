@@ -326,10 +326,10 @@ def _build_drag_handle(app):
     return handle
 
 def _card_height(task):
-    """从真实 widget 尺寸计算卡片高度（不依赖硬编码像素值）"""
+    """从真实 widget 尺寸计算卡片高度（考虑 hidden 子组件，sizeHint 会包含它们）"""
     fold_btn = getattr(task, '_fold_btn', None)
     if not fold_btn:
-        return 49  # fallback：卡片还没构建完
+        return 49
     card = fold_btn.parentWidget()
     if not card:
         return 49
@@ -338,7 +338,7 @@ def _card_height(task):
     spacing = card.layout().spacing()
     margin_h = margins.top() + margins.bottom()
 
-    # 标题行：从第一个子 layout 的实际内容取高度
+    # 标题行高度
     hdr_layout = card.layout().itemAt(0)
     hdr_h = 0
     if hdr_layout and hdr_layout.layout():
@@ -347,25 +347,21 @@ def _card_height(task):
             if w:
                 hdr_h = max(hdr_h, w.sizeHint().height())
     if hdr_h <= 0:
-        hdr_h = 27  # fallback
+        hdr_h = 27
 
     if getattr(task, '_collapsed', False):
         return margin_h + hdr_h
 
-    # 展开：标题行 + 按钮行 + 设置行 + 动作列表 + spacing
-    extra_h = 0
+    # 展开态：只计算可见子组件
+    visible_h = hdr_h
     for w in getattr(task, '_extra_rows', []):
-        extra_h += w.sizeHint().height() if w.isVisible() else 25
-    action_h = 0
+        if w.isVisible():
+            visible_h += spacing + w.sizeHint().height()
     af = getattr(task, '_action_frame', None)
-    if af:
-        action_h = af.sizeHint().height() if af.isVisible() else 0
-    visible_widgets = 1 + len(getattr(task, '_extra_rows', []))
-    if action_h > 0:
-        visible_widgets += 1
-    total_spacing = spacing * (visible_widgets - 1)
+    if af and af.isVisible():
+        visible_h += spacing + af.sizeHint().height()
 
-    return margin_h + hdr_h + extra_h + action_h + total_spacing
+    return margin_h + visible_h
 
 
 ACTION_ROW_H = 26   # DraggableRow 行高
@@ -378,15 +374,13 @@ def auto_size(app):
     if getattr(app, '_manual_resize', False):
         return
     # 卡片高度从真实 widget 尺寸动态计算
-    # 用 setMaximumHeight 限制卡片不能超过 sizeHint，防止被 layout 拉伸
+    # 用 setMaximumHeight 限制卡片不能超过计算高度，防止被 layout 拉伸
     content = 0
     for i, t in enumerate(app.keyboard_tasks):
+        ch = _card_height(t)
+        content += ch
         if i < len(app._cards):
-            card = app._cards[i]
-            card.setMaximumHeight(card.sizeHint().height())
-            content += card.sizeHint().height()
-        else:
-            content += _card_height(t)
+            app._cards[i].setMaximumHeight(ch)
     content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
 
     # 框架高度：标题栏 + 预设栏 + 容器间距 + 底部栏 + 拖动条
@@ -1328,6 +1322,7 @@ def load_preset(app):
             item.widget().deleteLater()
     app._cards.clear()
     app.keyboard_tasks.clear()
+    app._task_layout.addStretch()  # 重建 stretch spacer（上面的 while 把它也删了）
 
     p = presets[name]
     for td in p.get("tasks", []):
