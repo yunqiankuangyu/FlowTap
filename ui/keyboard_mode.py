@@ -335,23 +335,35 @@ def _dbg(msg):
         f.write(msg + '\n')
 
 def _card_height(task):
-    """计算卡片应有高度：从 widget 实际固定尺寸累加，不依赖 sizeHint()"""
-    def _layout_h(lay, include_hidden=False):
-        """递归计算 layout 中所有可见 widget 的最大高度"""
-        mx = 0
+    """计算卡片应有高度：从 widget 实际尺寸累加，不依赖 isVisible()"""
+    def _row_height(w):
+        """计算一个 row widget 的真实高度（含内部 layout 的 margins）"""
+        # 优先用已布局的尺寸
+        h = w.height()
+        if h > 0:
+            return h
+        # 未布局时，从 layout 内部 widget 推算
+        lay = w.layout()
         if not lay:
-            return mx
+            return w.maximumHeight() or 30
+        margins = lay.contentsMargins()
+        mx = 0
         for j in range(lay.count()):
             it = lay.itemAt(j)
             if not it:
                 continue
-            w = it.widget()
-            if w and (include_hidden or w.isVisible()):
-                mx = max(mx, w.height() or w.maximumHeight() or 25)
+            cw = it.widget()
+            if cw:
+                mx = max(mx, cw.height() or cw.maximumHeight() or 25)
             sub = it.layout()
             if sub:
-                mx = max(mx, _layout_h(sub, include_hidden))
-        return mx
+                # 递归子 layout
+                for k in range(sub.count()):
+                    sit = sub.itemAt(k)
+                    if sit and sit.widget():
+                        sw = sit.widget()
+                        mx = max(mx, sw.height() or sw.maximumHeight() or 25)
+        return (mx + margins.top() + margins.bottom()) if mx > 0 else 30
 
     fold_btn = getattr(task, '_fold_btn', None)
     if not fold_btn:
@@ -366,9 +378,19 @@ def _card_height(task):
     spacing = card.layout().spacing()
     margin_h = margins.top() + margins.bottom()
 
-    # 标题行高度：header layout 中最高的 widget
+    # 标题行高度
     hdr_lay = card.layout().itemAt(0)
-    hdr_h = _layout_h(hdr_lay.layout() if hdr_lay else None)
+    hdr_h = 0
+    if hdr_lay and hdr_lay.layout():
+        hdr_widget = hdr_lay.widget() if hasattr(hdr_lay, 'widget') else None
+        if hdr_widget:
+            hdr_h = _row_height(hdr_widget)
+        else:
+            # HBoxLayout 直接取 max widget
+            for i in range(hdr_lay.layout().count()):
+                w = hdr_lay.layout().itemAt(i).widget()
+                if w:
+                    hdr_h = max(hdr_h, w.height() or w.maximumHeight() or 22)
     if hdr_h <= 0:
         hdr_h = fold_btn.height() or fold_btn.maximumHeight() or 22
 
@@ -389,9 +411,7 @@ def _card_height(task):
         else:
             should_show = (not is_af) or bool(task.actions)
         if should_show:
-            row_h = _layout_h(w.layout())
-            if row_h <= 0:
-                row_h = w.height() or w.maximumHeight() or 30
+            row_h = _row_height(w)
             visible_h += spacing + row_h
             extra_details.append(f"{type(w).__name__}={row_h}")
     af = getattr(task, '_action_frame', None)
