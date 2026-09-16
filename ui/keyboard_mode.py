@@ -1334,6 +1334,7 @@ def load_preset(app):
         app.keyboard_tasks.append(task)
         create_card(app, task)
 
+    app._manual_resize = False  # 加载预设恢复自动调整
     auto_size(app)
     show_floating_notification(app, f"已加载: {name}")
 
