@@ -326,7 +326,24 @@ def _build_drag_handle(app):
     return handle
 
 def _card_height(task):
-    """从真实 widget 尺寸计算卡片高度（考虑 hidden 子组件，sizeHint 会包含它们）"""
+    """计算卡片应有高度：从 widget 实际固定尺寸累加，不依赖 sizeHint()"""
+    def _layout_h(lay, include_hidden=False):
+        """递归计算 layout 中所有可见 widget 的最大高度"""
+        mx = 0
+        if not lay:
+            return mx
+        for j in range(lay.count()):
+            it = lay.itemAt(j)
+            if not it:
+                continue
+            w = it.widget()
+            if w and (include_hidden or w.isVisible()):
+                mx = max(mx, w.height() or w.maximumHeight() or 25)
+            sub = it.layout()
+            if sub:
+                mx = max(mx, _layout_h(sub, include_hidden))
+        return mx
+
     fold_btn = getattr(task, '_fold_btn', None)
     if not fold_btn:
         return 49
@@ -338,16 +355,11 @@ def _card_height(task):
     spacing = card.layout().spacing()
     margin_h = margins.top() + margins.bottom()
 
-    # 标题行高度
-    hdr_layout = card.layout().itemAt(0)
-    hdr_h = 0
-    if hdr_layout and hdr_layout.layout():
-        for i in range(hdr_layout.layout().count()):
-            w = hdr_layout.layout().itemAt(i).widget()
-            if w:
-                hdr_h = max(hdr_h, w.sizeHint().height())
+    # 标题行高度：header layout 中最高的 widget
+    hdr_lay = card.layout().itemAt(0)
+    hdr_h = _layout_h(hdr_lay.layout() if hdr_lay else None)
     if hdr_h <= 0:
-        hdr_h = 27
+        hdr_h = fold_btn.height() or fold_btn.maximumHeight() or 22
 
     if getattr(task, '_collapsed', False):
         return margin_h + hdr_h
@@ -356,10 +368,16 @@ def _card_height(task):
     visible_h = hdr_h
     for w in getattr(task, '_extra_rows', []):
         if w.isVisible():
-            visible_h += spacing + w.sizeHint().height()
+            row_h = _layout_h(w.layout())
+            if row_h <= 0:
+                row_h = w.height() or w.maximumHeight() or 30
+            visible_h += spacing + row_h
     af = getattr(task, '_action_frame', None)
     if af and af.isVisible():
-        visible_h += spacing + af.sizeHint().height()
+        af_h = _layout_h(af.layout())
+        if af_h <= 0:
+            af_h = af.height() or af.maximumHeight() or 30
+        visible_h += spacing + af_h
 
     return margin_h + visible_h
 
