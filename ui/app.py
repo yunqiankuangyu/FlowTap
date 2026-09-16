@@ -26,7 +26,7 @@ class App(QMainWindow):
         Colors.apply(self._settings["theme"])
 
         self.setWindowTitle(DISGUISE_TITLE)
-        self.setFixedSize(360, 200)
+        self.setFixedSize(360, 400)
         flags = Qt.FramelessWindowHint
         if self._settings.get("always_on_top", True):
             flags |= Qt.WindowStaysOnTopHint
@@ -122,6 +122,9 @@ class App(QMainWindow):
         central.setStyleSheet(f"background: {Colors.CARD};")
         self.setCentralWidget(central)
         self._central_layout = QVBoxLayout(central)
+        self.setStyleSheet(f"""
+            QToolTip {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: 1px solid {Colors.DIM}; border-radius: 4px; padding: 4px 8px; font: 11px 'MiSans'; }}
+        """)
         self._central_layout.setContentsMargins(0, 0, 0, 0)
         self._central_layout.setSpacing(0)
 
