@@ -377,30 +377,28 @@ def _card_height(task):
         _dbg(f"collapsed h={h} margin={margin_h} hdr={hdr_h}")
         return h
 
-    # 展开态：只计算可见子组件
+    # 展开态：用 task 状态判断，不用 isVisible()（parent 未 show 时会全返回 False）
+    collapsed = getattr(task, '_collapsed', False)
     visible_h = hdr_h
     extra_details = []
-    _extra = getattr(task, '_extra_rows', [])
-    _has_attr = hasattr(task, '_extra_rows')
-    _dbg(f"  _extra_rows: has={_has_attr} count={len(_extra)} task_id={getattr(task,'task_id','?')} collapsed={getattr(task,'_collapsed','?')}")
-    _dbg(f"  vis={[w.isVisible() for w in _extra]} types={[type(w).__name__ for w in _extra]}")
-    for w in _extra:
-        if w.isVisible():
+    for w in getattr(task, '_extra_rows', []):
+        # settings frame 展开时可见；action frame 还要看有没有 actions
+        is_af = (w is getattr(task, '_action_frame', None))
+        if collapsed:
+            should_show = False
+        else:
+            should_show = (not is_af) or bool(task.actions)
+        if should_show:
             row_h = _layout_h(w.layout())
             if row_h <= 0:
                 row_h = w.height() or w.maximumHeight() or 30
             visible_h += spacing + row_h
             extra_details.append(f"{type(w).__name__}={row_h}")
     af = getattr(task, '_action_frame', None)
-    af_h_val = 0
-    if af and af.isVisible():
-        af_h_val = _layout_h(af.layout())
-        if af_h_val <= 0:
-            af_h_val = af.height() or af.maximumHeight() or 30
-        visible_h += spacing + af_h_val
+    # af 已经在上面的循环里处理了，这里不再重复
 
     h = margin_h + visible_h
-    _dbg(f"expand h={h} margin={margin_h} hdr={hdr_h} extras={'+'.join(extra_details)} af={af_h_val} spacing={spacing}")
+    _dbg(f"expand h={h} margin={margin_h} hdr={hdr_h} extras={'+'.join(extra_details)} spacing={spacing}")
     return h
 
 
