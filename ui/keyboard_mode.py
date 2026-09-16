@@ -326,8 +326,12 @@ def _build_drag_handle(app):
     return handle
 
 import os as _os
+_dbg_path = _os.path.join(_os.path.dirname(__file__), '_card_dbg.log')
+# 清空旧日志
+with open(_dbg_path, 'w', encoding='utf-8') as f:
+    f.write('')
 def _dbg(msg):
-    with open(_os.path.join(_os.path.dirname(__file__), '_card_dbg.log'), 'a', encoding='utf-8') as f:
+    with open(_dbg_path, 'a', encoding='utf-8') as f:
         f.write(msg + '\n')
 
 def _card_height(task):
@@ -377,7 +381,9 @@ def _card_height(task):
     visible_h = hdr_h
     extra_details = []
     _extra = getattr(task, '_extra_rows', [])
-    _dbg(f"  _extra_rows count={len(_extra)} vis={[w.isVisible() for w in _extra]}")
+    _has_attr = hasattr(task, '_extra_rows')
+    _dbg(f"  _extra_rows: has={_has_attr} count={len(_extra)} task_id={getattr(task,'task_id','?')} collapsed={getattr(task,'_collapsed','?')}")
+    _dbg(f"  vis={[w.isVisible() for w in _extra]} types={[type(w).__name__ for w in _extra]}")
     for w in _extra:
         if w.isVisible():
             row_h = _layout_h(w.layout())
@@ -772,6 +778,7 @@ def create_card(app, task):
 
     card_layout.addWidget(sf)
     task._extra_rows.append(sf)
+    _dbg(f"create_card: task_id={task.task_id} _extra_rows={len(task._extra_rows)} types={[type(w).__name__ for w in task._extra_rows]}")
 
     app._task_layout.insertWidget(app._task_layout.count() - 1, card)
     app._cards.append(card)
