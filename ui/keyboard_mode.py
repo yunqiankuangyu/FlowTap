@@ -313,24 +313,73 @@ def _build_drag_handle(app):
     handle.setMouseTracking(True)
     return handle
 
+def _card_height(task):
+    """从真实 widget 尺寸计算卡片高度（不依赖硬编码像素值）"""
+    fold_btn = getattr(task, '_fold_btn', None)
+    if not fold_btn:
+        return 49  # fallback：卡片还没构建完
+    card = fold_btn.parentWidget()
+    if not card:
+        return 49
+
+    margins = card.layout().contentsMargins()
+    spacing = card.layout().spacing()
+    margin_h = margins.top() + margins.bottom()
+
+    # 标题行：从第一个子 layout 的实际内容取高度
+    hdr_layout = card.layout().itemAt(0)
+    hdr_h = 0
+    if hdr_layout and hdr_layout.layout():
+        for i in range(hdr_layout.layout().count()):
+            w = hdr_layout.layout().itemAt(i).widget()
+            if w:
+                hdr_h = max(hdr_h, w.sizeHint().height())
+    if hdr_h <= 0:
+        hdr_h = 27  # fallback
+
+    if getattr(task, '_collapsed', False):
+        return margin_h + hdr_h
+
+    # 展开：标题行 + 按钮行 + 设置行 + 动作列表 + spacing
+    extra_h = 0
+    for w in getattr(task, '_extra_rows', []):
+        extra_h += w.sizeHint().height() if w.isVisible() else 25
+    action_h = 0
+    af = getattr(task, '_action_frame', None)
+    if af:
+        action_h = af.sizeHint().height() if af.isVisible() else 0
+    visible_widgets = 1 + len(getattr(task, '_extra_rows', []))
+    if action_h > 0:
+        visible_widgets += 1
+    total_spacing = spacing * (visible_widgets - 1)
+
+    return margin_h + hdr_h + extra_h + action_h + total_spacing
+
+
+ACTION_ROW_H = 26   # DraggableRow 行高
+ACTION_GAP = 2      # action_layout 内部行间距
+
+
 def auto_size(app):
     """自动调整窗口高度：完全跟随任务内容（收起卡片→窗口缩矮，展开/新建→长高）"""
-    # 卡片高度实测值：收起=11(margin)+27(hdr)+11(margin)=49；展开=margin22 + hdr27 + spacing10 为骨架109；
-    # 有动作列表再加 动作26+spacing5
+    # 卡片高度从真实 widget 尺寸动态计算
     content = 0
     for t in app.keyboard_tasks:
-        if getattr(t, '_collapsed', False):
-            content += 49
-            continue
-        card = 109
-        if t.actions:
-            card += 31  # 动作列表26 + spacing5
-        content += card
-    # 卡片间距（卡间spacing + 容器底部余量4）
-    content += 5 * max(0, len(app.keyboard_tasks) - 1)
+        content += _card_height(t)
+    content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
 
-    # 真实固定框架实测：标题栏40 + 预设栏39 + 容器顶距5 + 底部栏52 + 拖动条8 = 144
-    h = max(220, min(600, 144 + content))
+    # 框架高度：标题栏 + 预设栏 + 容器间距 + 底部栏 + 拖动条
+    titlebar_h = app._titlebar.sizeHint().height() if hasattr(app, '_titlebar') else 40
+    preset_bar = app.keyboard_layout.itemAt(0)
+    preset_h = preset_bar.widget().sizeHint().height() if preset_bar and preset_bar.widget() else 39
+    bottom_bar = getattr(app, '_bottom_bar', None)
+    bar_h = bottom_bar.sizeHint().height() if bottom_bar else BF_H
+    handle_h = HANDLE_H
+    container_top = app.keyboard_layout.contentsMargins().top()
+    layout_spacing = app.keyboard_layout.spacing()
+    framework = titlebar_h + preset_h + container_top + layout_spacing + bar_h + handle_h
+
+    h = max(220, min(600, framework + content))
     app._tracked_height = h
     app.setFixedSize(360, h)
     # 注意：这里不回写 window_height——该值只代表"用户拖动的高度"，
@@ -684,9 +733,6 @@ def toggle_card(app, task):
     task._action_frame.setVisible(bool(task.actions) and not collapsed)
     for w in getattr(task, '_extra_rows', []):
         w.setVisible(not collapsed)
-    card = task._fold_btn.parentWidget() if hasattr(task, '_fold_btn') else None
-    if card:
-        card.layout().setContentsMargins(11, 11, 11, 11) if collapsed else card.layout().setContentsMargins(11, 11, 11, 11)
     auto_size(app)
 
 
