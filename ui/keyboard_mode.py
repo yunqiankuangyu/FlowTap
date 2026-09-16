@@ -313,15 +313,6 @@ def _build_drag_handle(app):
     handle.setMouseTracking(True)
     return handle
 
-import os as _os
-_dbg_path = _os.path.join(_os.path.dirname(__file__), '_card_dbg.log')
-# 清空旧日志
-with open(_dbg_path, 'w', encoding='utf-8') as f:
-    f.write('')
-def _dbg(msg):
-    with open(_dbg_path, 'a', encoding='utf-8') as f:
-        f.write(msg + '\n')
-
 def _card_height(task):
     """计算卡片应有高度：从 widget 实际尺寸累加，不依赖 isVisible()"""
     def _row_height(w):
@@ -355,11 +346,9 @@ def _card_height(task):
 
     fold_btn = getattr(task, '_fold_btn', None)
     if not fold_btn:
-        _dbg("no fold_btn")
         return 49
     card = fold_btn.parentWidget()
     if not card:
-        _dbg("no card")
         return 49
 
     margins = card.layout().contentsMargins()
@@ -384,13 +373,10 @@ def _card_height(task):
 
     if getattr(task, '_collapsed', False):
         h = margin_h + hdr_h
-        _dbg(f"collapsed h={h} margin={margin_h} hdr={hdr_h}")
         return h
 
     # 展开态：用 task 状态判断，不用 isVisible()（parent 未 show 时会全返回 False）
-    collapsed = getattr(task, '_collapsed', False)
     visible_h = hdr_h
-    extra_details = []
     for w in getattr(task, '_extra_rows', []):
         # settings frame 展开时可见；action frame 还要看有没有 actions
         is_af = (w is getattr(task, '_action_frame', None))
@@ -401,12 +387,8 @@ def _card_height(task):
         if should_show:
             row_h = _row_height(w)
             visible_h += spacing + row_h
-            extra_details.append(f"{type(w).__name__}={row_h}")
-    af = getattr(task, '_action_frame', None)
-    # af 已经在上面的循环里处理了，这里不再重复
 
     h = margin_h + visible_h
-    _dbg(f"expand h={h} margin={margin_h} hdr={hdr_h} extras={'+'.join(extra_details)} spacing={spacing}")
     return h
 
 
@@ -439,7 +421,6 @@ def auto_size(app):
     framework = titlebar_h + preset_h + container_top + layout_spacing + bar_h + handle_h
 
     h = max(220, min(600, framework + content))
-    _dbg(f"auto_size: content={content} framework={framework} h={h} tasks={len(app.keyboard_tasks)} cards={len(app._cards)}")
     app._tracked_height = h
     app.setFixedSize(360, h)
 
@@ -778,7 +759,6 @@ def create_card(app, task):
 
     card_layout.addWidget(sf)
     task._extra_rows.append(sf)
-    _dbg(f"create_card: task_id={task.task_id} _extra_rows={len(task._extra_rows)} types={[type(w).__name__ for w in task._extra_rows]}")
 
     app._task_layout.insertWidget(app._task_layout.count() - 1, card)
     app._cards.append(card)
