@@ -169,10 +169,24 @@ def build_keyboard_mode(app):
 
     # ── 滚动区（expand 填充中间剩余空间）──
     app._task_scroll = QScrollArea()
-    app._task_scroll.setWidgetResizable(True)
+    app._task_scroll.setWidgetResizable(False)  # 手动同步容器尺寸，防止卡片被拉伸
     app._task_scroll.setFrameShape(QFrame.NoFrame)
     app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
     app._task_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+    # 手动同步容器尺寸：内容比 viewport 大时保持内容高度（可滚动），小时填满 viewport
+    _orig_resize = app._task_scroll.resizeEvent
+    def _sync_container(e):
+        _orig_resize(e)
+        vp = app._task_scroll.viewport()
+        c = app._task_container
+        sh = c.sizeHint().height()
+        vp_h = vp.height()
+        target_h = max(sh, vp_h)
+        if c.height() != target_h or c.width() != vp.width():
+            c.resize(vp.width(), target_h)
+    app._task_scroll.resizeEvent = _sync_container
+    app._sync_container = _sync_container  # auto_size 里也要调用
     app._task_scroll.setStyleSheet(f"""
         QScrollArea {{ background: {Colors.ACCENT}; border: none; }}
         QScrollBar:vertical {{ background: transparent; width: 6px; border-radius: 3px; margin: 0; }}
@@ -388,6 +402,9 @@ def auto_size(app):
     h = max(220, min(600, framework + content))
     app._tracked_height = h
     app.setFixedSize(360, h)
+    # 卡片增删后主动同步容器尺寸（窗口大小可能不变，但容器内容变了）
+    if hasattr(app, '_sync_container'):
+        app._sync_container(None)
     # 注意：这里不回写 window_height——该值只代表"用户拖动的高度"，
     # auto_size 是它的消费者不是生产者，否则会滚雪球越算越高。
 
