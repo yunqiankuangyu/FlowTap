@@ -174,17 +174,15 @@ def build_keyboard_mode(app):
     app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
     app._task_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-    # 手动同步容器尺寸：内容比 viewport 大时保持内容高度（可滚动），小时填满 viewport
-    _orig_resize = app._task_scroll.resizeEvent
-    def _sync_container(e):
-        _orig_resize(e)
+    # 手动同步容器尺寸：始终保持内容高度（不强制填满 viewport，防止卡片被拉伸）
+    def _sync_container(e=None):
+        if e:
+            QScrollArea.resizeEvent(app._task_scroll, e)
         vp = app._task_scroll.viewport()
         c = app._task_container
         sh = c.sizeHint().height()
-        vp_h = vp.height()
-        target_h = max(sh, vp_h)
-        if c.height() != target_h or c.width() != vp.width():
-            c.resize(vp.width(), target_h)
+        if c.height() != sh or c.width() != vp.width():
+            c.resize(vp.width(), sh)
     app._task_scroll.resizeEvent = _sync_container
     app._sync_container = _sync_container  # auto_size 里也要调用
     app._task_scroll.setStyleSheet(f"""
@@ -379,11 +377,14 @@ def auto_size(app):
     # 用户手动拖动过底部拖动条后，不再自动调整窗口高度
     if getattr(app, '_manual_resize', False):
         return
-    # 卡片高度从真实 widget 尺寸动态计算（不锁 setFixedHeight，防止内容被压扁）
+    # 卡片高度从真实 widget 尺寸动态计算
+    # 用 setMaximumHeight 限制卡片不能超过 sizeHint，防止被 layout 拉伸
     content = 0
     for i, t in enumerate(app.keyboard_tasks):
         if i < len(app._cards):
-            content += app._cards[i].sizeHint().height()
+            card = app._cards[i]
+            card.setMaximumHeight(card.sizeHint().height())
+            content += card.sizeHint().height()
         else:
             content += _card_height(t)
     content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
