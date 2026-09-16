@@ -421,6 +421,8 @@ def auto_size(app):
     framework = titlebar_h + preset_h + container_top + layout_spacing + bar_h + handle_h
 
     h = max(220, min(600, framework + content))
+    if h == getattr(app, '_tracked_height', 0):
+        return  # 高度没变，不触发 setFixedSize
     app._tracked_height = h
     app.setFixedSize(360, h)
 
