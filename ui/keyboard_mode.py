@@ -376,7 +376,9 @@ def _card_height(task):
     # 展开态：只计算可见子组件
     visible_h = hdr_h
     extra_details = []
-    for w in getattr(task, '_extra_rows', []):
+    _extra = getattr(task, '_extra_rows', [])
+    _dbg(f"  _extra_rows count={len(_extra)} vis={[w.isVisible() for w in _extra]}")
+    for w in _extra:
         if w.isVisible():
             row_h = _layout_h(w.layout())
             if row_h <= 0:
