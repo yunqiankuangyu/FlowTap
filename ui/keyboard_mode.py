@@ -362,14 +362,16 @@ ACTION_GAP = 2      # action_layout 内部行间距
 
 def auto_size(app):
     """自动调整窗口高度：完全跟随任务内容（收起卡片→窗口缩矮，展开/新建→长高）"""
-    # 卡片高度从真实 widget 尺寸动态计算，并锁定防止被 layout 拉伸
+    # 用户手动拖动过底部拖动条后，不再自动调整窗口高度
+    if getattr(app, '_manual_resize', False):
+        return
+    # 卡片高度从真实 widget 尺寸动态计算（不锁 setFixedHeight，防止内容被压扁）
     content = 0
     for i, t in enumerate(app.keyboard_tasks):
-        ch = _card_height(t)
-        content += ch
-        # 锁定卡片高度：防止窗口变大时 VBox layout 把卡片撑开
         if i < len(app._cards):
-            app._cards[i].setFixedHeight(ch)
+            content += app._cards[i].sizeHint().height()
+        else:
+            content += _card_height(t)
     content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
 
     # 框架高度：标题栏 + 预设栏 + 容器间距 + 底部栏 + 拖动条
@@ -517,6 +519,7 @@ def add_task(app):
     task = KeyboardTask(app.next_task_id, f"任务{app.next_task_id}", loop_interval=_ls().get("default_loop", 80))
     app.next_task_id += 1
     app.keyboard_tasks.append(task)
+    app._manual_resize = False  # 新增任务恢复自动调整
     create_card(app, task)
     auto_size(app)
     from .settings_mode import install_wheel_guard
@@ -1286,6 +1289,7 @@ def del_task(app, task, card):
     card.deleteLater()
     if card in app._cards:
         app._cards.remove(card)
+    app._manual_resize = False  # 删除任务恢复自动调整
     auto_size(app)
 
 
