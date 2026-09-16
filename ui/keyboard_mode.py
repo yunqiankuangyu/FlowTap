@@ -169,22 +169,10 @@ def build_keyboard_mode(app):
 
     # ── 滚动区（expand 填充中间剩余空间）──
     app._task_scroll = QScrollArea()
-    app._task_scroll.setWidgetResizable(False)  # 手动同步容器尺寸，防止卡片被拉伸
+    app._task_scroll.setWidgetResizable(True)  # 让容器自动填满 viewport
     app._task_scroll.setFrameShape(QFrame.NoFrame)
     app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
     app._task_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-    # 手动同步容器尺寸：始终保持内容高度（不强制填满 viewport，防止卡片被拉伸）
-    def _sync_container(e=None):
-        if e:
-            QScrollArea.resizeEvent(app._task_scroll, e)
-        vp = app._task_scroll.viewport()
-        c = app._task_container
-        ch = getattr(app, '_content_height', 0)
-        if ch > 0 and (c.height() != ch or c.width() != vp.width()):
-            c.resize(vp.width(), ch)
-    app._task_scroll.resizeEvent = _sync_container
-    app._sync_container = _sync_container  # 备用引用
     app._task_scroll.setStyleSheet(f"""
         QScrollArea {{ background: {Colors.ACCENT}; border: none; }}
         QScrollBar:vertical {{ background: transparent; width: 6px; border-radius: 3px; margin: 0; }}
@@ -374,13 +362,13 @@ def auto_size(app):
     if getattr(app, '_manual_resize', False):
         return
     # 卡片高度从真实 widget 尺寸动态计算
-    # 用 setMaximumHeight 限制卡片不能超过计算高度，防止被 layout 拉伸
+    # 用 setFixedHeight 锁定卡片高度，防止被 layout 拉伸
     content = 0
     for i, t in enumerate(app.keyboard_tasks):
         ch = _card_height(t)
         content += ch
         if i < len(app._cards):
-            app._cards[i].setMaximumHeight(ch)
+            app._cards[i].setFixedHeight(ch)
     content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
 
     # 框架高度：标题栏 + 预设栏 + 容器间距 + 底部栏 + 拖动条
@@ -397,10 +385,6 @@ def auto_size(app):
     h = max(220, min(600, framework + content))
     app._tracked_height = h
     app.setFixedSize(360, h)
-    # 直接用计算出的 content 高度设容器尺寸（不依赖 sizeHint，避免 layout 未完成时拿到0）
-    app._content_height = content
-    vp = app._task_scroll.viewport()
-    app._task_container.resize(vp.width(), content)
     # 注意：这里不回写 window_height——该值只代表"用户拖动的高度"，
     # auto_size 是它的消费者不是生产者，否则会滚雪球越算越高。
 
