@@ -362,10 +362,14 @@ ACTION_GAP = 2      # action_layout 内部行间距
 
 def auto_size(app):
     """自动调整窗口高度：完全跟随任务内容（收起卡片→窗口缩矮，展开/新建→长高）"""
-    # 卡片高度从真实 widget 尺寸动态计算
+    # 卡片高度从真实 widget 尺寸动态计算，并锁定防止被 layout 拉伸
     content = 0
-    for t in app.keyboard_tasks:
-        content += _card_height(t)
+    for i, t in enumerate(app.keyboard_tasks):
+        ch = _card_height(t)
+        content += ch
+        # 锁定卡片高度：防止窗口变大时 VBox layout 把卡片撑开
+        if i < len(app._cards):
+            app._cards[i].setFixedHeight(ch)
     content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
 
     # 框架高度：标题栏 + 预设栏 + 容器间距 + 底部栏 + 拖动条
