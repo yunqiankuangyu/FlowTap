@@ -337,15 +337,13 @@ def _dbg(msg):
 def _card_height(task):
     """计算卡片应有高度：从 widget 实际尺寸累加，不依赖 isVisible()"""
     def _row_height(w):
-        """计算一个 row widget 的真实高度（含内部 layout 的 margins）"""
-        # 优先用已布局的尺寸
-        h = w.height()
-        if h > 0:
-            return h
-        # 未布局时，从 layout 内部 widget 推算
+        """计算一个 row widget 的真实高度"""
         lay = w.layout()
         if not lay:
-            return w.maximumHeight() or 30
+            # 纯 widget（fold_btn, spinbox 等），用实际尺寸
+            return w.height() or w.maximumHeight() or 25
+        # 有 layout 的容器（settings frame, action frame）：
+        # 永远从内部 widget 推算，不用 w.height()（会被 setFixedHeight 污染）
         margins = lay.contentsMargins()
         mx = 0
         for j in range(lay.count()):
@@ -357,7 +355,6 @@ def _card_height(task):
                 mx = max(mx, cw.height() or cw.maximumHeight() or 25)
             sub = it.layout()
             if sub:
-                # 递归子 layout
                 for k in range(sub.count()):
                     sit = sub.itemAt(k)
                     if sit and sit.widget():
