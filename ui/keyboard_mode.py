@@ -342,8 +342,11 @@ def _card_height(task):
         if not lay:
             # 纯 widget（fold_btn, spinbox 等），用实际尺寸
             return w.height() or w.maximumHeight() or 25
-        # 有 layout 的容器（settings frame, action frame）：
-        # 永远从内部 widget 推算，不用 w.height()（会被 setFixedHeight 污染）
+        # 有 layout 的容器：用 sizeHint（Qt 内部正确处理嵌套 layout）
+        sh = w.sizeHint().height()
+        if sh > 0:
+            return sh
+        # sizeHint 不可用时，从子 widget 推算
         margins = lay.contentsMargins()
         mx = 0
         for j in range(lay.count()):
