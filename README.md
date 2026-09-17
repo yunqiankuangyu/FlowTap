@@ -57,6 +57,7 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.7.1 | PySide6 | Window height fix, UI stability |
 | v3.7 | PySide6 | Drag-and-drop reorder for action rows |
 | v3.6.1 | PySide6 | Stability fixes for long idle sessions |
 | v3.6 | PySide6 | Pause all tasks, collapse task cards |
@@ -68,6 +69,17 @@ FlowTap/
 | v3 | PySide6 | Qt migration, solves CTk rendering flicker |
 | v2 | CustomTkinter | Unified keyboard+mouse task mode |
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
+
+### v3.7.1 — Window Height & UI Fixes
+
+**Changed**
+- Increased initial window height for better visibility
+- Window height no longer recalculates when content height is unchanged, reducing visual flicker
+
+**Fixed**
+- Single task card no longer stretches to fill the entire task area
+- Fold/unfold animation now uses correct height values
+- Removed black tooltip artifact on drag handle hover
 
 ### v3.7 — Action Row Drag-and-Drop
 
