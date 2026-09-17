@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QApplication, QScrollArea, QFrame
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QApplication, QScrollArea, QFrame, QStackedWidget
 from PySide6.QtCore import Qt, QTimer
 
 from config import Colors, FONT_B, load_settings, save_settings
@@ -26,7 +26,7 @@ class App(QMainWindow):
         Colors.apply(self._settings["theme"])
 
         self.setWindowTitle(DISGUISE_TITLE)
-        self.setFixedSize(360, 400)
+        self.setFixedSize(360, 392)
         flags = Qt.FramelessWindowHint
         if self._settings.get("always_on_top", True):
             flags |= Qt.WindowStaysOnTopHint
@@ -41,7 +41,7 @@ class App(QMainWindow):
         self.next_task_id = 1
         self._current_mode = "keyboard"
         self._mini_window = None
-        self._tracked_height = 220  # 基准高度，与 keyboard_mode.BASE_WINDOW_H 一致
+        self._tracked_height = 392  # 与 setFixedSize 初始高度一致
         self._ready = False  # 初始化完成前禁用所有操作
 
         # 全局停止热键（_build_ui 的设置页要用，必须先初始化）
@@ -122,28 +122,24 @@ class App(QMainWindow):
         central.setStyleSheet(f"background: {Colors.CARD};")
         self.setCentralWidget(central)
         self._central_layout = QVBoxLayout(central)
-        self.setStyleSheet(f"""
-            QToolTip {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: 1px solid {Colors.DIM}; border-radius: 4px; padding: 4px 8px; font: 11px 'MiSans'; }}
-        """)
         self._central_layout.setContentsMargins(0, 0, 0, 0)
         self._central_layout.setSpacing(0)
 
         # 标题栏
         self._titlebar = build_titlebar(self)
 
-        # 内容区域
-        self.content_frame = QWidget()
-        self.content_frame.setStyleSheet(f"background: {Colors.CARD};")
-        self.content_layout = QVBoxLayout(self.content_frame)
-        self.content_layout.setContentsMargins(0, 0, 0, 0)
-        self.content_layout.setSpacing(0)
+        # 内容区域：QStackedWidget 切换页面（不重建 widget）
+        self.content_stack = QStackedWidget()
+        self.content_stack.setStyleSheet(f"background: {Colors.CARD};")
 
+        # 页面 0：键盘/任务模式
         self.keyboard_frame = QWidget()
         self.keyboard_frame.setStyleSheet(f"background: {Colors.CARD};")
         self.keyboard_layout = QVBoxLayout(self.keyboard_frame)
-        self.keyboard_layout.setContentsMargins(0, 0, 0, 0)
+        self.keyboard_layout.setContentsMargins(10, 0, 10, 0)
         self.keyboard_layout.setSpacing(0)
 
+        # 页面 1：设置模式
         self.settings_frame = QWidget()
         self.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
         self.settings_layout = QVBoxLayout(self.settings_frame)
@@ -155,56 +151,65 @@ class App(QMainWindow):
         from .settings_mode import install_wheel_guard
         install_wheel_guard(self)  # 防滚轮误调数值（任务页+设置页）
 
-        self._show_mode("keyboard")
+        # 滚动容器包裹键盘模式（与设置页对齐）
+        self._keyboard_scroll = QScrollArea()
+        self._keyboard_scroll.setWidgetResizable(True)
+        self._keyboard_scroll.setFrameShape(QFrame.NoFrame)
+        self._keyboard_scroll.setStyleSheet(f"""
+            QScrollArea {{ background: {Colors.CARD}; border: none; }}
+            QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
+            QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
+            QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+        """)
+        self._keyboard_scroll.setWidget(self.keyboard_frame)
 
-    def _show_mode(self, mode):
-        # Remove all from content_layout
-        while self.content_layout.count():
-            item = self.content_layout.takeAt(0)
-            if item.widget():
-                item.widget().setParent(None)
+        # 滚动容器包裹设置模式
+        self._settings_scroll = QScrollArea()
+        self._settings_scroll.setWidgetResizable(True)
+        self._settings_scroll.setFrameShape(QFrame.NoFrame)
+        self._settings_scroll.setStyleSheet(self._scroll_style())
+        self._settings_scroll.setWidget(self.settings_frame)
 
-        # Remove content_frame from central
-        while self._central_layout.count():
-            item = self._central_layout.takeAt(0)
-            if item.widget():
-                item.widget().setParent(None)
+        self.content_stack.addWidget(self._keyboard_scroll)  # index 0
+        self.content_stack.addWidget(self._settings_scroll)  # index 1
 
-        # Always add titlebar first
-        self._central_layout.addWidget(self._titlebar)
+        # 底部栏 + 拖动条：常驻，不随切页变化
+        self._ensure_bottom_bar(self._buttons_for("keyboard"))
+        self._all_btn = self._bottom_btns[1]
+        self._pause_btn = self._bottom_btns[2]
+        from .keyboard_mode import update_pause_btn
+        update_pause_btn(self)
 
-        self._current_mode = mode
-
-        if mode == "keyboard":
-            self._central_layout.addWidget(self.content_frame)
-            self.content_layout.addWidget(self.keyboard_frame)
-        elif mode == "settings":
-            self._central_layout.addWidget(self.content_frame)
-            self.content_layout.addWidget(self._settings_scroll())
-            # 恢复用户之前所在的设置分页（默认外观页）
-            from .settings_mode import _show_page, PAGE_APPEARANCE
-            _show_page(self, getattr(self, "_settings_current_page", PAGE_APPEARANCE))
-
-        # 常驻底部栏 + 拖动条：挂在 central_layout，永远在内容区之下、窗口最底
-        # （顺序：titlebar → content → bar → handle）
-        self._ensure_bottom_bar(self._buttons_for(mode))
         if getattr(self, '_drag_handle', None) is None:
             from .keyboard_mode import _build_drag_handle
             self._drag_handle = _build_drag_handle(self)
-        # 重排（takeAt 之前可能已把全部移出，这里统一按序挂回）
+
+        # 组装 central_layout：titlebar → stack → bar → handle
+        self._central_layout.addWidget(self._titlebar)
+        self._central_layout.addWidget(self.content_stack, 1)
         self._central_layout.addWidget(self._bottom_bar)
         self._central_layout.addWidget(self._drag_handle)
 
-        # "全部开始/停止"按钮绑定：必须在 _ensure_bottom_bar 之后（按钮组已按当前页重建）
-        if mode == "keyboard" and len(self._bottom_btns) >= 3:
+        self._current_mode = "keyboard"
+        QTimer.singleShot(150, self._auto_size)
+
+    def _show_mode(self, mode):
+        self._current_mode = mode
+        if mode == "keyboard":
+            self.content_stack.setCurrentIndex(0)
+            self._ensure_bottom_bar(self._buttons_for("keyboard"))
             self._all_btn = self._bottom_btns[1]
             self._pause_btn = self._bottom_btns[2]
             from .keyboard_mode import update_pause_btn
-            update_pause_btn(self)  # 切页回来时恢复暂停按钮的正确状态
-
-        if mode == "keyboard":
+            update_pause_btn(self)
             QTimer.singleShot(150, self._auto_size)
-        # 窗口只有一个：高度由任务页 auto_size/拖动决定，切页不变
+        elif mode == "settings":
+            self.content_stack.setCurrentIndex(1)
+            self._ensure_bottom_bar(self._buttons_for("settings"))
+            from .settings_mode import _show_page, PAGE_APPEARANCE
+            _show_page(self, getattr(self, "_settings_current_page", PAGE_APPEARANCE))
 
     def _buttons_for(self, mode):
         """各页的底部栏按钮配置"""
@@ -255,32 +260,7 @@ class App(QMainWindow):
                 self._bottom_btns.append(btn)
         return self._bottom_bar
 
-    def _settings_scroll(self):
-        """设置页滚动容器（懒建，复用）：滚动内容 + 常驻底部栏 + 常驻拖动条"""
-        if getattr(self, '_settings_scroller', None) is not None:
-            # 容器还在：settings_frame 可能刚被重建，重新挂进去并刷新样式
-            sc = self._settings_scroller
-            layout_item = sc.layout().itemAt(0)
-            old_scroll = layout_item.widget() if layout_item else None
-            if old_scroll is not None and old_scroll.widget() is not self.settings_frame:
-                old_scroll.setWidget(self.settings_frame)
-                old_scroll.setStyleSheet(self._scroll_style())
-            return sc
 
-        wrapper = QWidget()
-        w_layout = QVBoxLayout(wrapper)
-        w_layout.setContentsMargins(0, 0, 0, 0)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet(self._scroll_style())
-        scroll.setWidget(self.settings_frame)
-
-        w_layout.addWidget(scroll, 1)
-
-        self._settings_scroller = wrapper
-        return wrapper
 
     def _auto_size(self):
         from .keyboard_mode import auto_size

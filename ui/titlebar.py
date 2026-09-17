@@ -15,7 +15,7 @@ from config import Colors, FONT_B
 def build_titlebar(app):
     """构建标题栏"""
     bar = QWidget()
-    bar.setFixedHeight(40)
+    bar.setFixedHeight(32)
     bar.setStyleSheet(f"""
         QWidget {{
             background-color: {Colors.CARD};

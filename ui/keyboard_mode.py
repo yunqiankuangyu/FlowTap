@@ -168,24 +168,31 @@ def build_keyboard_mode(app):
     kf_layout.addWidget(pf)
 
     # ── 滚动区（expand 填充中间剩余空间）──
-    app._task_scroll = QScrollArea()
-    app._task_scroll.setWidgetResizable(True)  # 容器自动填满 viewport，卡片由 layout 管理
+    from PySide6.QtGui import QPainterPath, QRegion
+
+    class _RoundedScrollArea(QScrollArea):
+        """QScrollArea with rounded-corner clipping"""
+        _radius = 11
+        def resizeEvent(self, e):
+            super().resizeEvent(e)
+            path = QPainterPath()
+            path.addRoundedRect(0, 0, self.width(), self.height(), self._radius, self._radius)
+            region = QRegion(path.toFillPolygon().toPolygon())
+            self.setMask(region)
+
+    app._task_scroll = _RoundedScrollArea()
+    app._task_scroll.setWidgetResizable(True)
     app._task_scroll.setFrameShape(QFrame.NoFrame)
-    app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+    app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     app._task_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     app._task_scroll.setStyleSheet(f"""
         QScrollArea {{ background: {Colors.ACCENT}; border: none; }}
-        QScrollBar:vertical {{ background: transparent; width: 6px; border-radius: 3px; margin: 0; }}
-        QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
-        QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
-        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
     """)
 
     app._task_container = QWidget()
     app._task_container.setStyleSheet("background: transparent;")
     app._task_layout = QVBoxLayout(app._task_container)
-    app._task_layout.setContentsMargins(0, 5, 0, 0)
+    app._task_layout.setContentsMargins(0, 0, 0, 0)
     app._task_layout.setSpacing(5)
     app._task_layout.addStretch()
 
@@ -280,7 +287,7 @@ def _build_drag_handle(app):
             pt = ctypes.wintypes.POINT()
             _user32.GetCursorPos(ctypes.byref(pt))
             app._drag["start_y"] = pt.y
-            app._drag["start_h"] = app._tracked_height
+            app._drag["start_h"] = app.height()  # 读实际窗口高度，不用缓存
             indicator.setStyleSheet("background: #4fc3f7; border-radius: 2px;")
 
     def on_handle_release(e):
@@ -410,7 +417,7 @@ def auto_size(app):
     content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
 
     # 框架高度：标题栏 + 预设栏 + 容器间距 + 底部栏 + 拖动条
-    titlebar_h = app._titlebar.sizeHint().height() if hasattr(app, '_titlebar') else 40
+    titlebar_h = app._titlebar.sizeHint().height() if hasattr(app, '_titlebar') else 32
     preset_bar = app.keyboard_layout.itemAt(0)
     preset_h = preset_bar.widget().sizeHint().height() if preset_bar and preset_bar.widget() else 39
     bottom_bar = getattr(app, '_bottom_bar', None)
@@ -843,7 +850,7 @@ def _refresh_actions(app, task):
             QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 12px 'MiSans'; }}
             QPushButton:hover {{ color: {Colors.TEXT}; background: {Colors.ACCENT}; border-radius: 4px; }}
         """)
-        drag_btn.setToolTip("拖动排序")
+        drag_btn.setToolTip("")
         row_layout.addWidget(drag_btn)
 
         desc = fmt_action(action)

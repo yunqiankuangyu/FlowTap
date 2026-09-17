@@ -595,14 +595,15 @@ def show_notification(app, text, duration_ms=2000):
 def _rebuild_ui(app):
     """销毁并重建所有页面，让新主题的插值样式表生效"""
     from .titlebar import build_titlebar
-    from .keyboard_mode import build_keyboard_mode, auto_size
+    from .keyboard_mode import build_keyboard_mode, auto_size, _build_drag_handle
     from .settings_mode import build_settings_mode
+    from PySide6.QtWidgets import QScrollArea, QFrame
 
-    app.setUpdatesEnabled(False)  # 重建期间冻结绘制，消除中间态闪烁
-    frozen_size = (app.width(), app.height())  # 记住当前尺寸，重建后原样锁回
-    app._floating_panel = None  # 旧通知面板将随旧UI销毁，清引用防定时器打在死对象上
+    app.setUpdatesEnabled(False)
+    frozen_size = (app.width(), app.height())
+    app._floating_panel = None
 
-    # 常驻控件（底部栏/拖动条）先脱离 central，避免随旧UI销毁
+    # 常驻控件先脱离 central，避免随旧UI销毁
     for attr in ('_bottom_bar', '_drag_handle'):
         wd = getattr(app, attr, None)
         if wd is not None:
@@ -611,7 +612,7 @@ def _rebuild_ui(app):
             except RuntimeError:
                 pass
 
-    # 清空中央布局（content_frame 整个被删了，内部框架一并销毁）
+    # 清空中央布局
     while app._central_layout.count():
         item = app._central_layout.takeAt(0)
         w = item.widget()
@@ -619,32 +620,32 @@ def _rebuild_ui(app):
             w.setParent(None)
             w.deleteLater()
 
-    # 重建全部容器（旧的已销毁，不能复用）
+    # 重建全部容器
     central = app.centralWidget()
     central.setStyleSheet(f"background: {Colors.CARD};")
 
-    app.content_frame = QWidget()
-    app.content_frame.setStyleSheet(f"background: {Colors.CARD};")
-    app.content_layout = QVBoxLayout(app.content_frame)
-    app.content_layout.setContentsMargins(0, 0, 0, 0)
-    app.content_layout.setSpacing(0)
+    # QStackedWidget
+    app.content_stack = QStackedWidget()
+    app.content_stack.setStyleSheet(f"background: {Colors.CARD};")
 
+    # 键盘模式页
     app.keyboard_frame = QWidget()
     app.keyboard_frame.setStyleSheet(f"background: {Colors.CARD};")
     app.keyboard_layout = QVBoxLayout(app.keyboard_frame)
-    app.keyboard_layout.setContentsMargins(0, 0, 0, 0)
+    app.keyboard_layout.setContentsMargins(10, 0, 10, 0)
     app.keyboard_layout.setSpacing(0)
 
+    # 设置模式页
     app.settings_frame = QWidget()
     app.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
     app.settings_layout = QVBoxLayout(app.settings_frame)
     app.settings_layout.setContentsMargins(10, 0, 10, 4)
     app.settings_layout.setSpacing(8)
 
-    # 中央布局重挂：QWidget 不允许二次 setLayout，必须先卸载旧布局
+    # 中央布局重挂
     old_central_layout = central.layout()
     if old_central_layout is not None:
-        QWidget().setLayout(old_central_layout)  # 转移给临时 widget 丢弃
+        QWidget().setLayout(old_central_layout)
     app._central_layout = QVBoxLayout(central)
     app._central_layout.setContentsMargins(0, 0, 0, 0)
     app._central_layout.setSpacing(0)
@@ -652,18 +653,46 @@ def _rebuild_ui(app):
     app._titlebar = build_titlebar(app)
     build_keyboard_mode(app)
     build_settings_mode(app)
-    install_wheel_guard(app)  # 重建后的新控件也要装滚轮防误触
-    # 留在用户当前所在页面（通常就是设置页），不踢回任务页
-    app._show_mode(getattr(app, "_current_mode", "keyboard") or "keyboard")
+    install_wheel_guard(app)
+
+    # 滚动容器
+    app._keyboard_scroll = QScrollArea()
+    app._keyboard_scroll.setWidgetResizable(True)
+    app._keyboard_scroll.setFrameShape(QFrame.NoFrame)
+    app._keyboard_scroll.setStyleSheet(f"""
+        QScrollArea {{ background: {Colors.CARD}; border: none; }}
+        QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
+        QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
+        QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+    """)
+    app._keyboard_scroll.setWidget(app.keyboard_frame)
+
+    app._settings_scroll = QScrollArea()
+    app._settings_scroll.setWidgetResizable(True)
+    app._settings_scroll.setFrameShape(QFrame.NoFrame)
+    app._settings_scroll.setStyleSheet(app._scroll_style())
+    app._settings_scroll.setWidget(app.settings_frame)
+
+    app.content_stack.addWidget(app._keyboard_scroll)
+    app.content_stack.addWidget(app._settings_scroll)
+
+    # 恢复底部栏和拖动条
+    if getattr(app, '_bottom_bar', None) is None:
+        from .keyboard_mode import _build_drag_handle
+        app._drag_handle = _build_drag_handle(app)
+
+    app._central_layout.addWidget(app._titlebar)
+    app._central_layout.addWidget(app.content_stack, 1)
+    app._central_layout.addWidget(app._bottom_bar)
+    app._central_layout.addWidget(app._drag_handle)
 
     # 恢复窗口高度和透明度
     app.setWindowOpacity(load_settings().get("opacity", 1.0))
-    # 布局收敛后再恢复绘制：先按冻结前尺寸锁定（宽度绝不漂移），高度交给模式逻辑
     app.centralWidget().layout().activate()
     app.setFixedSize(*frozen_size)
     if app._current_mode == "keyboard":
-        from .keyboard_mode import auto_size as _as
-        _as(app)   # auto_size 内部会以正确高度重新 setFixedSize(360, h)
-    # 设置页不另设尺寸：窗口高度只有一个来源（任务页 auto_size / 拖动）
+        auto_size(app)
     app.setUpdatesEnabled(True)
     app.update()
