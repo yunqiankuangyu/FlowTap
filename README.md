@@ -57,6 +57,7 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.7.3 | PySide6 | Preset dependency fix, window height fix |
 | v3.7.2 | PySide6 | UI refinements |
 | v3.7.1 | PySide6 | Window height fix, UI stability |
 | v3.7 | PySide6 | Drag-and-drop reorder for action rows |
@@ -70,6 +71,13 @@ FlowTap/
 | v3 | PySide6 | Qt migration, solves CTk rendering flicker |
 | v2 | CustomTkinter | Unified keyboard+mouse task mode |
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
+
+### v3.7.3 — Preset & Window Fixes
+
+**Fixed**
+- Fixed preset dependency display after loading
+- Fixed window height shrinking when deleting tasks
+- General stability improvements
 
 ### v3.7.2 — UI Refinements
 
