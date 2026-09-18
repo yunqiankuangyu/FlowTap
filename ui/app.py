@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from config import Colors, FONT_B, load_settings, save_settings
 from tasks import MouseTask
+from ui.keyboard_mode import WIN_W
 
 # 伪装标题
 DISGUISE_TITLE = "svchost"
@@ -26,7 +27,7 @@ class App(QMainWindow):
         Colors.apply(self._settings["theme"])
 
         self.setWindowTitle(DISGUISE_TITLE)
-        self.setFixedSize(360, 392)
+        self.setFixedSize(WIN_W, 392)
         flags = Qt.FramelessWindowHint
         if self._settings.get("always_on_top", True):
             flags |= Qt.WindowStaysOnTopHint

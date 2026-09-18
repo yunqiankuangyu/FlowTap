@@ -209,7 +209,8 @@ def build_keyboard_mode(app):
     app._cards = []
 
 
-# 基准窗口高度（用户可拖动调整，auto_size 只读不写）
+# 基准窗口尺寸（用户可拖动调整高度，宽度固定）
+WIN_W = 400
 BASE_WINDOW_H = 220
 
 
@@ -305,7 +306,7 @@ def _build_drag_handle(app):
         if new_h == app._tracked_height:
             return
         app._tracked_height = new_h
-        app.setFixedSize(360, new_h)
+        app.setFixedSize(WIN_W, new_h)
         from config import load_settings, save_settings
         if load_settings().get("remember_height", True):
             s = load_settings()
@@ -438,7 +439,7 @@ def auto_size(app):
     if h <= cur:
         return
     app._tracked_height = h
-    app.setFixedSize(360, h)
+    app.setFixedSize(WIN_W, h)
 
 
 def _task_active(t):
