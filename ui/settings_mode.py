@@ -595,7 +595,7 @@ def show_notification(app, text, duration_ms=2000):
 def _rebuild_ui(app):
     """销毁并重建所有页面，让新主题的插值样式表生效"""
     from .titlebar import build_titlebar
-    from .keyboard_mode import build_keyboard_mode, auto_size, _build_drag_handle
+    from .keyboard_mode import build_keyboard_mode, _request_auto_size, _build_drag_handle
     from .settings_mode import build_settings_mode
     from PySide6.QtWidgets import QScrollArea, QFrame
 
@@ -693,6 +693,6 @@ def _rebuild_ui(app):
     app.centralWidget().layout().activate()
     app.setFixedSize(*frozen_size)
     if app._current_mode == "keyboard":
-        auto_size(app)
+        _request_auto_size(app)
     app.setUpdatesEnabled(True)
     app.update()

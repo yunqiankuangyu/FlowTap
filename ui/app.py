@@ -56,6 +56,15 @@ class App(QMainWindow):
         self._hotkey_capturing = False
         self._start_hotkey_poller()
 
+    def resizeEvent(self, e):
+        """阻止窗口被缩小到 _tracked_height 以下"""
+        new_h = e.size().height()
+        cur = getattr(self, '_tracked_height', 0)
+        if cur > 0 and new_h < cur:
+            e.ignore()
+            return
+        super().resizeEvent(e)
+
     def _start_hotkey_poller(self):
         """QTimer轮询全局热键（Qt主线程事件循环内调GetAsyncKeyState）"""
         self._hotkey_timer = QTimer(self)
@@ -112,7 +121,7 @@ class App(QMainWindow):
 
     def _build_ui(self):
         from .titlebar import build_titlebar
-        from .keyboard_mode import build_keyboard_mode, auto_size, show_floating_notification
+        from .keyboard_mode import build_keyboard_mode, _request_auto_size, show_floating_notification
         from .settings_mode import build_settings_mode
 
         self._show_floating_notification = show_floating_notification
@@ -263,8 +272,8 @@ class App(QMainWindow):
 
 
     def _auto_size(self):
-        from .keyboard_mode import auto_size
-        auto_size(self)
+        from .keyboard_mode import _request_auto_size
+        _request_auto_size(self)
 
     def _minimize_to_mini(self):
         from .mini_mode import minimize_to_mini
