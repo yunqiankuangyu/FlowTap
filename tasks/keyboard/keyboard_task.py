@@ -59,6 +59,7 @@ class KeyboardTask:
     max_runs: int = 0  # 执行次数限制，0=无限
     _running: bool = False
     _paused: bool = False  # 暂停中（时间计数冻结，随时可继续）
+    _collapsed: bool = False  # 卡片是否收起
     _pause_cond: threading.Condition = field(default_factory=threading.Condition, repr=False)
     _thread: Optional[threading.Thread] = field(default=None, repr=False)
     _dependents: List['KeyboardTask'] = field(default_factory=list, repr=False)

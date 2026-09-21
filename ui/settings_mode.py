@@ -595,104 +595,111 @@ def show_notification(app, text, duration_ms=2000):
 def _rebuild_ui(app):
     """销毁并重建所有页面，让新主题的插值样式表生效"""
     from .titlebar import build_titlebar
-    from .keyboard_mode import build_keyboard_mode, auto_size, _build_drag_handle
+    from .keyboard_mode import build_keyboard_mode, _build_drag_handle, build_bottom_bar
     from .settings_mode import build_settings_mode
-    from PySide6.QtWidgets import QScrollArea, QFrame
+    from PySide6.QtWidgets import QScrollArea, QFrame, QStackedWidget
 
-    app.setUpdatesEnabled(False)
     frozen_size = (app.width(), app.height())
+    frozen_mode = app._current_mode
+
+    # ── 1. 清浮动面板 ──
+    fp = getattr(app, '_floating_panel', None)
+    if fp is not None:
+        try:
+            fp.hide()
+            fp.deleteLater()
+        except RuntimeError:
+            pass
     app._floating_panel = None
 
-    # 常驻控件先脱离 central，避免随旧UI销毁
-    for attr in ('_bottom_bar', '_drag_handle'):
-        wd = getattr(app, attr, None)
-        if wd is not None:
-            try:
-                wd.setParent(None)
-            except RuntimeError:
-                pass
+    # ── 2. 隐藏旧 central 并移到屏幕外 ──
+    old_central = app.centralWidget()
+    if old_central is not None:
+        old_central.hide()
+        old_central.move(-9999, -9999)
+        old_central.resize(0, 0)
+        for child in old_central.findChildren(QWidget):
+            child.hide()
 
-    # 清空中央布局
-    while app._central_layout.count():
-        item = app._central_layout.takeAt(0)
-        w = item.widget()
-        if w:
-            w.setParent(None)
-            w.deleteLater()
+    # ── 3. 创建全新 central + 全新布局 ──
+    new_central = QWidget()
+    new_central.setStyleSheet(f"background: {Colors.CARD};")
+    app.setCentralWidget(new_central)
 
-    # 重建全部容器
-    central = app.centralWidget()
-    central.setStyleSheet(f"background: {Colors.CARD};")
+    lay = QVBoxLayout(new_central)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.setSpacing(0)
+    app._central_layout = lay
 
-    # QStackedWidget
-    app.content_stack = QStackedWidget()
-    app.content_stack.setStyleSheet(f"background: {Colors.CARD};")
+    # 标题栏
+    app._titlebar = build_titlebar(app)
 
-    # 键盘模式页
+    # 键盘模式页面
     app.keyboard_frame = QWidget()
     app.keyboard_frame.setStyleSheet(f"background: {Colors.CARD};")
     app.keyboard_layout = QVBoxLayout(app.keyboard_frame)
     app.keyboard_layout.setContentsMargins(10, 0, 10, 0)
     app.keyboard_layout.setSpacing(0)
+    build_keyboard_mode(app)
 
-    # 设置模式页
+    # 设置模式页面
     app.settings_frame = QWidget()
     app.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
     app.settings_layout = QVBoxLayout(app.settings_frame)
     app.settings_layout.setContentsMargins(10, 0, 10, 4)
     app.settings_layout.setSpacing(8)
-
-    # 中央布局重挂
-    old_central_layout = central.layout()
-    if old_central_layout is not None:
-        QWidget().setLayout(old_central_layout)
-    app._central_layout = QVBoxLayout(central)
-    app._central_layout.setContentsMargins(0, 0, 0, 0)
-    app._central_layout.setSpacing(0)
-
-    app._titlebar = build_titlebar(app)
-    build_keyboard_mode(app)
     build_settings_mode(app)
     install_wheel_guard(app)
 
     # 滚动容器
-    app._keyboard_scroll = QScrollArea()
-    app._keyboard_scroll.setWidgetResizable(True)
-    app._keyboard_scroll.setFrameShape(QFrame.NoFrame)
-    app._keyboard_scroll.setStyleSheet(f"""
+    scroll_qss = f"""
         QScrollArea {{ background: {Colors.CARD}; border: none; }}
         QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
         QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
         QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
         QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
-    """)
+    """
+
+    app._keyboard_scroll = QScrollArea()
+    app._keyboard_scroll.setWidgetResizable(True)
+    app._keyboard_scroll.setFrameShape(QFrame.NoFrame)
+    app._keyboard_scroll.setStyleSheet(scroll_qss)
     app._keyboard_scroll.setWidget(app.keyboard_frame)
 
     app._settings_scroll = QScrollArea()
     app._settings_scroll.setWidgetResizable(True)
     app._settings_scroll.setFrameShape(QFrame.NoFrame)
-    app._settings_scroll.setStyleSheet(app._scroll_style())
+    app._settings_scroll.setStyleSheet(scroll_qss)
     app._settings_scroll.setWidget(app.settings_frame)
 
+    # content stack
+    app.content_stack = QStackedWidget()
+    app.content_stack.setStyleSheet(f"background: {Colors.CARD};")
     app.content_stack.addWidget(app._keyboard_scroll)
     app.content_stack.addWidget(app._settings_scroll)
 
-    # 恢复底部栏和拖动条
-    if getattr(app, '_bottom_bar', None) is None:
-        from .keyboard_mode import _build_drag_handle
-        app._drag_handle = _build_drag_handle(app)
+    if frozen_mode == "settings":
+        app.content_stack.setCurrentIndex(1)
+        if hasattr(app, '_settings_current_page'):
+            from .settings_mode import _show_page
+            _show_page(app, app._settings_current_page)
+    else:
+        app.content_stack.setCurrentIndex(0)
 
-    app._central_layout.addWidget(app._titlebar)
-    app._central_layout.addWidget(app.content_stack, 1)
-    app._central_layout.addWidget(app._bottom_bar)
-    app._central_layout.addWidget(app._drag_handle)
+    # 底部栏 + 拖动条
+    bar, btns = build_bottom_bar(app, app._buttons_for(frozen_mode))
+    app._bottom_bar = bar
+    app._bottom_btns = btns
+    app._drag_handle = _build_drag_handle(app)
 
-    # 恢复窗口高度和透明度
+    lay.addWidget(app._titlebar)
+    lay.addWidget(app.content_stack, 1)
+    lay.addWidget(app._bottom_bar)
+    lay.addWidget(app._drag_handle)
+
+    # ── 4. 恢复窗口状态 ──
     app.setWindowOpacity(load_settings().get("opacity", 1.0))
-    app.centralWidget().layout().activate()
+    lay.activate()
     app.setFixedSize(*frozen_size)
-    if app._current_mode == "keyboard":
-        auto_size(app)
-    app.setUpdatesEnabled(True)
-    app.update()
+    app.repaint()

@@ -77,6 +77,7 @@ FlowTap/
 **Fixed**
 - Fixed preset dependency display after loading
 - Fixed window height shrinking when deleting tasks
+- Fixed theme switching not working correctly in certain situations
 - General stability improvements
 
 ### v3.7.2 — UI Refinements

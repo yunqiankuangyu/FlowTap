@@ -115,7 +115,6 @@ def _make_label(text, font=None, color=None):
     return lbl
 
 
-HANDLE_H = 12
 BF_H = 52
 
 
@@ -204,14 +203,11 @@ def build_keyboard_mode(app):
     # 初始化
     app._floating_panel = None
     app._floating_timer = None
-    from .keyboard_mode import BASE_WINDOW_H
-    app._tracked_height = BASE_WINDOW_H
     app._cards = []
 
 
-# 基准窗口高度（用户可拖动调整，auto_size 只读不写）
-BASE_WINDOW_H = 220
-
+# 窗口宽度（用户可拖动调整高度，宽度固定）
+WIN_W = 400
 
 
 HANDLE_H = 8  # 拖动条高度
@@ -282,7 +278,6 @@ def _build_drag_handle(app):
 
     def on_handle_press(e):
         if e.button() == Qt.LeftButton:
-            app._manual_resize = True
             app._drag["active"] = True
             pt = ctypes.wintypes.POINT()
             _user32.GetCursorPos(ctypes.byref(pt))
@@ -302,10 +297,7 @@ def _build_drag_handle(app):
         dy = (pt.y - app._drag["start_y"]) / _dpi_scale
         new_h = int(app._drag["start_h"] + dy)
         new_h = max(220, min(600, new_h))
-        if new_h == app._tracked_height:
-            return
-        app._tracked_height = new_h
-        app.setFixedSize(360, new_h)
+        app.setFixedSize(WIN_W, new_h)
         from config import load_settings, save_settings
         if load_settings().get("remember_height", True):
             s = load_settings()
@@ -319,119 +311,6 @@ def _build_drag_handle(app):
     handle.leaveEvent = lambda e: on_handle_leave(e)
     handle.setMouseTracking(True)
     return handle
-
-def _card_height(task):
-    """计算卡片应有高度：从 widget 实际尺寸累加，不依赖 isVisible()"""
-    def _row_height(w):
-        """计算一个 row widget 的真实高度"""
-        lay = w.layout()
-        if not lay:
-            # 纯 widget（fold_btn, spinbox 等），用实际尺寸
-            return w.height() or w.maximumHeight() or 25
-        # 有 layout 的容器：用 sizeHint（Qt 内部正确处理嵌套 layout）
-        sh = w.sizeHint().height()
-        if sh > 0:
-            return sh
-        # sizeHint 不可用时，从子 widget 推算
-        margins = lay.contentsMargins()
-        mx = 0
-        for j in range(lay.count()):
-            it = lay.itemAt(j)
-            if not it:
-                continue
-            cw = it.widget()
-            if cw:
-                mx = max(mx, cw.height() or cw.maximumHeight() or 25)
-            sub = it.layout()
-            if sub:
-                for k in range(sub.count()):
-                    sit = sub.itemAt(k)
-                    if sit and sit.widget():
-                        sw = sit.widget()
-                        mx = max(mx, sw.height() or sw.maximumHeight() or 25)
-        return (mx + margins.top() + margins.bottom()) if mx > 0 else 30
-
-    fold_btn = getattr(task, '_fold_btn', None)
-    if not fold_btn:
-        return 49
-    card = fold_btn.parentWidget()
-    if not card:
-        return 49
-
-    margins = card.layout().contentsMargins()
-    spacing = card.layout().spacing()
-    margin_h = margins.top() + margins.bottom()
-
-    # 标题行高度
-    hdr_lay = card.layout().itemAt(0)
-    hdr_h = 0
-    if hdr_lay and hdr_lay.layout():
-        hdr_widget = hdr_lay.widget() if hasattr(hdr_lay, 'widget') else None
-        if hdr_widget:
-            hdr_h = _row_height(hdr_widget)
-        else:
-            # HBoxLayout 直接取 max widget
-            for i in range(hdr_lay.layout().count()):
-                w = hdr_lay.layout().itemAt(i).widget()
-                if w:
-                    hdr_h = max(hdr_h, w.height() or w.maximumHeight() or 22)
-    if hdr_h <= 0:
-        hdr_h = fold_btn.height() or fold_btn.maximumHeight() or 22
-
-    if getattr(task, '_collapsed', False):
-        h = margin_h + hdr_h
-        return h
-
-    # 展开态：用 task 状态判断，不用 isVisible()（parent 未 show 时会全返回 False）
-    visible_h = hdr_h
-    for w in getattr(task, '_extra_rows', []):
-        # settings frame 展开时可见；action frame 还要看有没有 actions
-        is_af = (w is getattr(task, '_action_frame', None))
-        if collapsed:
-            should_show = False
-        else:
-            should_show = (not is_af) or bool(task.actions)
-        if should_show:
-            row_h = _row_height(w)
-            visible_h += spacing + row_h
-
-    h = margin_h + visible_h
-    return h
-
-
-ACTION_ROW_H = 26   # DraggableRow 行高
-ACTION_GAP = 2      # action_layout 内部行间距
-
-
-def auto_size(app):
-    """自动调整窗口高度：完全跟随任务内容（收起卡片→窗口缩矮，展开/新建→长高）"""
-    # 用户手动拖动过底部拖动条后，不再自动调整窗口高度
-    if getattr(app, '_manual_resize', False):
-        return
-    # 卡片高度从真实 widget 尺寸动态计算
-    # 用 setFixedHeight 锁定卡片高度，防止被 layout 拉伸
-    content = 0
-    for i, t in enumerate(app.keyboard_tasks):
-        ch = _card_height(t)
-        content += ch
-    content += 5 * max(0, len(app.keyboard_tasks) - 1)  # 卡间 spacing
-
-    # 框架高度：标题栏 + 预设栏 + 容器间距 + 底部栏 + 拖动条
-    titlebar_h = app._titlebar.sizeHint().height() if hasattr(app, '_titlebar') else 32
-    preset_bar = app.keyboard_layout.itemAt(0)
-    preset_h = preset_bar.widget().sizeHint().height() if preset_bar and preset_bar.widget() else 39
-    bottom_bar = getattr(app, '_bottom_bar', None)
-    bar_h = bottom_bar.sizeHint().height() if bottom_bar else BF_H
-    handle_h = HANDLE_H
-    container_top = app.keyboard_layout.contentsMargins().top()
-    layout_spacing = app.keyboard_layout.spacing()
-    framework = titlebar_h + preset_h + container_top + layout_spacing + bar_h + handle_h
-
-    h = max(220, min(600, framework + content))
-    if h == getattr(app, '_tracked_height', 0):
-        return  # 高度没变，不触发 setFixedSize
-    app._tracked_height = h
-    app.setFixedSize(360, h)
 
 
 def _task_active(t):
@@ -561,15 +440,14 @@ def add_task(app):
     task = KeyboardTask(app.next_task_id, f"任务{app.next_task_id}", loop_interval=_ls().get("default_loop", 80))
     app.next_task_id += 1
     app.keyboard_tasks.append(task)
-    app._manual_resize = False  # 新增任务恢复自动调整
     create_card(app, task)
-    auto_size(app)
     from .settings_mode import install_wheel_guard
     install_wheel_guard(app)  # 新卡片的 spinbox 防滚轮误触
 
 
 def create_card(app, task):
     """创建任务卡片"""
+    task._app = app  # 存引用，_task_index 用
     card = QFrame()
     card.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
     card_layout = QVBoxLayout(card)
@@ -681,10 +559,13 @@ def create_card(app, task):
     rel_combo = _make_menu_combo(["独立"], width=80)
 
     def _rebuild_rel_menu():
-        """菜单弹出前重建选项，保证任务列表最新"""
+        """菜单弹出前重建选项，用位置索引（第几个）而非运行时 id"""
         menu = rel_combo.menu()
         menu.clear()
-        opts = ["独立"] + [f"任务{t.task_id}后" for t in app.keyboard_tasks if t.task_id != task.task_id]
+        opts = ["独立"]
+        for i, t in enumerate(app.keyboard_tasks):
+            if t.task_id != task.task_id:
+                opts.append(f"任务{i+1}后")
         for o in opts:
             menu.addAction(o)
     rel_combo.menu().aboutToShow.connect(_rebuild_rel_menu)
@@ -695,7 +576,8 @@ def create_card(app, task):
         task.relation_type = "独立" if text == "独立" else "在任务x后"
         if text.startswith("任务") and text.endswith("后"):
             try:
-                task.dependency_task_id = int(text[2:-1])
+                # 存位置索引（第几个），不是运行时 task_id
+                task.dependency_task_id = int(text[2:-1]) - 1
             except ValueError:
                 task.dependency_task_id = None
                 task.relation_type = "独立"
@@ -709,6 +591,7 @@ def create_card(app, task):
             task._loop_label.setText("循环:")
     rel_combo.currentTextChanged.connect(_on_rel_select)  # 兼容旧接口（_on_action 会 emit）
     task._rel_combo = rel_combo
+    task._on_rel_select = _on_rel_select  # 存引用，load_preset 调用同步数据
 
     # 右：循环间隔
     spin = QDoubleSpinBox()
@@ -782,7 +665,6 @@ def toggle_card(app, task):
     task._action_frame.setVisible(bool(task.actions) and not collapsed)
     for w in getattr(task, '_extra_rows', []):
         w.setVisible(not collapsed)
-    auto_size(app)
 
 
 class DraggableRow(QFrame):
@@ -974,7 +856,6 @@ def _refresh_actions(app, task):
         task._action_layout.addWidget(row)
         task._action_rows.append({"frame": row, "action": action, "desc_lbl": desc_lbl})
 
-    auto_size(app)
     from .settings_mode import install_wheel_guard
     install_wheel_guard(app)  # 新卡片的 spinbox 防滚轮误触
 
@@ -1275,15 +1156,15 @@ def _start_task(app, task):
 
 
 def update_dependencies(app):
-    """更新任务依赖关系"""
+    """更新任务依赖关系（dependency_task_id 现在存位置索引）"""
     for t in app.keyboard_tasks:
         t._dependents = []
     for t in app.keyboard_tasks:
         if t.relation_type == "在任务x后" and t.dependency_task_id is not None:
-            for parent in app.keyboard_tasks:
-                if parent.task_id == t.dependency_task_id:
-                    parent._dependents.append(t)
-                    break
+            idx = t.dependency_task_id
+            if isinstance(idx, int) and 0 <= idx < len(app.keyboard_tasks):
+                parent = app.keyboard_tasks[idx]
+                parent._dependents.append(t)
 
 
 def _ensure_limit_watcher(app):
@@ -1331,8 +1212,6 @@ def del_task(app, task, card):
     card.deleteLater()
     if card in app._cards:
         app._cards.remove(card)
-    app._manual_resize = False  # 删除任务恢复自动调整
-    auto_size(app)
 
 
 def load_preset(app):
@@ -1352,20 +1231,42 @@ def load_preset(app):
             item.widget().deleteLater()
     app._cards.clear()
     app.keyboard_tasks.clear()
-    app._task_layout.addStretch()  # 重建 stretch spacer（上面的 while 把它也删了）
+    app._task_layout.addStretch()
 
     p = presets[name]
+
+    # 创建任务（dependency_task_id 现在直接存索引）
     for td in p.get("tasks", []):
         task = KeyboardTask(app.next_task_id, td.get("name", f"任务{app.next_task_id}"))
         app.next_task_id += 1
         task.actions = td.get("actions", [])
         task.loop_interval = td.get("loop_interval", 80)
         task.max_runs = td.get("max_runs", 0)
+        task.relation_type = td.get("relation_type", "独立")
+        task.dependency_task_id = td.get("dependency_task_id")  # 现在是索引
+        if task.relation_type == "在任务x后":
+            task._preset_loop_interval = task.loop_interval
         app.keyboard_tasks.append(task)
         create_card(app, task)
 
-    app._manual_resize = False  # 加载预设恢复自动调整
-    auto_size(app)
+    # 恢复 UI（直接设，不走信号链）
+    for t in app.keyboard_tasks:
+        if t.relation_type == "在任务x后" and t.dependency_task_id is not None:
+            idx = t.dependency_task_id
+            # 索引越界或自身引用→降级为独立
+            if not isinstance(idx, int) or idx < 0 or idx >= len(app.keyboard_tasks) or idx == app.keyboard_tasks.index(t):
+                t.relation_type = "独立"
+                t.dependency_task_id = None
+                combo_text = "独立"
+            else:
+                combo_text = f"任务{idx+1}后"
+            t._rel_combo._current_text = combo_text
+            t._rel_combo.setText(combo_text)
+            t._loop_label.setText("延迟:" if t.relation_type == "在任务x后" else "循环:")
+            if t.relation_type == "在任务x后" and hasattr(t, '_preset_loop_interval'):
+                t.loop_interval = t._preset_loop_interval
+                t._loop_spin.setValue(t.loop_interval)
+
     show_floating_notification(app, f"已加载: {name}")
 
 
@@ -1376,14 +1277,18 @@ def save_preset_dialog(app):
         return
     name = name.strip()
 
+
     presets = load_presets()
     presets[name] = {
         "tasks": [
             {
+                "task_id": t.task_id,
                 "name": t.name,
                 "actions": t.actions,
                 "loop_interval": t.loop_interval,
                 "max_runs": t.max_runs,
+                "relation_type": t.relation_type,
+                "dependency_task_id": t.dependency_task_id if t.relation_type == "在任务x后" else None,
             }
             for t in app.keyboard_tasks
         ]

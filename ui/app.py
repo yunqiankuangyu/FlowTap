@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from config import Colors, FONT_B, load_settings, save_settings
 from tasks import MouseTask
+from ui.keyboard_mode import WIN_W
 
 # 伪装标题
 DISGUISE_TITLE = "svchost"
@@ -26,7 +27,7 @@ class App(QMainWindow):
         Colors.apply(self._settings["theme"])
 
         self.setWindowTitle(DISGUISE_TITLE)
-        self.setFixedSize(360, 392)
+        self.setFixedSize(WIN_W, 392)
         flags = Qt.FramelessWindowHint
         if self._settings.get("always_on_top", True):
             flags |= Qt.WindowStaysOnTopHint
@@ -41,7 +42,6 @@ class App(QMainWindow):
         self.next_task_id = 1
         self._current_mode = "keyboard"
         self._mini_window = None
-        self._tracked_height = 392  # 与 setFixedSize 初始高度一致
         self._ready = False  # 初始化完成前禁用所有操作
 
         # 全局停止热键（_build_ui 的设置页要用，必须先初始化）
@@ -112,7 +112,7 @@ class App(QMainWindow):
 
     def _build_ui(self):
         from .titlebar import build_titlebar
-        from .keyboard_mode import build_keyboard_mode, auto_size, show_floating_notification
+        from .keyboard_mode import build_keyboard_mode, show_floating_notification
         from .settings_mode import build_settings_mode
 
         self._show_floating_notification = show_floating_notification
@@ -193,7 +193,6 @@ class App(QMainWindow):
         self._central_layout.addWidget(self._drag_handle)
 
         self._current_mode = "keyboard"
-        QTimer.singleShot(150, self._auto_size)
 
     def _show_mode(self, mode):
         self._current_mode = mode
@@ -204,7 +203,6 @@ class App(QMainWindow):
             self._pause_btn = self._bottom_btns[2]
             from .keyboard_mode import update_pause_btn
             update_pause_btn(self)
-            QTimer.singleShot(150, self._auto_size)
         elif mode == "settings":
             self.content_stack.setCurrentIndex(1)
             self._ensure_bottom_bar(self._buttons_for("settings"))
@@ -261,10 +259,6 @@ class App(QMainWindow):
         return self._bottom_bar
 
 
-
-    def _auto_size(self):
-        from .keyboard_mode import auto_size
-        auto_size(self)
 
     def _minimize_to_mini(self):
         from .mini_mode import minimize_to_mini
