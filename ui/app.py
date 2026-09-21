@@ -56,6 +56,15 @@ class App(QMainWindow):
         self._hotkey_capturing = False
         self._start_hotkey_poller()
 
+    def resizeEvent(self, e):
+        """阻止窗口被缩小到 _tracked_height 以下"""
+        new_h = e.size().height()
+        cur = getattr(self, '_tracked_height', 0)
+        if cur > 0 and new_h < cur:
+            e.ignore()
+            return
+        super().resizeEvent(e)
+
     def _start_hotkey_poller(self):
         """QTimer轮询全局热键（Qt主线程事件循环内调GetAsyncKeyState）"""
         self._hotkey_timer = QTimer(self)
