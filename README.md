@@ -57,6 +57,7 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.8.0 | PySide6 | Window binding (auto-wait on switch), rounded corners, bottom bar alignment |
 | v3.7.4 | PySide6 | Scroll kept, mini-window sync, preset load confirmation |
 | v3.7.3 | PySide6 | Preset dependency fix, window height fix |
 | v3.7.2 | PySide6 | UI refinements |
