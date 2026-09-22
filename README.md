@@ -57,7 +57,7 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
-| v3.7.4 | PySide6 | Scroll kept on page switch, mini-window state sync |
+| v3.7.4 | PySide6 | Scroll kept, mini-window sync, preset load confirmation |
 | v3.7.3 | PySide6 | Preset dependency fix, window height fix |
 | v3.7.2 | PySide6 | UI refinements |
 | v3.7.1 | PySide6 | Window height fix, UI stability |
@@ -74,6 +74,9 @@ FlowTap/
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
 
 ### v3.7.4 — Page Switch & Theme Fixes
+
+**Added**
+- Confirmation prompt before loading a preset, to avoid overwriting current tasks
 
 **Fixed**
 - Task list scroll position is kept when switching pages
