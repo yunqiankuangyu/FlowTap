@@ -9,7 +9,7 @@ DEFAULT_THEME = "🧊 冰川蓝"
 THEMES = {
     # ── 暗色系（高饱和，各有性格）──
     "🔵 默认蓝":   {"CARD": "#1a2a4a", "ACCENT": "#121e38", "BLUE": "#4d9cff", "GREEN": "#4ade80", "RED": "#f87171", "YELLOW": "#facc15", "TEXT": "#e2e8f0", "TEXT2": "#94a3b8", "DIM": "#64748b", "HOVER_GREEN": "#22c55e", "HOVER_RED": "#ef4444"},
-    "🟣 猫布丁":   {"CARD": "#382a50", "ACCENT": "#2a1e40", "BLUE": "#b4a0f0", "GREEN": "#a0e8a0", "RED": "#ff8090", "YELLOW": "#ffe080", "TEXT": "#e0d8f0", "TEXT2": "#c0b0e0", "DIM": "#8878b0", "HOVER_GREEN": "#60e0c0", "HOVER_RED": "#ff6080"},
+    "🟣 猫布丁":   {"CARD": "#382a50", "ACCENT": "#2a1e40", "BLUE": "#6948ca", "GREEN": "#256e43", "RED": "#aa3948", "YELLOW": "#7b5c1f", "TEXT": "#e0d8f0", "TEXT2": "#c0b0e0", "DIM": "#8878b0", "HOVER_GREEN": "#206d5d", "HOVER_RED": "#8f2e40"},
     "🔥 炭火":     {"CARD": "#382818", "ACCENT": "#2a1e10", "BLUE": "#68c8e8", "GREEN": "#b8e060", "RED": "#ff6848", "YELLOW": "#ffb830", "TEXT": "#f0e8d8", "TEXT2": "#d0c0a0", "DIM": "#a08860", "HOVER_GREEN": "#98d040", "HOVER_RED": "#ff5030"},
     "🌲 北欧森林": {"CARD": "#1e3030", "ACCENT": "#162828", "BLUE": "#60c8d8", "GREEN": "#80e090", "RED": "#e07070", "YELLOW": "#e0d070", "TEXT": "#d8f0e0", "TEXT2": "#a0d0b8", "DIM": "#508878", "HOVER_GREEN": "#40d8a0", "HOVER_RED": "#d06060"},
     "🍇 葡萄冻":   {"CARD": "#302048", "ACCENT": "#241838", "BLUE": "#c8a0ff", "GREEN": "#90e0b0", "RED": "#ff80a0", "YELLOW": "#ffe090", "TEXT": "#e8d8f8", "TEXT2": "#c8b0e0", "DIM": "#9070c0", "HOVER_GREEN": "#60d8a0", "HOVER_RED": "#ff6090"},
