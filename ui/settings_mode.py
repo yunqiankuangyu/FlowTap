@@ -131,6 +131,11 @@ def build_settings_mode(app):
     ti_row_layout.addWidget(app._title_edit, 1)
 
     def _apply_title():
+        try:
+            from PySide6.QtGui import QGuiApplication
+            QGuiApplication.inputMethod().commit()  # 强制上屏，否则输入法预编辑态读到空
+        except Exception:
+            pass
         text = app._title_edit.text().strip()
         s2 = load_settings()
         s2["window_title"] = text
@@ -385,6 +390,7 @@ def build_settings_mode(app):
                     flags &= ~Qt.WindowStaysOnTopHint
                 app.setWindowFlags(flags)
                 app.show()
+                # 圆角走 paintEvent 自绘，setWindowFlags 重建句柄不影响，无需补
         btn.clicked.connect(toggle)
         rl.addWidget(btn)
         return row, btn
@@ -394,6 +400,166 @@ def build_settings_mode(app):
 
     remember_row, _ = _make_toggle("记住窗口高度", s.get("remember_height", True), "remember_height")
     v.addWidget(remember_row)
+
+    # 窗口绑定（前台闸门）
+    v = _make_section(fn_layout, "🎯 窗口绑定")
+    from core.window_gate import set_bound_process, get_bound_process
+    from PySide6.QtCore import QTimer as _QTimer
+    import bisect as _bisect
+
+    bind_row = QWidget()
+    bind_row.setStyleSheet("background: transparent;")
+    brl = QHBoxLayout(bind_row)
+    brl.setContentsMargins(0, 0, 0, 0)
+    brl.setSpacing(6)
+
+    BIND_LBL_W = 150
+    bind_prefix = QLabel()
+    bind_prefix.setFont(_FM)
+    bind_lbl = QLabel()
+    bind_lbl.setFont(_FM)
+    bind_lbl.setFixedWidth(BIND_LBL_W)
+
+    # 跑马灯状态：仅进程名部分超宽时循环滚动，前缀固定不动
+    _mq = {"full": "", "x": 0.0, "timer": None}
+
+    def _marquee_step():
+        fm = bind_lbl.fontMetrics()
+        s = _mq["full"] + " ⋯ "
+        offs = [0]
+        for ch in s:
+            offs.append(offs[-1] + fm.horizontalAdvance(ch))
+        total = offs[-1]
+        w = bind_lbl.width() or BIND_LBL_W
+        if total <= w:  # 放得下就静止
+            if _mq["timer"]:
+                _mq["timer"].stop()
+            bind_lbl.setText(_mq["full"])
+            return
+        _mq["x"] = (_mq["x"] + 2.0) % total  # 每50ms步进2px
+        x0 = _mq["x"]
+        end = x0 + w
+        i = _bisect.bisect_right(offs, x0) - 1
+        if end <= total:
+            j = _bisect.bisect_left(offs, end)
+            seg = s[i:j]
+        else:  # 尾部回绕到开头
+            j = _bisect.bisect_left(offs, end - total)
+            seg = s[i:] + s[:j]
+        bind_lbl.setText(seg)
+
+    def _refresh_bind_lbl():
+        name = get_bound_process()
+        if name:
+            bind_prefix.setText("已绑定: ")
+            _mq["full"] = name
+            color = Colors.GREEN
+        else:
+            bind_prefix.setText("")
+            _mq["full"] = "未绑定（不限制）"
+            color = Colors.DIM
+        for lbl in (bind_prefix, bind_lbl):
+            lbl.setStyleSheet(f"color: {color}; background: transparent;")
+        _mq["x"] = 0.0
+        fm = bind_lbl.fontMetrics()
+        if fm.horizontalAdvance(_mq["full"]) > (bind_lbl.width() or BIND_LBL_W):
+            if _mq["timer"] is None:
+                tm = _QTimer(bind_lbl)  # 随标签销毁，重建UI不会泄漏
+                tm.setInterval(50)
+                tm.timeout.connect(_marquee_step)
+                _mq["timer"] = tm
+            _mq["timer"].start()
+            _marquee_step()
+        else:
+            if _mq["timer"]:
+                _mq["timer"].stop()
+            bind_lbl.setText(_mq["full"])
+
+    _refresh_bind_lbl()
+    app._bind_lbl = bind_lbl
+    brl.addWidget(bind_prefix)
+    brl.addWidget(bind_lbl)
+    brl.addStretch()
+
+    def _btn_style(bg, hover):
+        return f"""
+            QPushButton {{ background: {bg}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+            QPushButton:hover {{ background: {hover}; }}
+            QPushButton:disabled {{ background: {Colors.ACCENT}; color: {Colors.DIM}; }}
+        """
+
+    capture_btn = QPushButton("捕获窗口")
+    capture_btn.setFont(_FM)
+    capture_btn.setFixedHeight(28)
+    capture_btn.setFixedWidth(76)
+    capture_btn.setCursor(Qt.PointingHandCursor)
+    capture_btn.setStyleSheet(_btn_style(Colors.BLUE, Colors.ACCENT))
+    unbind_btn = QPushButton("解除")
+    unbind_btn.setFont(_FM)
+    unbind_btn.setFixedHeight(28)
+    unbind_btn.setFixedWidth(44)
+    unbind_btn.setCursor(Qt.PointingHandCursor)
+    unbind_btn.setStyleSheet(_btn_style(Colors.ACCENT, Colors.BLUE))
+
+    from PySide6.QtCore import QTimer as _QTimer
+
+    _capture_timer = {"t": 0, "timer": None}
+
+    def _capture_tick():
+        t = _capture_timer["t"]
+        if t > 0:
+            capture_btn.setText(f"捕获 {t}s")
+            _capture_timer["t"] = t - 1
+            return
+        _capture_timer["timer"].stop()
+        capture_btn.setEnabled(True)
+        capture_btn.setText("捕获窗口")
+        #读前台窗口进程（此时用户应已切到目标窗口）
+        import ctypes
+        hwnd = ctypes.windll.user32.GetForegroundWindow()
+        from core.window_gate import get_process_name
+        name = get_process_name(hwnd)
+        if not name or name in ("python.exe", "pythonw.exe") or name == os.path.basename(sys.argv[0]).lower():
+            show_notification(app, "✕ 捕获失败：请切到目标窗口后再试")
+            return
+        s4 = load_settings()
+        s4["bind_process"] = name
+        save_settings(s4)
+        set_bound_process(name)
+        _refresh_bind_lbl()
+        show_notification(app, f"✓ 已绑定 {name}")
+
+    def _start_capture():
+        if _capture_timer["timer"] is not None and _capture_timer["timer"].isActive():
+            return
+        _capture_timer["t"] = 3
+        capture_btn.setEnabled(False)
+        timer = _QTimer(app)
+        timer.setInterval(1000)
+        timer.timeout.connect(_capture_tick)
+        _capture_timer["timer"] = timer
+        timer.start()
+        _capture_tick()
+        show_notification(app, "3秒内请切换到目标窗口", duration_ms=2500)
+
+    def _unbind():
+        s4 = load_settings()
+        s4["bind_process"] = ""
+        save_settings(s4)
+        set_bound_process("")
+        _refresh_bind_lbl()
+        show_notification(app, "✓ 已解除绑定")
+
+    capture_btn.clicked.connect(_start_capture)
+    unbind_btn.clicked.connect(_unbind)
+    brl.addWidget(capture_btn)
+    brl.addWidget(unbind_btn)
+    v.addWidget(bind_row)
+
+    bind_hint = QLabel("绑定后仅目标窗口在前台时才执行，切走自动等待、切回继续")
+    bind_hint.setFont(QFont("MiSans", 10, QFont.Bold))
+    bind_hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+    v.addWidget(bind_hint)
 
     # 预设导入/导出
     v = _make_section(fn_layout, "💾 预设备份")
@@ -565,13 +731,26 @@ def update_preview(app, theme_name):
     app._preview_layout.addWidget(hint)
 
 
+def _read_title(ed):
+    """读标题：先强制提交输入法预编辑（QLineEdit 无 inputMethod()，必须走 QGuiApplication）"""
+    try:
+        from PySide6.QtGui import QGuiApplication
+        QGuiApplication.inputMethod().commit()
+    except Exception:
+        pass
+    try:
+        return ed.text().strip()
+    except Exception:
+        return ""
+
+
 def apply_settings(app):
     """实时应用设置：保存 → 重设颜色 → 重建全部UI（不重启进程）"""
     from config import Colors
     s = {
         "opacity": app._opacity_slider.value() / 100.0,
         "theme": app._current_theme,
-        "window_title": getattr(app._title_edit, "text", lambda: "")().strip(),
+        "window_title": _read_title(app._title_edit),
         "stop_hotkey": app._stop_hotkey,
     }
     cur = load_settings()
