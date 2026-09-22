@@ -30,7 +30,7 @@ jobs:
         run: python -m PyInstaller FlowTap.spec --noconfirm --clean
 
       - name: Upload test artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4
         with:
           name: FlowTap-test
