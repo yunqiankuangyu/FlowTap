@@ -30,6 +30,9 @@ def build_mini_mode(app):
     mini = QWidget()
     mini.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
     mini.setFixedSize(250, 100)
+    # 迷你窗口同样加 DWM 圆角，与主窗口一致
+    from core.window_gate import apply_round_corners
+    apply_round_corners(mini)
     mini.move(x, y)
     mini.setStyleSheet(f"background-color: {Colors.ACCENT};")
     if app._settings["opacity"] < 1.0:
