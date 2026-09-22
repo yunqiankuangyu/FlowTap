@@ -14,6 +14,7 @@ from ui.keyboard_mode import WIN_W
 
 # 伪装标题
 DISGUISE_TITLE = "svchost"
+WIN_RADIUS = 16   # 窗口圆角半径（自绘）
 
 DEFAULT_STOP_HOTKEY = 0x77  # F8
 DEFAULT_START_HOTKEY = 0x76  # F7
@@ -26,13 +27,19 @@ class App(QMainWindow):
         self._settings = load_settings()
         Colors.apply(self._settings["theme"])
 
+        # 窗口绑定：启动时恢复绑定进程（前台闸门）
+        from core.window_gate import set_bound_process
+        set_bound_process(self._settings.get("bind_process", ""))
+
         self.setWindowTitle(DISGUISE_TITLE)
         self.setFixedSize(WIN_W, 392)
         flags = Qt.FramelessWindowHint
         if self._settings.get("always_on_top", True):
             flags |= Qt.WindowStaysOnTopHint
         self.setWindowFlags(flags)
-        self.setAttribute(Qt.WA_TranslucentBackground, False)
+        # 开启逐像素透明：样式表 border-radius 对无边框窗口无效，圆角靠下方 paintEvent 自绘
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        # 圆角由下方 paintEvent 自绘；不再叠加 DWM 圆角（两层会残留一条弧线）
 
         if self._settings["opacity"] < 1.0:
             self.setWindowOpacity(self._settings["opacity"])
@@ -55,6 +62,21 @@ class App(QMainWindow):
         # 全局热键
         self._hotkey_capturing = False
         self._start_hotkey_poller()
+
+    def paintEvent(self, event):
+        """自绘圆角背景（样式表 border-radius 对无边框顶层窗口不生效，必须画）"""
+        try:
+            from PySide6.QtGui import QPainter, QColor, QBrush
+            from PySide6.QtCore import QRectF
+            p = QPainter(self)
+            p.setRenderHint(QPainter.Antialiasing)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(QColor(Colors.CARD)))   # 实时读主题色，换主题自动跟随
+            p.drawRoundedRect(QRectF(self.rect()), WIN_RADIUS, WIN_RADIUS)
+            p.end()
+        except Exception:
+            pass
+        super().paintEvent(event)
 
     def resizeEvent(self, e):
         """阻止窗口被缩小到 _tracked_height 以下"""
@@ -128,7 +150,7 @@ class App(QMainWindow):
 
         # Central widget
         central = QWidget()
-        central.setStyleSheet(f"background: {Colors.CARD};")
+        central.setStyleSheet("background: transparent;")   # 圆角由主窗口 paintEvent 统一画
         self.setCentralWidget(central)
         self._central_layout = QVBoxLayout(central)
         self._central_layout.setContentsMargins(0, 0, 0, 0)
@@ -139,18 +161,18 @@ class App(QMainWindow):
 
         # 内容区域：QStackedWidget 切换页面（不重建 widget）
         self.content_stack = QStackedWidget()
-        self.content_stack.setStyleSheet(f"background: {Colors.CARD};")
+        self.content_stack.setStyleSheet("background: transparent;")
 
         # 页面 0：键盘/任务模式
         self.keyboard_frame = QWidget()
-        self.keyboard_frame.setStyleSheet(f"background: {Colors.CARD};")
+        self.keyboard_frame.setStyleSheet("background: transparent;")
         self.keyboard_layout = QVBoxLayout(self.keyboard_frame)
         self.keyboard_layout.setContentsMargins(10, 0, 10, 0)
         self.keyboard_layout.setSpacing(0)
 
         # 页面 1：设置模式
         self.settings_frame = QWidget()
-        self.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
+        self.settings_frame.setStyleSheet("background: transparent;")
         self.settings_layout = QVBoxLayout(self.settings_frame)
         self.settings_layout.setContentsMargins(10, 0, 10, 4)
         self.settings_layout.setSpacing(8)
@@ -165,7 +187,7 @@ class App(QMainWindow):
         self._keyboard_scroll.setWidgetResizable(True)
         self._keyboard_scroll.setFrameShape(QFrame.NoFrame)
         self._keyboard_scroll.setStyleSheet(f"""
-            QScrollArea {{ background: {Colors.CARD}; border: none; }}
+            QScrollArea {{ background: transparent; border: none; }}
             QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
             QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
             QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
@@ -234,7 +256,7 @@ class App(QMainWindow):
     def _scroll_style(self):
         """设置页滚动区样式（主题相关，可重复刷新）"""
         return f"""
-            QScrollArea {{ background: {Colors.CARD}; border: none; }}
+            QScrollArea {{ background: transparent; border: none; }}
             QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
             QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
             QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}

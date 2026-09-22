@@ -18,7 +18,7 @@ def build_titlebar(app):
     bar.setFixedHeight(32)
     bar.setStyleSheet(f"""
         QWidget {{
-            background-color: {Colors.CARD};
+            background-color: transparent;
         }}
         QPushButton {{
             background-color: transparent;
@@ -42,7 +42,7 @@ def build_titlebar(app):
     # 标题（可自定义，从设置读取）
     from config import load_settings
     custom_title = load_settings().get("window_title", "")
-    title = QLabel(custom_title or "⚡ 工具")
+    title = QLabel(custom_title or "FlowTap")
     title.setFont(FONT_B)
     layout.addWidget(title)
     app._title_label = title
