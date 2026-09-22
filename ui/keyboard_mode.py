@@ -8,7 +8,7 @@ import ctypes
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QFrame, QScrollArea, QComboBox, QDoubleSpinBox,
-    QInputDialog, QMenu
+    QInputDialog, QMenu, QMessageBox
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QFont, QCursor
@@ -1222,6 +1222,16 @@ def load_preset(app):
     presets = load_presets()
     if name not in presets:
         return
+
+    #有任务时先确认，防止误点覆盖当前编辑内容
+    if app.keyboard_tasks:
+        ret = QMessageBox.question(
+            app, "加载预设",
+            f"加载「{name}」将替换当前 {len(app.keyboard_tasks)} 个任务，且无法撤销。\n确定继续吗？",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if ret != QMessageBox.Yes:
+            return
 
     for t in app.keyboard_tasks:
         t.stop()
