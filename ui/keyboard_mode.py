@@ -225,7 +225,7 @@ def build_bottom_bar(app, buttons):
     bar.setFixedHeight(BF_H)
     bar.setMinimumHeight(BF_H)
     bar_layout = QHBoxLayout(bar)
-    bar_layout.setContentsMargins(2, 2, 2, 0)
+    bar_layout.setContentsMargins(10, 2, 10, 0)   # 左右与内容区(10)对齐
     bar_layout.setSpacing(3)
 
     btns = []
@@ -650,7 +650,7 @@ def create_card(app, task):
     sf_layout.addLayout(left)
 
     card_layout.addWidget(sf)
-    task._extra_rows.append(sf)
+    # sf 不进 _extra_rows：收起时保留最后一行（关系/循环/次数），只隐藏动作列表和+⌨+🖱清空行
 
     app._task_layout.insertWidget(app._task_layout.count() - 1, card)
     app._cards.append(card)
