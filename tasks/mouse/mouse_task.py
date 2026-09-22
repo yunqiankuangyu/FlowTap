@@ -2,6 +2,7 @@
 鼠标任务模块
 """
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -40,6 +41,11 @@ class MouseTask:
         sim = MouseSimulator()
         first = True
         while self._running:
+            #窗口绑定闸门：目标进程不在前台则原地等待，不点击不计数
+            from core.window_gate import get_bound_process, is_target_foreground
+            if get_bound_process() and not is_target_foreground():
+                time.sleep(0.2)
+                continue
             if self.position:
                 if not first:
                     cur = sim.get_mouse_pos()

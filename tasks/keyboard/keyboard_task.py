@@ -117,12 +117,34 @@ class KeyboardTask:
             elapsed = 0.0 if self._paused else time.monotonic() - t0
             remaining -= elapsed
 
+    def _window_gate(self):
+        """窗口绑定闸门：绑定进程不在前台则原地等待（不注入不计数）；未绑定恒放行
+        返回 False=任务已停止"""
+        from core.window_gate import get_bound_process, is_target_foreground
+        name = get_bound_process()
+        if not name:
+            return True
+        shown = None
+        while self._running:
+            if is_target_foreground():
+                if shown and self._countdown_callback:
+                    try: self._countdown_callback("● 执行中...", "#4ade80")
+                    except Exception: pass
+                return True
+            if shown != name and self._countdown_callback:
+                shown = name
+                try: self._countdown_callback("● 等待窗口...", "#facc15")
+                except Exception: pass
+            time.sleep(0.2)
+        return False
+
     def _execute_actions(self):
         """执行一轮动作序列"""
         kb_sim = KeyboardSimulator()
         ms_sim = MouseSimulator()
         for action in self.actions:
             if not self._running: return False
+            if not self._window_gate(): return False
             try:
                 hold = action.get("hold", 0)
                 if action["type"] == "key":
@@ -165,6 +187,7 @@ class KeyboardTask:
                     self._finished_by_limit = True
                     self.stop()
                     return
+                if not self._window_gate(): return  # 窗口不在前台：本轮不计数
                 self.done_count += 1
                 if not self._execute_actions(): return
                 # 触发依赖此任务的其他任务
@@ -239,6 +262,7 @@ class KeyboardTask:
                 self._finished_by_limit = True
                 self.stop()
                 return
+            if not self._window_gate(): return  # 窗口不在前台：本轮不计数
             self.done_count += 1
             self._execute_actions()
             if self.max_runs > 0 and self.done_count >= self.max_runs:

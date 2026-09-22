@@ -25,7 +25,7 @@ SETTINGS_FILE = os.path.join(_app_dir(), "settings.json")
 
 def load_settings():
     """加载设置"""
-    defaults = {"opacity": 0.9, "theme": DEFAULT_THEME}
+    defaults = {"opacity": 0.9, "theme": DEFAULT_THEME, "bind_process": ""}
     try:
         with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
             defaults.update(json.load(f))
