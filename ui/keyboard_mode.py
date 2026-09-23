@@ -572,40 +572,39 @@ def create_card(app, task):
     af_layout.setContentsMargins(0, 0, 0, 0)
     af_layout.setSpacing(3)
 
-    add_key_btn = _make_btn("+ ⌨", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
-    add_key_btn.clicked.connect(lambda: add_key_action(app, task))
-    af_layout.addWidget(add_key_btn)
-
-    add_click_btn = _make_btn("+ 🖱", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
-    add_click_btn.clicked.connect(lambda: add_click_action(app, task))
-    af_layout.addWidget(add_click_btn)
-
     from .vision_capture import add_image_wait_action
-    add_img_btn = _make_btn("+ 📷", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
-    add_img_btn.setToolTip("框选等待图像：画面出现选中目标才继续")
-    add_img_btn.clicked.connect(lambda: add_image_wait_action(
-        app, task, lambda: _refresh_actions(app, task)))
-    af_layout.addWidget(add_img_btn)
-
     from tasks.keyboard.keyboard_task import make_branch_action, make_jump_action
 
-    def _add_branch(_c=False):
-        task.actions.append(make_branch_action([]))
-        _refresh_actions(app, task)
+    # 添加动作区并成三控件一排：键鼠下拉 / 插入下拉 / 清空（原 6 按钮太密）
+    def _pick_kb(what):
+        dd_kb.setText("+ 键鼠")  # 菜单触发会把按钮改成选项文案，触发器须复位常驻标签
+        if "键盘" in what:
+            add_key_action(app, task)
+        else:
+            add_click_action(app, task)
 
-    def _add_jump(_c=False):
-        task.actions.append(make_jump_action())
-        _refresh_actions(app, task)
+    dd_kb = _make_menu_combo(["⌨ 键盘", "🖱 点击"], width=90, on_select=_pick_kb)
+    dd_kb.setText("+ 键鼠")
+    dd_kb._current_text = "+ 键鼠"
+    dd_kb.setToolTip("添加动作：键盘 / 鼠标点击")
+    af_layout.addWidget(dd_kb)
 
-    add_br_btn = _make_btn("+ 🔀", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
-    add_br_btn.setToolTip("多模板分支：挂N张图带优先级，命中即跳转")
-    add_br_btn.clicked.connect(_add_branch)
-    af_layout.addWidget(add_br_btn)
+    def _pick_in(what):
+        dd_in.setText("+ 插入")
+        if "等图像" in what:
+            add_image_wait_action(app, task, lambda: _refresh_actions(app, task))
+        elif "分支" in what:
+            task.actions.append(make_branch_action([]))
+            _refresh_actions(app, task)
+        else:
+            task.actions.append(make_jump_action())
+            _refresh_actions(app, task)
 
-    add_jp_btn = _make_btn("+ ↳", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
-    add_jp_btn.setToolTip("跳转：无条件跳到指定动作（分支路线用它收口）")
-    add_jp_btn.clicked.connect(_add_jump)
-    af_layout.addWidget(add_jp_btn)
+    dd_in = _make_menu_combo(["📷 等图像", "🔀 分支", "↳ 跳转"], width=90, on_select=_pick_in)
+    dd_in.setText("+ 插入")
+    dd_in._current_text = "+ 插入"
+    dd_in.setToolTip("插入：等图像（框选等待）/ 多模板分支 / 跳转")
+    af_layout.addWidget(dd_in)
 
     clear_btn = _make_btn("清空", bg=Colors.DIM, hover=Colors.ACCENT, height=25)
     clear_btn.clicked.connect(lambda: clear_actions(app, task))
