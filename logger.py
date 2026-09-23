@@ -19,22 +19,36 @@ def _log_dir():
 LOG_FILE = os.path.join(_log_dir(), "runtime.log")
 
 
-def log_error(tag: str, exc: BaseException = None):
-    """写一条带时间戳的异常记录；exc=None 时只记 tag"""
+def _write(line):
+    """追加一行；超限截断保留后半（日志本身不能抛异常）"""
     try:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        tb = traceback.format_exc() if exc else ""
-        line = f"[{now}] [{tag}] {exc}\n{tb}\n" if exc else f"[{now}] [{tag}]\n"
-
-        # 超限截断
         if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > _MAX_SIZE:
             with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()
             half = len(lines) // 2
             with open(LOG_FILE, "w", encoding="utf-8") as f:
                 f.writelines(lines[half:])
-
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line)
+    except Exception:
+        pass
+
+
+def log_info(tag: str, msg: str):
+    """写一条带时间戳的信息记录（与 log_error 同文件同 1MB 上限）"""
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        _write(f"[{now}] [{tag}] {msg}\n")
+    except Exception:
+        pass
+
+
+def log_error(tag: str, exc: BaseException = None):
+    """写一条带时间戳的异常记录；exc=None 时只记 tag"""
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        tb = traceback.format_exc() if exc else ""
+        line = f"[{now}] [{tag}] {exc}\n{tb}\n" if exc else f"[{now}] [{tag}]\n"
+        _write(line)
     except Exception:
         pass  # 日志本身不能再抛异常
