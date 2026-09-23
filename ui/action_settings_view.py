@@ -41,7 +41,7 @@ class ActionSettingsView(QWidget):
         head.addWidget(_make_label(fmt_action(action) + " 设置", font=QFont("MiSans", 15, QFont.Bold)))
         head.addStretch(1)
         close_btn = QPushButton("\u2715")
-        close_btn.setFixedSize(20, 20)
+        close_btn.setFixedSize(26, 26)
         close_btn.setCursor(QCursor(Qt.PointingHandCursor))
         close_btn.setStyleSheet(
             f"QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 15px 'MiSans'; }}"
@@ -132,7 +132,8 @@ class ActionSettingsView(QWidget):
             hold_spin.setSingleStep(0.1)
             hold_spin.setValue(action.get("hold", 0))
         hold_spin.setFixedHeight(20)
-        hold_spin.setFixedWidth(31 if (is_wait or is_branch) else 46)
+        _fit_spin(hold_spin, font=FONT13)
+        hold_spin.textChanged.connect(lambda _t, sp=hold_spin: _fit_spin(sp, font=FONT13))
         hold_spin.setAlignment(Qt.AlignRight)
         hold_spin.setFont(FONT13)
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
@@ -157,17 +158,13 @@ class ActionSettingsView(QWidget):
             delay_spin.setSingleStep(0.1)
             delay_spin.setValue(action.get("delay", 0.5))
         delay_spin.setFixedHeight(20)
-        if is_wait:  # wait行这个框标签就是"阈值"
-            _fit_spin(delay_spin, font=FONT13)
-        else:
-            delay_spin.setFixedWidth(46)
+        _fit_spin(delay_spin, font=FONT13)  # wait=阈值, branch=后延, 都按13pt字宽贴
         delay_spin.setAlignment(Qt.AlignRight)
         delay_spin.setFont(FONT13)
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
-        if is_wait:
-            delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp, font=FONT13))
+        delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp, font=FONT13))
         _ctl.addWidget(delay_spin)
         if not is_wait:
             _ctl.addWidget(_make_label("s", font=FONT13, color=Colors.DIM))
@@ -181,7 +178,8 @@ class ActionSettingsView(QWidget):
             hit_spin.setSingleStep(1)
             hit_spin.setValue(int(action.get("min_hits", 2)))
             hit_spin.setFixedHeight(20)
-            hit_spin.setFixedWidth(16)
+            _fit_spin(hit_spin, font=FONT13)
+            hit_spin.textChanged.connect(lambda _t, sp=hit_spin: _fit_spin(sp, font=FONT13))
             hit_spin.setAlignment(Qt.AlignRight)
             hit_spin.setFont(FONT13)
             hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
@@ -191,7 +189,7 @@ class ActionSettingsView(QWidget):
             _ctl.addSpacing(2)
             # 尺度：多尺度/精确 动态切换（点击翻转 action.scales）
             scale_btn = _make_btn("", font=FONT13, height=20)
-            scale_btn.setFixedWidth(47)
+            scale_btn.setFixedWidth(60)
             scale_btn.setToolTip("多尺度：UI缩放125%/150%也识别；精确：只按标定原尺寸")
             def _flip_scale(_checked=False, a=action, b=scale_btn):
                 cur = a.get("scales") or [1.0, 1.25, 1.5]
@@ -214,7 +212,7 @@ class ActionSettingsView(QWidget):
             # 超时后行为：跳过/中止 动态切换（中止=红）
             _ctl.addWidget(_make_label("超时后", font=FONT13, color=Colors.DIM))
             ot_btn = _make_btn("", font=FONT13, height=20)
-            ot_btn.setFixedWidth(32)
+            ot_btn.setFixedWidth(43)
             ot_btn.setToolTip("等待超时后：跳过=继续执行下一动作；中止=终止本轮")
             def _flip_ot(_checked=False, a=action, b=ot_btn):
                 if a.get("on_timeout", "skip") == "skip":
@@ -284,7 +282,7 @@ class ActionSettingsView(QWidget):
                 _subA.addSpacing(2)
 
                 _sc = _make_btn("", font=FONT13, height=20)
-                _sc.setFixedWidth(47)
+                _sc.setFixedWidth(60)
                 def _flip_sc(_c=False, o=option, b=_sc):
                     cur = o.get("scales") or [1.0, 1.25, 1.5]
                     if len(cur) > 1:
@@ -301,17 +299,14 @@ class ActionSettingsView(QWidget):
                 _tint_btn(_sc, Colors.BLUE if _m else Colors.DIM)
                 _subA.addWidget(_sc)
 
-                _subA.addStretch(1)
-                _vbox.addLayout(_subA)
-
-                _subB = QHBoxLayout()
-                _subB.setSpacing(6)  # 行内舒展
-                _subB.addSpacing(0)
-                _subB.addWidget(_make_label("跳到", font=FONT13, color=Colors.DIM))
-                _subB.addWidget(_target_combo(task, option, big=True))
+                _subA.addSpacing(14)  # 组界: 阈值组↔跳到组
+                _subA.addWidget(_make_label("跳到", font=FONT13, color=Colors.DIM))
+                _subA.addSpacing(4)
+                _subA.addWidget(_target_combo(task, option, big=True))
+                _subA.addSpacing(6)
 
                 _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, font=FONT13, height=20)
-                _cap.setFixedWidth(20)
+                _cap.setFixedWidth(26)
                 _cap.setToolTip("重拍本模板（覆盖原路径）")
                 def _recap(_c=False, o=option):
                     capture_template(
@@ -320,7 +315,7 @@ class ActionSettingsView(QWidget):
                         on_done=lambda: _refresh_actions(app, task),
                         rel=o.get("tpl"))
                 _cap.clicked.connect(_recap)
-                _subB.addWidget(_cap)
+                _subA.addWidget(_cap)
 
                 def _del_opt(_c=False, a=action, i=k):
                     (a.get("options") or []).pop(i)
@@ -342,18 +337,18 @@ class ActionSettingsView(QWidget):
                                         ("↓", _down_opt, "下移"),
                                         ("✕", _del_opt, "删除本选项")):
                     _b = _make_btn(_txt, bg=Colors.DIM, hover=Colors.ACCENT, font=FONT13, height=20)
-                    _b.setFixedWidth(18)
+                    _b.setFixedWidth(24)
                     _b.setToolTip(_tip)
                     _b.clicked.connect(_fn)
-                    _subB.addWidget(_b)
-                _subB.addStretch(1)  # 多余空间归行尾, 防跳到label被拉宽(拉伸锁回归)
-                _vbox.addLayout(_subB)
+                    _subA.addWidget(_b)
+                _subA.addStretch(1)  # 多余空间归行尾, 防label被拉宽
+                _vbox.addLayout(_subA)
 
             _subf = QHBoxLayout()
             _subf.setSpacing(3)
             _subf.addSpacing(0)
             _addopt = _make_btn("+ 加分支", bg=Colors.BLUE, hover=Colors.ACCENT, font=FONT13, height=20)
-            _addopt.setFixedWidth(80)
+            _addopt.setFixedWidth(92)
             def _add_option(_c=False, a=action):
                 capture_template(
                     app, task,

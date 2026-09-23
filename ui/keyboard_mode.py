@@ -114,7 +114,7 @@ def _target_combo(task, container, big=False):
     from PySide6.QtWidgets import QComboBox
     combo = QComboBox()
     combo.setFixedHeight(22 if big else 18)
-    combo.setFixedWidth(86 if big else 74)
+    combo.setFixedWidth(104 if big else 74)
     _pt = 13 if big else 11
     combo.setStyleSheet(f"""
         QComboBox {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none;
