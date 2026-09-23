@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QInputDialog, QMenu, QMessageBox
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
-from PySide6.QtGui import QFont, QCursor
+from PySide6.QtGui import QFont, QCursor, QFontMetricsF
 
 import sys
 import os
@@ -145,6 +145,11 @@ def _target_combo(task, container):
     combo.currentIndexChanged.connect(lambda _i, c=combo: c.setToolTip(c.currentText()))
     return combo
 
+
+def _fit_spin(spin):
+    #宽度=字宽+2, 右对齐下label侧和右侧邻居都贴死(字体显式, 不受调用顺序/setFont先后影响)
+    _fm = QFontMetricsF(QFont("MiSans", 11, QFont.Bold))
+    spin.setFixedWidth(int(_fm.horizontalAdvance(spin.text())) + 2)
 
 def _make_label(text, font=None, color=None):
     lbl = QLabel(text)
@@ -848,12 +853,13 @@ def _refresh_actions(app, task):
             hold_spin.setSingleStep(0.1)
             hold_spin.setValue(action.get("hold", 0))
         hold_spin.setFixedHeight(20)
-        hold_spin.setFixedWidth(31 if (is_wait or is_branch) else 46)
+        _fit_spin(hold_spin)
         hold_spin.setAlignment(Qt.AlignRight)
         hold_spin.setFont(QFont("MiSans", 11, QFont.Bold))
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "timeout" if a.get("type") in ("wait_image", "branch") else "hold", round(v, 2)))
+        hold_spin.textChanged.connect(lambda _t, sp=hold_spin: _fit_spin(sp))
         _ctl.addWidget(hold_spin)
         _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
@@ -873,12 +879,13 @@ def _refresh_actions(app, task):
             delay_spin.setSingleStep(0.1)
             delay_spin.setValue(action.get("delay", 0.5))
         delay_spin.setFixedHeight(20)
-        delay_spin.setFixedWidth(61 if is_wait else 46)
+        _fit_spin(delay_spin)
         delay_spin.setAlignment(Qt.AlignRight)
         delay_spin.setFont(QFont("MiSans", 11, QFont.Bold))
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
+        delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp))
         _ctl.addWidget(delay_spin)
         if not is_wait:
             _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
@@ -893,11 +900,12 @@ def _refresh_actions(app, task):
             hit_spin.setSingleStep(1)
             hit_spin.setValue(int(action.get("min_hits", 2)))
             hit_spin.setFixedHeight(20)
-            hit_spin.setFixedWidth(16)
+            _fit_spin(hit_spin)
             hit_spin.setAlignment(Qt.AlignRight)
             hit_spin.setFont(QFont("MiSans", 11, QFont.Bold))
             hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
             hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
+            hit_spin.textChanged.connect(lambda _t, sp=hit_spin: _fit_spin(sp))
             _ctl.addWidget(hit_spin)
 
             _ctl.addSpacing(2)
@@ -1003,11 +1011,12 @@ def _refresh_actions(app, task):
                 _th.setSingleStep(0.05)
                 _th.setValue(float(option.get("threshold", 0.85)))
                 _th.setFixedHeight(20)
-                _th.setFixedWidth(61)
+                _fit_spin(_th)
                 _th.setAlignment(Qt.AlignRight)
                 _th.setFont(QFont("MiSans", 11, QFont.Bold))
                 _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
                 _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
+                _th.textChanged.connect(lambda _t, sp=_th: _fit_spin(sp))
                 _subA.addWidget(_th)
                 _subA.addSpacing(2)
 
