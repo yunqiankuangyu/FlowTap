@@ -804,7 +804,7 @@ def _refresh_actions(app, task):
         row_layout.setSpacing(2)
         _vbox.addLayout(row_layout)
         _ctl = QHBoxLayout()
-        _ctl.setSpacing(1)  # 11pt字下参数密排, 渲染间隔实测4~7px
+        _ctl.setSpacing(0)  # 配对紧挨: label贴数字, 组界另加2px分组
         _ctl.addSpacing(12)
         _vbox.addLayout(_ctl)
 
@@ -848,7 +848,7 @@ def _refresh_actions(app, task):
             hold_spin.setSingleStep(0.1)
             hold_spin.setValue(action.get("hold", 0))
         hold_spin.setFixedHeight(20)
-        hold_spin.setFixedWidth(32 if (is_wait or is_branch) else 47)
+        hold_spin.setFixedWidth(31 if (is_wait or is_branch) else 46)
         hold_spin.setAlignment(Qt.AlignRight)
         hold_spin.setFont(QFont("MiSans", 11, QFont.Bold))
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
@@ -873,7 +873,7 @@ def _refresh_actions(app, task):
             delay_spin.setSingleStep(0.1)
             delay_spin.setValue(action.get("delay", 0.5))
         delay_spin.setFixedHeight(20)
-        delay_spin.setFixedWidth(62 if is_wait else 47)
+        delay_spin.setFixedWidth(61 if is_wait else 46)
         delay_spin.setAlignment(Qt.AlignRight)
         delay_spin.setFont(QFont("MiSans", 11, QFont.Bold))
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
@@ -893,7 +893,7 @@ def _refresh_actions(app, task):
             hit_spin.setSingleStep(1)
             hit_spin.setValue(int(action.get("min_hits", 2)))
             hit_spin.setFixedHeight(20)
-            hit_spin.setFixedWidth(17)
+            hit_spin.setFixedWidth(16)
             hit_spin.setAlignment(Qt.AlignRight)
             hit_spin.setFont(QFont("MiSans", 11, QFont.Bold))
             hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
@@ -979,7 +979,7 @@ def _refresh_actions(app, task):
                 _vbox.addLayout(_sub0)
             for k, option in enumerate(options):
                 _subA = QHBoxLayout()
-                _subA.setSpacing(1)  # 配对内紧
+                _subA.setSpacing(0)  # 配对紧挨
                 _subA.addSpacing(12)
 
                 _thumb = QLabel()
@@ -1003,7 +1003,7 @@ def _refresh_actions(app, task):
                 _th.setSingleStep(0.05)
                 _th.setValue(float(option.get("threshold", 0.85)))
                 _th.setFixedHeight(20)
-                _th.setFixedWidth(62)
+                _th.setFixedWidth(61)
                 _th.setAlignment(Qt.AlignRight)
                 _th.setFont(QFont("MiSans", 11, QFont.Bold))
                 _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
