@@ -33,6 +33,15 @@ def make_click_action(x, y, delay=0.5, hold=0):
     return {"type": "click", "x": x, "y": y, "delay": delay, "hold": hold}
 
 
+def make_wait_image_action(tpl, threshold=0.85, timeout=30, on_timeout="skip", delay=0.0):
+    """创建等待图像动作（画面出现目标模板才继续）
+    tpl 模板相对路径，threshold 匹配阈值，timeout 超时秒(0=无限等)
+    on_timeout 超时行为 skip=跳过继续 stop=中止本轮
+    """
+    return {"type": "wait_image", "tpl": tpl, "threshold": threshold,
+            "timeout": timeout, "on_timeout": on_timeout, "delay": delay}
+
+
 def fmt_action(action):
     """格式化动作为可读字符串"""
     from vk_map import VK_NAME
@@ -43,6 +52,8 @@ def fmt_action(action):
         return "+".join(VK_NAME.get(vk, f"[{vk}]") for vk in action["vks"])
     elif action["type"] == "click":
         return f"({action['x']}, {action['y']})"
+    elif action["type"] == "wait_image":
+        return f"📷 等图像≥{action.get('threshold', 0.85):.2f}"
     return "?"
 
 
@@ -138,6 +149,44 @@ class KeyboardTask:
             time.sleep(0.2)
         return False
 
+    def _wait_for_image(self, action):
+        """等待目标图像出现在画面中（可暂停、受窗口闸门约束）
+        返回 True=已出现/超时跳过，False=任务停止或超时中止本轮"""
+        from core import vision
+        rel = action.get("tpl", "")
+        threshold = float(action.get("threshold", 0.85))
+        timeout = float(action.get("timeout", 30))
+        waited = 0.0  # 只累计真实等待秒，暂停/等窗口时间不计入
+        announced = False
+        while self._running:
+            self._pause_gate()
+            if not self._running: return False
+            if not self._window_gate(): return False
+            try:
+                found, score = vision.match_once(rel, threshold)
+            except Exception as e:
+                from logger import log_error
+                log_error("wait_image_match", e)
+                found = False
+            if found:
+                if self._countdown_callback:
+                    try: self._countdown_callback("● 执行中...", "#4ade80")
+                    except Exception: pass
+                return True
+            if timeout > 0 and waited >= timeout:
+                if self._countdown_callback:
+                    try: self._countdown_callback("● 等待图像超时，跳过...", "#facc15")
+                    except Exception: pass
+                return action.get("on_timeout", "skip") != "stop"
+            if not announced and self._countdown_callback:
+                announced = True
+                try: self._countdown_callback("● 等待图像...", "#facc15")
+                except Exception: pass
+            t0 = time.monotonic()
+            time.sleep(0.2)
+            waited += time.monotonic() - t0
+        return False
+
     def _execute_actions(self):
         """执行一轮动作序列"""
         kb_sim = KeyboardSimulator()
@@ -146,6 +195,11 @@ class KeyboardTask:
             if not self._running: return False
             if not self._window_gate(): return False
             try:
+                if action["type"] == "wait_image":
+                    if not self._wait_for_image(action): return False
+                    if not self._running: return False
+                    self._pause_aware_delay(action.get("delay", 0))
+                    continue
                 hold = action.get("hold", 0)
                 if action["type"] == "key":
                     if hold > 0:
