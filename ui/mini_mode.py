@@ -50,7 +50,8 @@ def build_mini_mode(app):
     bar_layout = QHBoxLayout(bar)
     bar_layout.setContentsMargins(8, 0, 6, 0)
 
-    title = QLabel("⚡ 轻松AI")
+    # 与主窗口同源：读 window_title 设置，缺省 FlowTap
+    title = QLabel(s.get("window_title", "") or "FlowTap")
     title.setFont(FONT_B)
     title.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
     bar_layout.addWidget(title)
@@ -198,18 +199,22 @@ def update_mini_status(app):
 
 def update_mini_btn(app):
     """同步迷你模式的全部按钮状态"""
-    if not hasattr(app, '_mini_all_btn') or not app._mini_all_btn:
+    #迷你窗口已关闭时按钮控件可能已销毁，直接跳过
+    if not getattr(app, '_mini_window', None) or not hasattr(app, '_mini_all_btn'):
         return
-    running_count = sum(1 for t in app.keyboard_tasks if t._running or getattr(t, '_countdown_active', False))
-    if running_count > 0:
-        app._mini_all_btn.setText("■ 全部停止")
-        app._mini_all_btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-            QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
-        """)
-    else:
-        app._mini_all_btn.setText("▶ 全部开始")
-        app._mini_all_btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-            QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-        """)
+    try:
+        running_count = sum(1 for t in app.keyboard_tasks if t._running or getattr(t, '_countdown_active', False))
+        if running_count > 0:
+            app._mini_all_btn.setText("■ 全部停止")
+            app._mini_all_btn.setStyleSheet(f"""
+                QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+                QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
+            """)
+        else:
+            app._mini_all_btn.setText("▶ 全部开始")
+            app._mini_all_btn.setStyleSheet(f"""
+                QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+                QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
+            """)
+    except RuntimeError:
+        pass  #控件在遍历间隙被销毁，下一次窗口重建后自然恢复

@@ -232,8 +232,9 @@ class App(QMainWindow):
             self._ensure_bottom_bar(self._buttons_for("keyboard"))
             self._all_btn = self._bottom_btns[1]
             self._pause_btn = self._bottom_btns[2]
-            from .keyboard_mode import update_pause_btn
-            update_pause_btn(self)
+            #底部按钮是按配置重建的(默认绿)，必须按真实运行状态重同步
+            from .keyboard_mode import update_all_btn
+            update_all_btn(self)
         elif mode == "settings":
             self.content_stack.setCurrentIndex(1)
             self._ensure_bottom_bar(self._buttons_for("settings"))
@@ -321,7 +322,12 @@ class App(QMainWindow):
 
     def _toggle_all(self):
         from .keyboard_mode import toggle_all
-        toggle_all(self)
+        #槽内异常必须落日志，否则点按钮会静默无反应查无对证
+        try:
+            toggle_all(self)
+        except Exception as e:
+            from logger import log_error
+            log_error("toggle_all", e)
 
     def _toggle_pause(self):
         from .keyboard_mode import toggle_pause_all

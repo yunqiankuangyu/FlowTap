@@ -320,21 +320,24 @@ def _task_active(t):
 
 def update_all_btn(app):
     """更新全部按钮状态"""
-    running = any(_task_active(t) for t in app.keyboard_tasks)
-    if running:
-        app._all_btn.setText("■ 全部停止")
-        app._all_btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-            QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
-        """)
-    else:
-        app._all_btn.setText("▶ 全部开始")
-        app._all_btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-            QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-        """)
-    update_pause_btn(app)
-    app._update_mini_btn()
+    try:
+        running = any(_task_active(t) for t in app.keyboard_tasks)
+        if running:
+            app._all_btn.setText("■ 全部停止")
+            app._all_btn.setStyleSheet(f"""
+                QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
+                QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
+            """)
+        else:
+            app._all_btn.setText("▶ 全部开始")
+            app._all_btn.setStyleSheet(f"""
+                QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
+                QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
+            """)
+        update_pause_btn(app)
+        app._update_mini_btn()
+    except RuntimeError:
+        pass  #切页/迷你窗口关闭瞬间的已销毁控件，回切页面时会重建并重同步
 
 
 def stop_all(app):
@@ -359,6 +362,8 @@ def toggle_all(app):
     running = any(_task_active(t) for t in app.keyboard_tasks)
     if running:
         stop_all(app)
+    elif not app.keyboard_tasks:
+        show_floating_notification(app, "没有任务，先新建或加载预设")
     else:
         for t in app.keyboard_tasks:
             if not _task_active(t):
