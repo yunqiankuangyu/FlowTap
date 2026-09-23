@@ -21,7 +21,6 @@ from config import Colors, FONT_B, FONT_M, load_presets, save_presets
 from tasks.keyboard.keyboard_task import KeyboardTask, make_key_action, make_combo_action, make_click_action, fmt_action
 from vk_map import VK_NAME
 
-
 # ── 跨线程 UI 更新桥 ──────────────────────────────────
 # QTimer.singleShot(0, fn) 从工作线程调用时 timer 挂在工作线程
 # 的 event loop 上——工作线程没有 event loop，timer 永远不触发。
@@ -32,11 +31,9 @@ class _UIBridge(QObject):
 _ui_bridge = _UIBridge()
 _ui_bridge._run.connect(lambda fn: fn(), Qt.QueuedConnection)
 
-
 def _post_to_main(fn):
     """跨线程安全投递回调到主线程执行"""
     _ui_bridge._run.emit(fn)
-
 
 class _Signal:
     """极简信号模拟，只支持 connect"""
@@ -47,7 +44,6 @@ class _Signal:
     def emit(self, *args):
         for slot in self._slots:
             slot(*args)
-
 
 def _make_menu_combo(items, width=80, on_select=None):
     """用 QPushButton+QMenu 替代 QComboBox，避免 frameless 窗口双击 bug"""
@@ -91,8 +87,6 @@ def _make_menu_combo(items, width=80, on_select=None):
     btn.addItems = _addItems
     return btn
 
-
-
 def _make_btn(text, bg=None, fg=None, hover=None, font=None, height=25):
     btn = QPushButton(text)
     btn.setFont(font or FONT_M)
@@ -107,14 +101,12 @@ def _make_btn(text, bg=None, fg=None, hover=None, font=None, height=25):
     """)
     return btn
 
-
 def _tint_btn(btn, bg):
     """动态按钮换底色（与 _make_btn 同款样式）：状态切换按钮专用"""
     btn.setStyleSheet(f"""
         QPushButton {{ background: {bg}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
         QPushButton:hover {{ background: {Colors.ACCENT}; }}
     """)
-
 
 def _target_combo(task, container):
     """跳转目标下拉：顺序继续(None) + 全部动作；itemData=lid，显示 动作N: 描述
@@ -145,7 +137,6 @@ def _target_combo(task, container):
     combo.currentIndexChanged.connect(lambda _i, c=combo: c.setToolTip(c.currentText()))
     return combo
 
-
 def _fit_spin(spin):
     #宽度=字宽+2, 右对齐下label侧和右侧邻居都贴死(字体显式, 不受调用顺序/setFont先后影响)
     _fm = QFontMetricsF(QFont("MiSans", 11, QFont.Bold))
@@ -157,9 +148,7 @@ def _make_label(text, font=None, color=None):
     lbl.setStyleSheet(f"color: {color or Colors.TEXT}; background: transparent;")
     return lbl
 
-
 BF_H = 52
-
 
 def build_keyboard_mode(app):
     """构建键盘模式页面"""
@@ -248,14 +237,10 @@ def build_keyboard_mode(app):
     app._floating_timer = None
     app._cards = []
 
-
 # 窗口宽度（用户可拖动调整高度，宽度固定）
 WIN_W = 400
 
-
 HANDLE_H = 8  # 拖动条高度
-
-
 
 def build_bottom_bar(app, buttons):
     """构建统一底部按钮栏（任务页/设置页共用）。
@@ -278,7 +263,6 @@ def build_bottom_bar(app, buttons):
         bar_layout.addWidget(btn)
         btns.append(btn)
     return bar, btns
-
 
 def _build_drag_handle(app):
     """构建窗口底部拖动条（任务页/设置页共用），返回 handle 控件"""
@@ -355,11 +339,9 @@ def _build_drag_handle(app):
     handle.setMouseTracking(True)
     return handle
 
-
 def _task_active(t):
     """任务是否处于活跃状态（运行中或倒计时中）"""
     return t._running or getattr(t, '_countdown_active', False)
-
 
 def update_all_btn(app):
     """更新全部按钮状态"""
@@ -382,7 +364,6 @@ def update_all_btn(app):
     except RuntimeError:
         pass  #切页/迷你窗口关闭瞬间的已销毁控件，回切页面时会重建并重同步
 
-
 def stop_all(app):
     for t in app.keyboard_tasks:
         if _task_active(t):
@@ -400,7 +381,6 @@ def stop_all(app):
                 t._st_lbl.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
     update_all_btn(app)
 
-
 def toggle_all(app):
     running = any(_task_active(t) for t in app.keyboard_tasks)
     if running:
@@ -412,7 +392,6 @@ def toggle_all(app):
             if not _task_active(t):
                 _start_task(app, t)
         update_all_btn(app)
-
 
 # ── 全部暂停/继续 ──
 
@@ -429,7 +408,6 @@ def pause_all(app):
             except RuntimeError:
                 pass
 
-
 def resume_all(app):
     """继续所有已暂停任务：从冻结的位置接着跑"""
     for t in app.keyboard_tasks:
@@ -442,7 +420,6 @@ def resume_all(app):
                 t._st_set_text("● 准备中...")
                 t._st_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
 
-
 def toggle_pause_all(app):
     """有未暂停的活跃任务 → 全部暂停；全在暂停中 → 全部继续"""
     running = [t for t in app.keyboard_tasks if _task_active(t)]
@@ -453,7 +430,6 @@ def toggle_pause_all(app):
     else:
         resume_all(app)
     update_all_btn(app)
-
 
 def update_pause_btn(app):
     """同步底部暂停按钮：无活跃任务置灰 / 全在暂停→继续 / 否则→暂停"""
@@ -482,7 +458,6 @@ def update_pause_btn(app):
             QPushButton {{ background: {Colors.YELLOW}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
         """)
 
-
 def add_task(app):
     from config import load_settings as _ls
     task = KeyboardTask(app.next_task_id, f"任务{app.next_task_id}", loop_interval=_ls().get("default_loop", 80))
@@ -491,7 +466,6 @@ def add_task(app):
     create_card(app, task)
     from .settings_mode import install_wheel_guard
     install_wheel_guard(app)  # 新卡片的 spinbox 防滚轮误触
-
 
 def create_card(app, task):
     """创建任务卡片"""
@@ -567,7 +541,6 @@ def create_card(app, task):
     task._action_layout = QVBoxLayout(task._action_frame)
     task._action_layout.setContentsMargins(0, 0, 0, 0)
     task._action_layout.setSpacing(2)
-
 
     task._action_rows = []
     task._action_frame.setVisible(False)
@@ -737,7 +710,6 @@ def create_card(app, task):
     app._cards.append(card)
     _refresh_actions(app, task)
 
-
 def toggle_card(app, task):
     """收起/展开任务卡片：收起时只保留标题行（内边距同步收紧）"""
     collapsed = not getattr(task, '_collapsed', False)
@@ -746,7 +718,6 @@ def toggle_card(app, task):
     task._action_frame.setVisible(bool(task.actions) and not collapsed)
     for w in getattr(task, '_extra_rows', []):
         w.setVisible(not collapsed)
-
 
 class DraggableRow(QFrame):
     """可拖动的动作行，用QPainter画高亮线，不影响内部布局"""
@@ -787,8 +758,6 @@ class DraggableRow(QFrame):
                 p.drawLine(8, self.height() - 2, w - 8, self.height() - 2)
             p.end()
 
-
-
 def _refresh_actions(app, task):
     """刷新动作列表UI"""
     while task._action_layout.count():
@@ -808,10 +777,14 @@ def _refresh_actions(app, task):
         row_layout = QHBoxLayout()
         row_layout.setSpacing(2)
         _vbox.addLayout(row_layout)
-        _ctl = QHBoxLayout()
-        _ctl.setSpacing(0)  # 配对紧挨: label贴数字, 组界另加2px分组
-        _ctl.addSpacing(12)
-        _vbox.addLayout(_ctl)
+        # wait/branch设置搬进悬浮设置页(⚙), 行内只留摘要
+        _inline_full = action.get("type") not in ("wait_image", "branch")
+        _ctl = None
+        if _inline_full:
+            _ctl = QHBoxLayout()
+            _ctl.setSpacing(0)  # 配对紧挨: label贴数字, 组界另加2px分组
+            _ctl.addSpacing(12)
+            _vbox.addLayout(_ctl)
 
         # ☰ 拖动排序手柄
         drag_btn = QPushButton("☰")
@@ -838,62 +811,63 @@ def _refresh_actions(app, task):
         is_branch = action.get("type") == "branch"
         is_jump = action.get("type") == "jump"
 
-        hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
-        _ctl.addWidget(hold_label)
+        if _inline_full:
+            hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+            _ctl.addWidget(hold_label)
 
-        hold_spin = QDoubleSpinBox()
-        if is_wait or is_branch:
-            hold_spin.setRange(0, 600)
-            hold_spin.setDecimals(0)
-            hold_spin.setSingleStep(10)
-            hold_spin.setValue(action.get("timeout", 30))
-        else:
-            hold_spin.setRange(0, 30)
-            hold_spin.setDecimals(1)
-            hold_spin.setSingleStep(0.1)
-            hold_spin.setValue(action.get("hold", 0))
-        hold_spin.setFixedHeight(20)
-        hold_spin.setFixedWidth(31 if (is_wait or is_branch) else 46)
-        hold_spin.setAlignment(Qt.AlignRight)
-        hold_spin.setFont(QFont("MiSans", 11, QFont.Bold))
-        hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
-        hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
-            "timeout" if a.get("type") in ("wait_image", "branch") else "hold", round(v, 2)))
-        _ctl.addWidget(hold_spin)
-        _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
-
-        delay_label = _make_label("阈值" if is_wait else "后延", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
-        _ctl.addSpacing(2)  # 组界: 配对内紧、组间松
-        _ctl.addWidget(delay_label)
-
-        delay_spin = QDoubleSpinBox()
-        if is_wait:
-            delay_spin.setRange(0, 1)
-            delay_spin.setDecimals(2)
-            delay_spin.setSingleStep(0.05)
-            delay_spin.setValue(action.get("threshold", 0.85))
-        else:
-            delay_spin.setRange(0, 30)
-            delay_spin.setDecimals(1)
-            delay_spin.setSingleStep(0.1)
-            delay_spin.setValue(action.get("delay", 0.5))
-        delay_spin.setFixedHeight(20)
-        if is_wait:  # wait行这个框标签就是"阈值"
-            _fit_spin(delay_spin)
-        else:
-            delay_spin.setFixedWidth(46)
-        delay_spin.setAlignment(Qt.AlignRight)
-        delay_spin.setFont(QFont("MiSans", 11, QFont.Bold))
-        delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
-        delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
-            "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
-        if is_wait:
-            delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp))
-        _ctl.addWidget(delay_spin)
-        if not is_wait:
+            hold_spin = QDoubleSpinBox()
+            if is_wait or is_branch:
+                hold_spin.setRange(0, 600)
+                hold_spin.setDecimals(0)
+                hold_spin.setSingleStep(10)
+                hold_spin.setValue(action.get("timeout", 30))
+            else:
+                hold_spin.setRange(0, 30)
+                hold_spin.setDecimals(1)
+                hold_spin.setSingleStep(0.1)
+                hold_spin.setValue(action.get("hold", 0))
+            hold_spin.setFixedHeight(20)
+            hold_spin.setFixedWidth(31 if (is_wait or is_branch) else 46)
+            hold_spin.setAlignment(Qt.AlignRight)
+            hold_spin.setFont(QFont("MiSans", 11, QFont.Bold))
+            hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+            hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
+                "timeout" if a.get("type") in ("wait_image", "branch") else "hold", round(v, 2)))
+            _ctl.addWidget(hold_spin)
             _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
-        if is_wait:
+            delay_label = _make_label("阈值" if is_wait else "后延", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+            _ctl.addSpacing(2)  # 组界: 配对内紧、组间松
+            _ctl.addWidget(delay_label)
+
+            delay_spin = QDoubleSpinBox()
+            if is_wait:
+                delay_spin.setRange(0, 1)
+                delay_spin.setDecimals(2)
+                delay_spin.setSingleStep(0.05)
+                delay_spin.setValue(action.get("threshold", 0.85))
+            else:
+                delay_spin.setRange(0, 30)
+                delay_spin.setDecimals(1)
+                delay_spin.setSingleStep(0.1)
+                delay_spin.setValue(action.get("delay", 0.5))
+            delay_spin.setFixedHeight(20)
+            if is_wait:  # wait行这个框标签就是"阈值"
+                _fit_spin(delay_spin)
+            else:
+                delay_spin.setFixedWidth(46)
+            delay_spin.setAlignment(Qt.AlignRight)
+            delay_spin.setFont(QFont("MiSans", 11, QFont.Bold))
+            delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+            delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
+                "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
+            if is_wait:
+                delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp))
+            _ctl.addWidget(delay_spin)
+            if not is_wait:
+                _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+
+        if _inline_full and is_wait:
             _ctl.addSpacing(2)
             # 帧：防抖连续命中次数
             _ctl.addWidget(_make_label("帧", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
@@ -931,7 +905,7 @@ def _refresh_actions(app, task):
             _tint_btn(scale_btn, Colors.BLUE if _multi else Colors.DIM)
             _ctl.addWidget(scale_btn)
 
-        if is_wait or is_branch:
+        if _inline_full and (is_wait or is_branch):
             _ctl.addSpacing(2)
             # 超时后行为：跳过/中止 动态切换（中止=红）
             _ctl.addWidget(_make_label("超时后", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
@@ -962,8 +936,16 @@ def _refresh_actions(app, task):
                 a, on_close=lambda: _refresh_actions(app, task)))
             row_layout.addWidget(prev_btn)
 
-        if _ctl is not row_layout:
+        if _ctl is not None:
             _ctl.addStretch(1)  # 控件加齐后尾部补stretch: 多余空间归行尾, 防QLabel(Preferred)被拉宽留大空白
+
+        if not _inline_full:
+            from .action_settings_view import open_settings_view
+            edit_btn = _make_btn("⚙", bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+            edit_btn.setFixedWidth(20)
+            edit_btn.setToolTip("打开设置页")
+            edit_btn.clicked.connect(lambda _c=False, a=action: open_settings_view(app, task, a))
+            row_layout.addWidget(edit_btn)
 
         del_btn = QPushButton("✕")
         del_btn.setFixedSize(18, 18)
@@ -974,138 +956,6 @@ def _refresh_actions(app, task):
         """)
         del_btn.clicked.connect(lambda checked, i=idx: _delete_action(app, task, i))
         row_layout.addWidget(del_btn)
-
-        if is_branch:
-            # 分支子行：每选项 缩略图/阈值/尺度/跳到/📷重拍/✕删/↑↓优先级 + 加分支尾行
-            from core import vision as _v
-            import os as _os
-            options = action.get("options") or []
-            if not options:
-                _sub0 = QHBoxLayout()
-                _sub0.setSpacing(3)
-                _sub0.addSpacing(12)
-                _sub0.addWidget(_make_label("还没有模板 — 点下方 + 加分支 开始框选", font=QFont("MiSans", 10, QFont.Bold), color=Colors.DIM))
-                _sub0.addStretch(1)
-                _vbox.addLayout(_sub0)
-            for k, option in enumerate(options):
-                _subA = QHBoxLayout()
-                _subA.setSpacing(0)  # 配对紧挨
-                _subA.addSpacing(12)
-
-                _thumb = QLabel()
-                _full = _os.path.join(_v._app_dir(), option.get("tpl", ""))
-                if _os.path.isfile(_full):
-                    from PySide6.QtGui import QPixmap
-                    _pm = QPixmap(_full)
-                    if not _pm.isNull():
-                        _thumb.setPixmap(_pm.scaledToHeight(20))
-                if _thumb.pixmap() is None or _thumb.pixmap().isNull():
-                    _thumb.setText("—")
-                _thumb.setFixedWidth(20)
-                _thumb.setFont(QFont("MiSans", 11, QFont.Bold))
-                _subA.addWidget(_thumb)
-                _subA.addSpacing(2)
-
-                _subA.addWidget(_make_label("阈值", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
-                _th = QDoubleSpinBox()
-                _th.setRange(0, 1)
-                _th.setDecimals(2)
-                _th.setSingleStep(0.05)
-                _th.setValue(float(option.get("threshold", 0.85)))
-                _th.setFixedHeight(20)
-                _fit_spin(_th)
-                _th.setAlignment(Qt.AlignRight)
-                _th.setFont(QFont("MiSans", 11, QFont.Bold))
-                _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
-                _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
-                _th.textChanged.connect(lambda _t, sp=_th: _fit_spin(sp))
-                _subA.addWidget(_th)
-                _subA.addSpacing(2)
-
-                _sc = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
-                _sc.setFixedWidth(47)
-                def _flip_sc(_c=False, o=option, b=_sc):
-                    cur = o.get("scales") or [1.0, 1.25, 1.5]
-                    if len(cur) > 1:
-                        o["scales"] = [1.0]
-                        b.setText("精确")
-                        _tint_btn(b, Colors.DIM)
-                    else:
-                        o["scales"] = [1.0, 1.25, 1.5]
-                        b.setText("多尺度")
-                        _tint_btn(b, Colors.BLUE)
-                _sc.clicked.connect(_flip_sc)
-                _m = len(option.get("scales") or [1.0, 1.25, 1.5]) > 1
-                _sc.setText("多尺度" if _m else "精确")
-                _tint_btn(_sc, Colors.BLUE if _m else Colors.DIM)
-                _subA.addWidget(_sc)
-
-                _subA.addStretch(1)
-                _vbox.addLayout(_subA)
-
-                _subB = QHBoxLayout()
-                _subB.setSpacing(3)  # 行内舒展
-                _subB.addSpacing(12)
-                _subB.addWidget(_make_label("跳到", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
-                _subB.addWidget(_target_combo(task, option))
-
-                _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
-                _cap.setFixedWidth(20)
-                _cap.setToolTip("重拍本模板（覆盖原路径）")
-                def _recap(_c=False, o=option):
-                    from .vision_capture import capture_template
-                    capture_template(
-                        app, task,
-                        on_got=lambda rel, oo=o: oo.__setitem__("tpl", rel),
-                        on_done=lambda: _refresh_actions(app, task),
-                        rel=o.get("tpl"))
-                _cap.clicked.connect(_recap)
-                _subB.addWidget(_cap)
-
-                def _del_opt(_c=False, a=action, i=k):
-                    (a.get("options") or []).pop(i)
-                    _refresh_actions(app, task)
-
-                def _up_opt(_c=False, a=action, i=k):
-                    o = a.get("options")
-                    if i > 0:
-                        o[i - 1], o[i] = o[i], o[i - 1]
-                    _refresh_actions(app, task)
-
-                def _down_opt(_c=False, a=action, i=k):
-                    o = a.get("options")
-                    if i < len(o) - 1:
-                        o[i + 1], o[i] = o[i], o[i + 1]
-                    _refresh_actions(app, task)
-
-                for _txt, _fn, _tip in (("↑", _up_opt, "上移（列表顺序=优先级）"),
-                                        ("↓", _down_opt, "下移"),
-                                        ("✕", _del_opt, "删除本选项")):
-                    _b = _make_btn(_txt, bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
-                    _b.setFixedWidth(18)
-                    _b.setToolTip(_tip)
-                    _b.clicked.connect(_fn)
-                    _subB.addWidget(_b)
-                _subB.addStretch(1)  # 多余空间归行尾, 防跳到label被拉宽(拉伸锁回归)
-                _vbox.addLayout(_subB)
-
-            _subf = QHBoxLayout()
-            _subf.setSpacing(3)
-            _subf.addSpacing(12)
-            _addopt = _make_btn("+ 加分支", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
-            _addopt.setFixedWidth(80)
-            def _add_option(_c=False, a=action):
-                from .vision_capture import capture_template
-                capture_template(
-                    app, task,
-                    on_got=lambda rel, aa=a: aa.setdefault("options", []).append(
-                        {"tpl": rel, "threshold": 0.85, "scales": [1.0, 1.25, 1.5],
-                         "min_hits": 2, "target": None}),
-                    on_done=lambda: _refresh_actions(app, task))
-            _addopt.clicked.connect(_add_option)
-            _subf.addWidget(_addopt)
-            _subf.addStretch(1)
-            _vbox.addLayout(_subf)
 
         # 拖动排序（检测区=行高30%，UI不变）
         def _drag_start(e, _idx=idx, _row=row):
@@ -1182,12 +1032,10 @@ def _refresh_actions(app, task):
     from .settings_mode import install_wheel_guard
     install_wheel_guard(app)  # 新卡片的 spinbox 防滚轮误触
 
-
 def _delete_action(app, task, idx):
     if 0 <= idx < len(task.actions):
         task.actions.pop(idx)
         _refresh_actions(app, task)
-
 
 def add_key_action(app, task):
     """捕获按键：即时提示 + QTimer 轮询"""
@@ -1198,7 +1046,6 @@ def add_key_action(app, task):
         QTimer.singleShot(50, lambda: _start_capture(app, task))
         return
     _start_capture(app, task)
-
 
 def _start_capture(app, task):
     """启动按键捕获（支持任意组合键）：按住的键实时入集合，全部松开即确认"""
@@ -1270,7 +1117,6 @@ def _start_capture(app, task):
 
     poll_timer.timeout.connect(poll_keys)
     poll_timer.start(15)
-
 
 def add_click_action(app, task):
     """录制鼠标位置：移出屏幕 + 全屏遮罩 + QTimer 轮询"""
@@ -1390,11 +1236,9 @@ def add_click_action(app, task):
     wait_timer.timeout.connect(initial_wait)
     wait_timer.start(50)
 
-
 def clear_actions(app, task):
     task.actions.clear()
     _refresh_actions(app, task)
-
 
 def _toggle_task(app, task, btn, lbl):
     """启动/停止任务"""
@@ -1411,7 +1255,6 @@ def _toggle_task(app, task, btn, lbl):
         update_all_btn(app)
     else:
         _start_task(app, task)
-
 
 def _start_task(app, task):
     """启动任务（带3秒倒计时）"""
@@ -1493,7 +1336,6 @@ def _start_task(app, task):
         from config import load_settings
         _tick(load_settings().get("start_countdown", 3))
 
-
 def update_dependencies(app):
     """更新任务依赖关系（dependency_task_id 现在存位置索引）"""
     for t in app.keyboard_tasks:
@@ -1505,7 +1347,6 @@ def update_dependencies(app):
                 parent = app.keyboard_tasks[idx]
                 parent._dependents.append(t)
 
-
 def _ensure_limit_watcher(app):
     """启动全局监视器：检测任务因次数限制自动完成，同步UI（只挂一次）"""
     if getattr(app, '_limit_watcher', None) is not None:
@@ -1514,7 +1355,6 @@ def _ensure_limit_watcher(app):
     timer.timeout.connect(lambda: _check_limit_finished(app))
     timer.start(300)
     app._limit_watcher = timer
-
 
 def _check_limit_finished(app):
     """检查是否有任务因次数限制跑满自动停了，同步按钮和状态"""
@@ -1542,7 +1382,6 @@ def _check_limit_finished(app):
         from logger import log_error
         log_error("limit_watcher", e)
 
-
 def del_task(app, task, card):
     """删除任务"""
     task.stop()
@@ -1551,7 +1390,6 @@ def del_task(app, task, card):
     card.deleteLater()
     if card in app._cards:
         app._cards.remove(card)
-
 
 def load_preset(app):
     """加载预设"""
@@ -1619,14 +1457,12 @@ def load_preset(app):
 
     show_floating_notification(app, f"已加载: {name}")
 
-
 def save_preset_dialog(app):
     """保存预设对话框"""
     name, ok = QInputDialog.getText(app, "保存预设", "预设名称:")
     if not ok or not name.strip():
         return
     name = name.strip()
-
 
     presets = load_presets()
     presets[name] = {
@@ -1651,7 +1487,6 @@ def save_preset_dialog(app):
 
     show_floating_notification(app, f"已保存: {name}")
 
-
 def delete_preset_cmd(app):
     """删除预设"""
     name = app._preset_combo.currentText()
@@ -1663,7 +1498,6 @@ def delete_preset_cmd(app):
     app._preset_combo.clear()
     app._preset_combo.addItems(list(presets.keys()) if presets else ["无预设"])
     show_floating_notification(app, f"已删除: {name}")
-
 
 def show_floating_notification(app, text, duration_ms=2000):
     """在窗口内显示一条悬浮通知"""
@@ -1700,7 +1534,6 @@ def show_floating_notification(app, text, duration_ms=2000):
 
     if duration_ms > 0:
         QTimer.singleShot(duration_ms, lambda: hide_floating_notification(app))
-
 
 def hide_floating_notification(app):
     """隐藏悬浮通知"""

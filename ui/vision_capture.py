@@ -114,7 +114,7 @@ class _SelectOverlay(QWidget):
         p.end()
 
 
-def capture_template(app, task, on_got, on_done, rel=None):
+def capture_template(app, task, on_got, on_done, rel=None, on_cancel=None):
     """全屏框选 → 截取存模板 → on_got(rel)；成功才调 on_done（取消不调）
     rel 指定=覆盖该路径（重拍，缓存自动失效），否则新建路径
     期间把主窗移出屏幕防止截到自己；占用标记复用 task._capturing_image"""
@@ -146,7 +146,7 @@ def capture_template(app, task, on_got, on_done, rel=None):
             app.activateWindow()
 
         if not accepted:
-            QTimer.singleShot(0, _restore)
+            QTimer.singleShot(0, lambda: (_restore(), on_cancel and on_cancel()))
             return
 
         # 先藏遮罩再截图，等 DWM 合成一帧，避免截到暗罩
