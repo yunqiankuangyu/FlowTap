@@ -115,11 +115,11 @@ def _target_combo(task, container, big=False):
     combo = QComboBox()
     combo.setFixedHeight(22 if big else 18)
     combo.setFixedWidth(104 if big else 74)
-    _pt = 13 if big else 11
+    _pt = 11  # big档同比缩小2px后与行内一致
     combo.setStyleSheet(f"""
         QComboBox {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none;
             border-radius: 4px; padding: 0px 6px; font: bold {_pt}pt 'MiSans'; }}
-        QComboBox QAbstractItemView {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; font: bold 11pt 'MiSans'; }}
+        QComboBox QAbstractItemView {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; font: bold 9pt 'MiSans'; }}
     """)
     combo.addItem("顺序继续", None)
     cur = container.get("target")
@@ -137,18 +137,18 @@ def _target_combo(task, container, big=False):
     combo.setToolTip(combo.currentText())  # 锁宽后靠tooltip看全文
     combo.currentIndexChanged.connect(lambda _i, c=combo: c.setToolTip(c.currentText()))
     # 弹出列表与combo框宽解耦: 选项11pt, 宽按最长项(至少280)完整展示每一行
-    _fm11 = QFontMetricsF(QFont("MiSans", 11, QFont.Bold))
+    _fm9 = QFontMetricsF(QFont("MiSans", 9, QFont.Bold))
     _pw = 280
     for _i in range(combo.count()):
-        _pw = max(_pw, _fm11.horizontalAdvance(combo.itemText(_i)) + 34)
-    combo.view().setMinimumWidth(_pw)
+        _pw = max(_pw, _fm9.horizontalAdvance(combo.itemText(_i)) + 34)
+    combo.view().setMinimumWidth(int(_pw * 0.75))  # 宽度=原75%
     return combo
 
-def _fit_spin(spin, font=None):
-    #宽度=max(三位数基准+4, 当前值字宽+2): 默认有框的存在感, 值更长时textChanged实时拉长, 永不装不下(字体显式; font供悬浮页放大档)
+def _fit_spin(spin, font=None, extra=0):
+    #宽度=max(三位数基准, 当前值字宽)+10呼吸+extra: 默认有框的存在感, 值更长时textChanged实时拉长(字体显式; font供悬浮页放大档; extra给阈值等单独加宽)
     _fm = QFontMetricsF(font if font is not None else QFont("MiSans", 11, QFont.Bold))
     _min_w = int(_fm.horizontalAdvance("000")) + 10
-    spin.setFixedWidth(max(_min_w, int(_fm.horizontalAdvance(spin.text())) + 10))
+    spin.setFixedWidth(max(_min_w, int(_fm.horizontalAdvance(spin.text())) + 10) + extra)
 
 def _make_label(text, font=None, color=None):
     lbl = QLabel(text)

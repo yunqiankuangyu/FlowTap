@@ -170,13 +170,13 @@ class ActionSettingsView(QWidget):
             delay_spin.setSingleStep(0.1)
             delay_spin.setValue(action.get("delay", 0.5))
         delay_spin.setFixedHeight(20)
-        _fit_spin(delay_spin, font=FONT13)  # wait=阈值, branch=后延, 都按13pt字宽贴
+        _fit_spin(delay_spin, font=FONT13, extra=6 if is_wait else 0)  # 只有wait行这个框是阈值  # wait=阈值, branch=后延, 都按13pt字宽贴
         delay_spin.setAlignment(Qt.AlignRight)
         delay_spin.setFont(FONT13)
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
-        delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp, font=FONT13))
+        delay_spin.textChanged.connect(lambda _t, sp=delay_spin, _x=(6 if is_wait else 0): _fit_spin(sp, font=FONT13, extra=_x))
         _ctl.addWidget(delay_spin)
         if not is_wait:
             _ctl.addWidget(_make_label("s", font=FONT13, color=Colors.DIM))
@@ -357,12 +357,12 @@ class ActionSettingsView(QWidget):
                 _th.setSingleStep(0.05)
                 _th.setValue(float(option.get("threshold", 0.85)))
                 _th.setFixedHeight(20)
-                _fit_spin(_th, font=FONT13)
+                _fit_spin(_th, font=FONT13, extra=6)
                 _th.setAlignment(Qt.AlignRight)
                 _th.setFont(FONT13)
                 _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
                 _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
-                _th.textChanged.connect(lambda _t, sp=_th: _fit_spin(sp, font=FONT13))
+                _th.textChanged.connect(lambda _t, sp=_th: _fit_spin(sp, font=FONT13, extra=6))
                 _rowL.addWidget(_th)
                 _rowL.addSpacing(2)
 
@@ -390,9 +390,9 @@ class ActionSettingsView(QWidget):
                 _rowL.addWidget(_target_combo(task, option, big=True))
                 _rowL.addSpacing(6)
 
-                _cap = _make_btn("📷 重拍", bg=Colors.BLUE, hover=Colors.ACCENT, font=FONT13, height=20)
-                # emoji/空格是比例字符(字体环境相关), 宽度按13pt字宽动态算
-                _cap.setFixedWidth(int(QFontMetricsF(FONT13).horizontalAdvance("📷 重拍")) + 10)
+                _cap = _make_btn("重拍", bg=Colors.BLUE, hover=Colors.ACCENT, font=FONT13, height=20)
+                _cap.setFixedWidth(int(QFontMetricsF(FONT13).horizontalAdvance("重拍")) + 10)
+                _cap.setToolTip("重拍本模板（覆盖原路径）")
                 _cap.setToolTip("重拍本模板（覆盖原路径）")
                 def _recap(_c=False, o=option):
                     capture_template(
