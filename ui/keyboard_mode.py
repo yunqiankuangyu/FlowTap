@@ -139,9 +139,10 @@ def _target_combo(task, container, big=False):
     return combo
 
 def _fit_spin(spin, font=None):
-    #宽度=字宽+2, 右对齐下label侧和右侧邻居都贴死(字体显式, 不受调用顺序/setFont先后影响; font供悬浮页放大档)
+    #宽度=max(三位数基准+4, 当前值字宽+2): 默认有框的存在感, 值更长时textChanged实时拉长, 永不装不下(字体显式; font供悬浮页放大档)
     _fm = QFontMetricsF(font if font is not None else QFont("MiSans", 11, QFont.Bold))
-    spin.setFixedWidth(int(_fm.horizontalAdvance(spin.text())) + 2)
+    _min_w = int(_fm.horizontalAdvance("000")) + 4
+    spin.setFixedWidth(max(_min_w, int(_fm.horizontalAdvance(spin.text())) + 2))
 
 def _make_label(text, font=None, color=None):
     lbl = QLabel(text)
