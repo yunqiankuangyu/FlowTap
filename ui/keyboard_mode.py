@@ -122,10 +122,10 @@ def _target_combo(task, container):
     from PySide6.QtWidgets import QComboBox
     combo = QComboBox()
     combo.setFixedHeight(18)
-    combo.setFixedWidth(56)
+    combo.setFixedWidth(74)
     combo.setStyleSheet(f"""
         QComboBox {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none;
-            border-radius: 4px; padding: 0px 6px; font: bold 11px 'MiSans'; }}
+            border-radius: 4px; padding: 0px 6px; font: bold 11pt 'MiSans'; }}
         QComboBox QAbstractItemView {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; }}
     """)
     combo.addItem("顺序继续", None)
@@ -805,7 +805,7 @@ def _refresh_actions(app, task):
         _vbox.addLayout(row_layout)
         _ctl = QHBoxLayout()
         _ctl.setSpacing(1)  # 11pt字下参数密排, 渲染间隔实测4~7px
-        _ctl.addSpacing(16)
+        _ctl.addSpacing(12)
         _vbox.addLayout(_ctl)
 
         # ☰ 拖动排序手柄
@@ -858,6 +858,7 @@ def _refresh_actions(app, task):
         _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
         delay_label = _make_label("阈值" if is_wait else "后延", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+        _ctl.addSpacing(2)  # 组界: 配对内紧、组间松
         _ctl.addWidget(delay_label)
 
         delay_spin = QDoubleSpinBox()
@@ -883,6 +884,7 @@ def _refresh_actions(app, task):
             _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
         if is_wait:
+            _ctl.addSpacing(2)
             # 帧：防抖连续命中次数
             _ctl.addWidget(_make_label("帧", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
             hit_spin = QDoubleSpinBox()
@@ -898,9 +900,10 @@ def _refresh_actions(app, task):
             hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
             _ctl.addWidget(hit_spin)
 
+            _ctl.addSpacing(2)
             # 尺度：多尺度/精确 动态切换（点击翻转 action.scales）
             scale_btn = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
-            scale_btn.setFixedWidth(48)
+            scale_btn.setFixedWidth(47)
             scale_btn.setToolTip("多尺度：UI缩放125%/150%也识别；精确：只按标定原尺寸")
             def _flip_scale(_checked=False, a=action, b=scale_btn):
                 cur = a.get("scales") or [1.0, 1.25, 1.5]
@@ -919,10 +922,11 @@ def _refresh_actions(app, task):
             _ctl.addWidget(scale_btn)
 
         if is_wait or is_branch:
+            _ctl.addSpacing(2)
             # 超时后行为：跳过/中止 动态切换（中止=红）
             _ctl.addWidget(_make_label("超时后", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
             ot_btn = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
-            ot_btn.setFixedWidth(33)
+            ot_btn.setFixedWidth(32)
             ot_btn.setToolTip("等待超时后：跳过=继续执行下一动作；中止=终止本轮")
             def _flip_ot(_checked=False, a=action, b=ot_btn):
                 if a.get("on_timeout", "skip") == "skip":
@@ -969,14 +973,14 @@ def _refresh_actions(app, task):
             if not options:
                 _sub0 = QHBoxLayout()
                 _sub0.setSpacing(3)
-                _sub0.addSpacing(16)
+                _sub0.addSpacing(12)
                 _sub0.addWidget(_make_label("还没有模板 — 点下方 + 加分支 开始框选", font=QFont("MiSans", 10, QFont.Bold), color=Colors.DIM))
                 _sub0.addStretch(1)
                 _vbox.addLayout(_sub0)
             for k, option in enumerate(options):
-                _sub = QHBoxLayout()
-                _sub.setSpacing(2)
-                _sub.addSpacing(16)
+                _subA = QHBoxLayout()
+                _subA.setSpacing(1)  # 配对内紧
+                _subA.addSpacing(12)
 
                 _thumb = QLabel()
                 _full = _os.path.join(_v._app_dir(), option.get("tpl", ""))
@@ -988,9 +992,11 @@ def _refresh_actions(app, task):
                 if _thumb.pixmap() is None or _thumb.pixmap().isNull():
                     _thumb.setText("—")
                 _thumb.setFixedWidth(20)
-                _sub.addWidget(_thumb)
+                _thumb.setFont(QFont("MiSans", 11, QFont.Bold))
+                _subA.addWidget(_thumb)
+                _subA.addSpacing(2)
 
-                _sub.addWidget(_make_label("阈值", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                _subA.addWidget(_make_label("阈值", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
                 _th = QDoubleSpinBox()
                 _th.setRange(0, 1)
                 _th.setDecimals(2)
@@ -1002,10 +1008,11 @@ def _refresh_actions(app, task):
                 _th.setFont(QFont("MiSans", 11, QFont.Bold))
                 _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
                 _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
-                _sub.addWidget(_th)
+                _subA.addWidget(_th)
+                _subA.addSpacing(2)
 
                 _sc = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
-                _sc.setFixedWidth(48)
+                _sc.setFixedWidth(47)
                 def _flip_sc(_c=False, o=option, b=_sc):
                     cur = o.get("scales") or [1.0, 1.25, 1.5]
                     if len(cur) > 1:
@@ -1020,11 +1027,16 @@ def _refresh_actions(app, task):
                 _m = len(option.get("scales") or [1.0, 1.25, 1.5]) > 1
                 _sc.setText("多尺度" if _m else "精确")
                 _tint_btn(_sc, Colors.BLUE if _m else Colors.DIM)
-                _sub.addWidget(_sc)
+                _subA.addWidget(_sc)
 
-                _sub.addStretch(1)
-                _sub.addWidget(_make_label("跳到", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
-                _sub.addWidget(_target_combo(task, option))
+                _subA.addStretch(1)
+                _vbox.addLayout(_subA)
+
+                _subB = QHBoxLayout()
+                _subB.setSpacing(3)  # 行内舒展
+                _subB.addSpacing(12)
+                _subB.addWidget(_make_label("跳到", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                _subB.addWidget(_target_combo(task, option))
 
                 _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
                 _cap.setFixedWidth(20)
@@ -1037,7 +1049,7 @@ def _refresh_actions(app, task):
                         on_done=lambda: _refresh_actions(app, task),
                         rel=o.get("tpl"))
                 _cap.clicked.connect(_recap)
-                _sub.addWidget(_cap)
+                _subB.addWidget(_cap)
 
                 def _del_opt(_c=False, a=action, i=k):
                     (a.get("options") or []).pop(i)
@@ -1062,12 +1074,13 @@ def _refresh_actions(app, task):
                     _b.setFixedWidth(18)
                     _b.setToolTip(_tip)
                     _b.clicked.connect(_fn)
-                    _sub.addWidget(_b)
-                _vbox.addLayout(_sub)
+                    _subB.addWidget(_b)
+                _subB.addStretch(1)  # 多余空间归行尾, 防跳到label被拉宽(拉伸锁回归)
+                _vbox.addLayout(_subB)
 
             _subf = QHBoxLayout()
             _subf.setSpacing(3)
-            _subf.addSpacing(26)
+            _subf.addSpacing(12)
             _addopt = _make_btn("+ 加分支", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
             _addopt.setFixedWidth(80)
             def _add_option(_c=False, a=action):
