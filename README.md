@@ -57,6 +57,7 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.8.1 | PySide6 | Humanized mouse movement, Start All fix |
 | v3.8.0 | PySide6 | Window binding (auto-wait on switch), rounded corners, bottom bar alignment |
 | v3.7.4 | PySide6 | Scroll kept, mini-window sync, preset load confirmation |
 | v3.7.3 | PySide6 | Preset dependency fix, window height fix |
@@ -73,6 +74,15 @@ FlowTap/
 | v3 | PySide6 | Qt migration, solves CTk rendering flicker |
 | v2 | CustomTkinter | Unified keyboard+mouse task mode |
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
+
+### v3.8.1 — Humanized Mouse & State Fixes
+
+**New**
+- **Humanized mouse movement** — Arc trajectories with easing, random jitter and overshoot
+
+**Fixed**
+- Fixed "Start All" button doing nothing after switching pages
+- Mini window title now follows the custom title setting
 
 ### v3.7.4 — Page Switch & Theme Fixes
 
