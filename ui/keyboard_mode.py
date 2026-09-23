@@ -108,16 +108,17 @@ def _tint_btn(btn, bg):
         QPushButton:hover {{ background: {Colors.ACCENT}; }}
     """)
 
-def _target_combo(task, container):
+def _target_combo(task, container, big=False):
     """跳转目标下拉：顺序继续(None) + 全部动作；itemData=lid，显示 动作N: 描述
-    container = 存 target 的字典（jump 动作本身 或 branch 的 option）"""
+    container = 存 target 的字典（jump 动作本身 或 branch 的 option）; big=悬浮页放大档"""
     from PySide6.QtWidgets import QComboBox
     combo = QComboBox()
-    combo.setFixedHeight(18)
-    combo.setFixedWidth(74)
+    combo.setFixedHeight(22 if big else 18)
+    combo.setFixedWidth(86 if big else 74)
+    _pt = 13 if big else 11
     combo.setStyleSheet(f"""
         QComboBox {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none;
-            border-radius: 4px; padding: 0px 6px; font: bold 11pt 'MiSans'; }}
+            border-radius: 4px; padding: 0px 6px; font: bold {_pt}pt 'MiSans'; }}
         QComboBox QAbstractItemView {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; }}
     """)
     combo.addItem("顺序继续", None)
@@ -137,9 +138,9 @@ def _target_combo(task, container):
     combo.currentIndexChanged.connect(lambda _i, c=combo: c.setToolTip(c.currentText()))
     return combo
 
-def _fit_spin(spin):
-    #宽度=字宽+2, 右对齐下label侧和右侧邻居都贴死(字体显式, 不受调用顺序/setFont先后影响)
-    _fm = QFontMetricsF(QFont("MiSans", 11, QFont.Bold))
+def _fit_spin(spin, font=None):
+    #宽度=字宽+2, 右对齐下label侧和右侧邻居都贴死(字体显式, 不受调用顺序/setFont先后影响; font供悬浮页放大档)
+    _fm = QFontMetricsF(font if font is not None else QFont("MiSans", 11, QFont.Bold))
     spin.setFixedWidth(int(_fm.horizontalAdvance(spin.text())) + 2)
 
 def _make_label(text, font=None, color=None):
@@ -777,7 +778,7 @@ def _refresh_actions(app, task):
         row_layout = QHBoxLayout()
         row_layout.setSpacing(2)
         _vbox.addLayout(row_layout)
-        # wait/branch设置搬进悬浮设置页(⚙), 行内只留摘要
+        # wait/branch设置搬进悬浮设置页(✎), 行内只留摘要
         _inline_full = action.get("type") not in ("wait_image", "branch")
         _ctl = None
         if _inline_full:
@@ -941,7 +942,7 @@ def _refresh_actions(app, task):
 
         if not _inline_full:
             from .action_settings_view import open_settings_view
-            edit_btn = _make_btn("⚙", bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+            edit_btn = _make_btn("✎", bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
             edit_btn.setFixedWidth(20)
             edit_btn.setToolTip("打开设置页")
             edit_btn.clicked.connect(lambda _c=False, a=action: open_settings_view(app, task, a))

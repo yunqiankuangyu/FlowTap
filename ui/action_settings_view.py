@@ -8,6 +8,7 @@ from .keyboard_mode import (_make_btn, _make_label, _tint_btn, _fit_spin, _targe
                             _refresh_actions as _refresh_main)
 
 RADIUS = 16
+FONT13 = QFont("MiSans", 13, QFont.Bold)
 
 
 def open_settings_view(app, task, action):
@@ -27,29 +28,30 @@ class ActionSettingsView(QWidget):
     def __init__(self, app, task, action):
         super().__init__()
         self._app, self._task, self._action = app, task, action
+        self._drag_off = None
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setFixedWidth(560)
+        self.setFixedWidth(600)
         self._root = QVBoxLayout(self)
-        self._root.setContentsMargins(16, 12, 16, 16)
+        self._root.setContentsMargins(18, 14, 18, 20)
         self._root.setSpacing(10)
 
         head = QHBoxLayout()
         head.setSpacing(4)
-        head.addWidget(_make_label(fmt_action(action) + " 设置", font=QFont("MiSans", 12, QFont.Bold)))
+        head.addWidget(_make_label(fmt_action(action) + " 设置", font=QFont("MiSans", 15, QFont.Bold)))
         head.addStretch(1)
         close_btn = QPushButton("\u2715")
         close_btn.setFixedSize(20, 20)
         close_btn.setCursor(QCursor(Qt.PointingHandCursor))
         close_btn.setStyleSheet(
-            f"QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 13px 'MiSans'; }}"
+            f"QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 15px 'MiSans'; }}"
             f"QPushButton:hover {{ background: {Colors.RED}; }}")
         close_btn.clicked.connect(self.close)
         head.addWidget(close_btn)
         self._root.addLayout(head)
 
         self._content = QVBoxLayout()
-        self._content.setSpacing(8)
+        self._content.setSpacing(10)
         self._root.addLayout(self._content)
         self._build()
 
@@ -57,9 +59,9 @@ class ActionSettingsView(QWidget):
         card = QFrame()
         card.setStyleSheet(f"QFrame {{ background: {Colors.ACCENT}; border-radius: 10px; }}")
         v = QVBoxLayout(card)
-        v.setContentsMargins(14, 8, 14, 10)
-        v.setSpacing(6)
-        v.addWidget(_make_label(title, font=QFont("MiSans", 10, QFont.Bold), color=Colors.DIM))
+        v.setContentsMargins(16, 10, 16, 12)
+        v.setSpacing(8)
+        v.addWidget(_make_label(title, font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
         self._content.addWidget(card)
         return v
 
@@ -115,7 +117,7 @@ class ActionSettingsView(QWidget):
         _ctl = QHBoxLayout()
         _ctl.setSpacing(0)
         _ctl.addSpacing(8)
-        hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+        hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=FONT13, color=Colors.DIM)
         _ctl.addWidget(hold_label)
 
         hold_spin = QDoubleSpinBox()
@@ -132,14 +134,14 @@ class ActionSettingsView(QWidget):
         hold_spin.setFixedHeight(20)
         hold_spin.setFixedWidth(31 if (is_wait or is_branch) else 46)
         hold_spin.setAlignment(Qt.AlignRight)
-        hold_spin.setFont(QFont("MiSans", 11, QFont.Bold))
+        hold_spin.setFont(FONT13)
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "timeout" if a.get("type") in ("wait_image", "branch") else "hold", round(v, 2)))
         _ctl.addWidget(hold_spin)
-        _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+        _ctl.addWidget(_make_label("s", font=FONT13, color=Colors.DIM))
 
-        delay_label = _make_label("阈值" if is_wait else "后延", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+        delay_label = _make_label("阈值" if is_wait else "后延", font=FONT13, color=Colors.DIM)
         _ctl.addSpacing(2)  # 组界: 配对内紧、组间松
         _ctl.addWidget(delay_label)
 
@@ -156,23 +158,23 @@ class ActionSettingsView(QWidget):
             delay_spin.setValue(action.get("delay", 0.5))
         delay_spin.setFixedHeight(20)
         if is_wait:  # wait行这个框标签就是"阈值"
-            _fit_spin(delay_spin)
+            _fit_spin(delay_spin, font=FONT13)
         else:
             delay_spin.setFixedWidth(46)
         delay_spin.setAlignment(Qt.AlignRight)
-        delay_spin.setFont(QFont("MiSans", 11, QFont.Bold))
+        delay_spin.setFont(FONT13)
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
         if is_wait:
-            delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp))
+            delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp, font=FONT13))
         _ctl.addWidget(delay_spin)
         if not is_wait:
-            _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+            _ctl.addWidget(_make_label("s", font=FONT13, color=Colors.DIM))
         if is_wait:
             _ctl.addSpacing(2)
             # 帧：防抖连续命中次数
-            _ctl.addWidget(_make_label("帧", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+            _ctl.addWidget(_make_label("帧", font=FONT13, color=Colors.DIM))
             hit_spin = QDoubleSpinBox()
             hit_spin.setRange(1, 5)
             hit_spin.setDecimals(0)
@@ -181,14 +183,14 @@ class ActionSettingsView(QWidget):
             hit_spin.setFixedHeight(20)
             hit_spin.setFixedWidth(16)
             hit_spin.setAlignment(Qt.AlignRight)
-            hit_spin.setFont(QFont("MiSans", 11, QFont.Bold))
+            hit_spin.setFont(FONT13)
             hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
             hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
             _ctl.addWidget(hit_spin)
 
             _ctl.addSpacing(2)
             # 尺度：多尺度/精确 动态切换（点击翻转 action.scales）
-            scale_btn = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
+            scale_btn = _make_btn("", font=FONT13, height=20)
             scale_btn.setFixedWidth(47)
             scale_btn.setToolTip("多尺度：UI缩放125%/150%也识别；精确：只按标定原尺寸")
             def _flip_scale(_checked=False, a=action, b=scale_btn):
@@ -210,8 +212,8 @@ class ActionSettingsView(QWidget):
         if is_wait or is_branch:
             _ctl.addSpacing(2)
             # 超时后行为：跳过/中止 动态切换（中止=红）
-            _ctl.addWidget(_make_label("超时后", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
-            ot_btn = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
+            _ctl.addWidget(_make_label("超时后", font=FONT13, color=Colors.DIM))
+            ot_btn = _make_btn("", font=FONT13, height=20)
             ot_btn.setFixedWidth(32)
             ot_btn.setToolTip("等待超时后：跳过=继续执行下一动作；中止=终止本轮")
             def _flip_ot(_checked=False, a=action, b=ot_btn):
@@ -243,7 +245,7 @@ class ActionSettingsView(QWidget):
                 _sub0 = QHBoxLayout()
                 _sub0.setSpacing(3)
                 _sub0.addSpacing(0)
-                _sub0.addWidget(_make_label("还没有模板 — 点下方 + 加分支 开始框选", font=QFont("MiSans", 10, QFont.Bold), color=Colors.DIM))
+                _sub0.addWidget(_make_label("还没有模板 — 点下方 + 加分支 开始框选", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
                 _sub0.addStretch(1)
                 _vbox.addLayout(_sub0)
             for k, option in enumerate(options):
@@ -257,31 +259,31 @@ class ActionSettingsView(QWidget):
                     from PySide6.QtGui import QPixmap
                     _pm = QPixmap(_full)
                     if not _pm.isNull():
-                        _thumb.setPixmap(_pm.scaledToHeight(48))
+                        _thumb.setPixmap(_pm.scaledToHeight(56))
                 if _thumb.pixmap() is None or _thumb.pixmap().isNull():
                     _thumb.setText("—")
-                _thumb.setFixedHeight(48)
-                _thumb.setFont(QFont("MiSans", 11, QFont.Bold))
+                _thumb.setFixedHeight(56)
+                _thumb.setFont(FONT13)
                 _subA.addWidget(_thumb)
                 _subA.addSpacing(2)
 
-                _subA.addWidget(_make_label("阈值", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                _subA.addWidget(_make_label("阈值", font=FONT13, color=Colors.DIM))
                 _th = QDoubleSpinBox()
                 _th.setRange(0, 1)
                 _th.setDecimals(2)
                 _th.setSingleStep(0.05)
                 _th.setValue(float(option.get("threshold", 0.85)))
                 _th.setFixedHeight(20)
-                _fit_spin(_th)
+                _fit_spin(_th, font=FONT13)
                 _th.setAlignment(Qt.AlignRight)
-                _th.setFont(QFont("MiSans", 11, QFont.Bold))
+                _th.setFont(FONT13)
                 _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
                 _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
-                _th.textChanged.connect(lambda _t, sp=_th: _fit_spin(sp))
+                _th.textChanged.connect(lambda _t, sp=_th: _fit_spin(sp, font=FONT13))
                 _subA.addWidget(_th)
                 _subA.addSpacing(2)
 
-                _sc = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
+                _sc = _make_btn("", font=FONT13, height=20)
                 _sc.setFixedWidth(47)
                 def _flip_sc(_c=False, o=option, b=_sc):
                     cur = o.get("scales") or [1.0, 1.25, 1.5]
@@ -305,10 +307,10 @@ class ActionSettingsView(QWidget):
                 _subB = QHBoxLayout()
                 _subB.setSpacing(6)  # 行内舒展
                 _subB.addSpacing(0)
-                _subB.addWidget(_make_label("跳到", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
-                _subB.addWidget(_target_combo(task, option))
+                _subB.addWidget(_make_label("跳到", font=FONT13, color=Colors.DIM))
+                _subB.addWidget(_target_combo(task, option, big=True))
 
-                _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+                _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, font=FONT13, height=20)
                 _cap.setFixedWidth(20)
                 _cap.setToolTip("重拍本模板（覆盖原路径）")
                 def _recap(_c=False, o=option):
@@ -339,7 +341,7 @@ class ActionSettingsView(QWidget):
                 for _txt, _fn, _tip in (("↑", _up_opt, "上移（列表顺序=优先级）"),
                                         ("↓", _down_opt, "下移"),
                                         ("✕", _del_opt, "删除本选项")):
-                    _b = _make_btn(_txt, bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+                    _b = _make_btn(_txt, bg=Colors.DIM, hover=Colors.ACCENT, font=FONT13, height=20)
                     _b.setFixedWidth(18)
                     _b.setToolTip(_tip)
                     _b.clicked.connect(_fn)
@@ -350,7 +352,7 @@ class ActionSettingsView(QWidget):
             _subf = QHBoxLayout()
             _subf.setSpacing(3)
             _subf.addSpacing(0)
-            _addopt = _make_btn("+ 加分支", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+            _addopt = _make_btn("+ 加分支", bg=Colors.BLUE, hover=Colors.ACCENT, font=FONT13, height=20)
             _addopt.setFixedWidth(80)
             def _add_option(_c=False, a=action):
                 capture_template(
@@ -363,6 +365,25 @@ class ActionSettingsView(QWidget):
             _subf.addWidget(_addopt)
             _subf.addStretch(1)
             _vbox.addLayout(_subf)
+
+    def mousePressEvent(self, e):
+        # 窗口拖拽: 按下记录偏移(子控件消费各自事件, 到不了这里)
+        if e.button() == Qt.LeftButton:
+            self._drag_off = e.globalPosition().toPoint() - self.geometry().topLeft()
+            e.accept()
+        else:
+            super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if getattr(self, "_drag_off", None) is not None and (e.buttons() & Qt.LeftButton):
+            self.move(e.globalPosition().toPoint() - self._drag_off)
+        else:
+            super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        self._drag_off = None
+        super().mouseReleaseEvent(e)
+
     def paintEvent(self, event):
         try:
             p = QPainter(self)
