@@ -42,6 +42,14 @@ class Colors:
         t = THEMES.get(theme_name, THEMES[DEFAULT_THEME])
         for k, v in t.items():
             setattr(cls, k, v)
+        #工具提示显式着色, 系统暗色黑底配浅色调色板黑字会黑上叠黑看不到字
+        from PySide6.QtWidgets import QApplication
+        _app = QApplication.instance()
+        if _app is not None:
+            _app.setStyleSheet(
+                f"QToolTip {{ background: {cls.ACCENT}; color: {cls.TEXT}; "
+                f"border: 1px solid {cls.BLUE}; padding: 3px 7px; border-radius: 3px; }}"
+            )
 
 
 # 字体
