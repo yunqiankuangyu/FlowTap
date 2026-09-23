@@ -802,7 +802,7 @@ def _refresh_actions(app, task):
             _vbox.setContentsMargins(6, 4, 6, 4)
             _vbox.setSpacing(3)
             row_layout = QHBoxLayout()
-            row_layout.setSpacing(4)
+            row_layout.setSpacing(3)
             _vbox.addLayout(row_layout)
             _ctl = QHBoxLayout()
             _ctl.setSpacing(3)
@@ -811,7 +811,7 @@ def _refresh_actions(app, task):
         else:
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(6, 4, 6, 4)
-            row_layout.setSpacing(4)
+            row_layout.setSpacing(3)
             _ctl = row_layout
 
         # ☰ 拖动排序手柄
@@ -853,8 +853,8 @@ def _refresh_actions(app, task):
             hold_spin.setDecimals(1)
             hold_spin.setSingleStep(0.1)
             hold_spin.setValue(action.get("hold", 0))
-        hold_spin.setFixedHeight(18)
-        hold_spin.setFixedWidth(38)
+        hold_spin.setFixedHeight(20)
+        hold_spin.setFixedWidth(30 if (is_wait or is_branch) else 42)
         hold_spin.setAlignment(Qt.AlignRight)
         hold_spin.setFont(QFont("MiSans", 10, QFont.Bold))
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
@@ -877,8 +877,8 @@ def _refresh_actions(app, task):
             delay_spin.setDecimals(1)
             delay_spin.setSingleStep(0.1)
             delay_spin.setValue(action.get("delay", 0.5))
-        delay_spin.setFixedHeight(18)
-        delay_spin.setFixedWidth(38)
+        delay_spin.setFixedHeight(20)
+        delay_spin.setFixedWidth(54 if is_wait else 42)
         delay_spin.setAlignment(Qt.AlignRight)
         delay_spin.setFont(QFont("MiSans", 10, QFont.Bold))
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
@@ -896,8 +896,8 @@ def _refresh_actions(app, task):
             hit_spin.setDecimals(0)
             hit_spin.setSingleStep(1)
             hit_spin.setValue(int(action.get("min_hits", 2)))
-            hit_spin.setFixedHeight(18)
-            hit_spin.setFixedWidth(28)
+            hit_spin.setFixedHeight(20)
+            hit_spin.setFixedWidth(18)
             hit_spin.setAlignment(Qt.AlignRight)
             hit_spin.setFont(QFont("MiSans", 10, QFont.Bold))
             hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
@@ -905,8 +905,8 @@ def _refresh_actions(app, task):
             _ctl.addWidget(hit_spin)
 
             # 尺度：多尺度/精确 动态切换（点击翻转 action.scales）
-            scale_btn = _make_btn("", height=25)
-            scale_btn.setFixedWidth(44)
+            scale_btn = _make_btn("", font=QFont("MiSans", 10, QFont.Bold), height=20)
+            scale_btn.setFixedWidth(46)
             scale_btn.setToolTip("多尺度：UI缩放125%/150%也识别；精确：只按标定原尺寸")
             def _flip_scale(_checked=False, a=action, b=scale_btn):
                 cur = a.get("scales") or [1.0, 1.25, 1.5]
@@ -927,8 +927,8 @@ def _refresh_actions(app, task):
         if is_wait or is_branch:
             # 超时后行为：跳过/中止 动态切换（中止=红）
             _ctl.addWidget(_make_label("超时后", font=QFont("MiSans", 10, QFont.Bold), color=Colors.DIM))
-            ot_btn = _make_btn("", height=25)
-            ot_btn.setFixedWidth(44)
+            ot_btn = _make_btn("", font=QFont("MiSans", 10, QFont.Bold), height=20)
+            ot_btn.setFixedWidth(34)
             ot_btn.setToolTip("等待超时后：跳过=继续执行下一动作；中止=终止本轮")
             def _flip_ot(_checked=False, a=action, b=ot_btn):
                 if a.get("on_timeout", "skip") == "skip":
@@ -947,7 +947,8 @@ def _refresh_actions(app, task):
 
         if is_wait:
             from .vision_preview import open_preview
-            prev_btn = _make_btn("🔍", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+            prev_btn = _make_btn("🔍", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 10, QFont.Bold), height=20)
+            prev_btn.setFixedWidth(24)
             prev_btn.setToolTip("实时预览匹配得分")
             prev_btn.clicked.connect(lambda checked, a=action: open_preview(
                 a, on_close=lambda: _refresh_actions(app, task)))
@@ -977,7 +978,7 @@ def _refresh_actions(app, task):
                 _vbox.addLayout(_sub0)
             for k, option in enumerate(options):
                 _sub = QHBoxLayout()
-                _sub.setSpacing(3)
+                _sub.setSpacing(2)
                 _sub.addSpacing(26)
 
                 _thumb = QLabel()
@@ -989,7 +990,7 @@ def _refresh_actions(app, task):
                         _thumb.setPixmap(_pm.scaledToHeight(20))
                 if _thumb.pixmap() is None or _thumb.pixmap().isNull():
                     _thumb.setText("—")
-                _thumb.setFixedWidth(24)
+                _thumb.setFixedWidth(22)
                 _sub.addWidget(_thumb)
 
                 _sub.addWidget(_make_label("阈值", font=QFont("MiSans", 10, QFont.Bold), color=Colors.DIM))
@@ -998,15 +999,15 @@ def _refresh_actions(app, task):
                 _th.setDecimals(2)
                 _th.setSingleStep(0.05)
                 _th.setValue(float(option.get("threshold", 0.85)))
-                _th.setFixedHeight(18)
-                _th.setFixedWidth(38)
+                _th.setFixedHeight(20)
+                _th.setFixedWidth(54)
                 _th.setAlignment(Qt.AlignRight)
                 _th.setFont(QFont("MiSans", 10, QFont.Bold))
                 _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
                 _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
                 _sub.addWidget(_th)
 
-                _sc = _make_btn("", height=25)
+                _sc = _make_btn("", font=QFont("MiSans", 10, QFont.Bold), height=20)
                 _sc.setFixedWidth(44)
                 def _flip_sc(_c=False, o=option, b=_sc):
                     cur = o.get("scales") or [1.0, 1.25, 1.5]
@@ -1028,8 +1029,8 @@ def _refresh_actions(app, task):
                 _sub.addWidget(_make_label("跳到", font=QFont("MiSans", 10, QFont.Bold), color=Colors.DIM))
                 _sub.addWidget(_target_combo(task, option))
 
-                _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
-                _cap.setFixedWidth(26)
+                _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 10, QFont.Bold), height=20)
+                _cap.setFixedWidth(22)
                 _cap.setToolTip("重拍本模板（覆盖原路径）")
                 def _recap(_c=False, o=option):
                     from .vision_capture import capture_template
@@ -1060,7 +1061,7 @@ def _refresh_actions(app, task):
                 for _txt, _fn, _tip in (("↑", _up_opt, "上移（列表顺序=优先级）"),
                                         ("↓", _down_opt, "下移"),
                                         ("✕", _del_opt, "删除本选项")):
-                    _b = _make_btn(_txt, bg=Colors.DIM, hover=Colors.ACCENT, height=25)
+                    _b = _make_btn(_txt, bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 10, QFont.Bold), height=20)
                     _b.setFixedWidth(18)
                     _b.setToolTip(_tip)
                     _b.clicked.connect(_fn)
@@ -1070,7 +1071,8 @@ def _refresh_actions(app, task):
             _subf = QHBoxLayout()
             _subf.setSpacing(3)
             _subf.addSpacing(26)
-            _addopt = _make_btn("+ 加分支", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+            _addopt = _make_btn("+ 加分支", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 10, QFont.Bold), height=20)
+            _addopt.setFixedWidth(72)
             def _add_option(_c=False, a=action):
                 from .vision_capture import capture_template
                 capture_template(
