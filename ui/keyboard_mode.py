@@ -587,7 +587,7 @@ def create_card(app, task):
     dd_kb.setText("+ 键鼠")
     dd_kb._current_text = "+ 键鼠"
     dd_kb.setToolTip("添加动作：键盘 / 鼠标点击")
-    af_layout.addWidget(dd_kb)
+    af_layout.addWidget(dd_kb, 1)
 
     def _pick_in(what):
         dd_in.setText("+ 插入")
@@ -604,11 +604,18 @@ def create_card(app, task):
     dd_in.setText("+ 插入")
     dd_in._current_text = "+ 插入"
     dd_in.setToolTip("插入：等图像（框选等待）/ 多模板分支 / 跳转")
-    af_layout.addWidget(dd_in)
+    af_layout.addWidget(dd_in, 1)
 
     clear_btn = _make_btn("清空", bg=Colors.DIM, hover=Colors.ACCENT, height=25)
     clear_btn.clicked.connect(lambda: clear_actions(app, task))
-    af_layout.addWidget(clear_btn)
+    af_layout.addWidget(clear_btn, 1)
+
+    # 三等分：解除 helper 的固定宽 + 横向可伸展，stretch=1 把整行均分成三份
+    from PySide6.QtWidgets import QSizePolicy
+    for _w in (dd_kb, dd_in, clear_btn):
+        _w.setMinimumWidth(0)
+        _w.setMaximumWidth(16777215)
+        _w.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     card_layout.addWidget(af)
     task._extra_rows = [af]  # 折叠时隐藏的附属行
