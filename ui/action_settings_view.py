@@ -1,11 +1,11 @@
 """动作完整设置悬浮页: 设置内容多的动作(wait/branch)独立窗编辑, 编辑期主窗隐藏"""
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFrame, QDoubleSpinBox, QPushButton, QLabel
 from PySide6.QtCore import Qt, QRectF
-from PySide6.QtGui import QPainter, QBrush, QColor, QFont, QCursor, QPixmap
+from PySide6.QtGui import QPainter, QBrush, QColor, QFont, QCursor, QPixmap, QFontMetricsF
 from config.themes import Colors
 from tasks.keyboard.keyboard_task import fmt_action
 from .keyboard_mode import (_make_btn, _make_label, _tint_btn, _fit_spin, _target_combo,
-                            _refresh_actions as _refresh_main)
+                            DraggableRow, _refresh_actions as _refresh_main)
 
 RADIUS = 16
 FONT13 = QFont("MiSans", 13, QFont.Bold)
@@ -65,6 +65,17 @@ class ActionSettingsView(QWidget):
         self._content.addWidget(card)
         return v
 
+    def _move_option(self, fr, to):
+        """选项拖拽排序核心(手势drop和测试共用): fr→to 交换"""
+        opts = self._action.get("options") or []
+        if not (0 <= fr < len(opts)) or fr == to:
+            return
+        o = opts.pop(fr)
+        if fr < to:
+            to -= 1
+        opts.insert(to, o)
+        self._after_change()
+
     def _after_change(self, app=None, task=None):
         """搬入段的结构变化回调: 行内摘要同步 + 本页重建"""
         _refresh_main(self._app, self._task)
@@ -86,6 +97,7 @@ class ActionSettingsView(QWidget):
         app, task, action = self._app, self._task, self._action
         is_wait = action.get("type") == "wait_image"
         is_branch = action.get("type") == "branch"
+        self._opt_rows = []
 
         def _refresh_actions(_a=None, _t=None):
             # 遮蔽搬入段的调用: 选项增删排序后重建本页
@@ -235,7 +247,7 @@ class ActionSettingsView(QWidget):
         if is_branch:
             _vbox = self._card("分支选项 (列表顺序=优先级)")
         if is_branch:
-            # 分支子行：每选项 缩略图/阈值/尺度/跳到/📷重拍/✕删/↑↓优先级 + 加分支尾行
+            # 分支选项: 每选项一行 ☰拖拽排序/缩略图/阈值/尺度/跳到/📷重拍/✕删 + 加分支尾行
             from core import vision as _v
             import os as _os
             options = action.get("options") or []
@@ -247,9 +259,82 @@ class ActionSettingsView(QWidget):
                 _sub0.addStretch(1)
                 _vbox.addLayout(_sub0)
             for k, option in enumerate(options):
-                _subA = QHBoxLayout()
-                _subA.setSpacing(0)  # 配对紧挨
-                _subA.addSpacing(0)
+                _roww = DraggableRow()
+                _roww.setStyleSheet(f"DraggableRow {{ background: {Colors.CARD}; border-radius: 8px; }}")
+                self._opt_rows.append(_roww)
+                _rowL = QHBoxLayout(_roww)
+                _rowL.setContentsMargins(6, 4, 6, 4)
+                _rowL.setSpacing(0)  # 配对紧挨
+
+                # ☰ 拖拽排序手柄(与主界面动作行同款QDrag)
+                _h = QPushButton("☰")
+                _h.setFixedSize(22, 18)
+                _h.setCursor(QCursor(Qt.SizeVerCursor))
+                _h.setStyleSheet(
+                    f"QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 12px 'MiSans'; }}"
+                    f"QPushButton:hover {{ color: {Colors.TEXT}; background: {Colors.ACCENT}; border-radius: 4px; }}")
+                _h.setToolTip("拖动排序（列表顺序=优先级）")
+
+                def _h_press(e, _i=k, _rw=_roww):
+                    if e.button() == Qt.LeftButton:
+                        from PySide6.QtGui import QDrag
+                        from PySide6.QtCore import QMimeData
+                        _rw.setDragging(True)
+                        _mime = QMimeData()
+                        _mime.setText(str(_i))
+                        _drag = QDrag(_rw)
+                        _drag.setMimeData(_mime)
+                        _drag.exec_(Qt.MoveAction)
+                        _rw.setDragging(False)
+                _h.mousePressEvent = _h_press
+                _rowL.addWidget(_h)
+
+                def _opt_clear_hl():
+                    for _r in self._opt_rows:
+                        _r.setHighlight()
+
+                def _opt_enter(e, _rw=_roww):
+                    if e.mimeData().hasText():
+                        e.acceptProposedAction()
+
+                def _opt_move(e, _rw=_roww):
+                    if e.mimeData().hasText():
+                        e.acceptProposedAction()
+                        _opt_clear_hl()
+                        _y = e.position().y()
+                        _hh = _rw.height()
+                        _z = _hh * 0.5
+                        if _y < _z:
+                            _rw.setHighlight(top=True)
+                        elif _y > _hh - _z:
+                            _rw.setHighlight(bottom=True)
+                        else:
+                            _rw.setHighlight(top=True, bottom=True)
+
+                def _opt_drop(e, _idx=k, _rw=_roww):
+                    _opt_clear_hl()
+                    if e.mimeData().hasText():
+                        try:
+                            _fr = int(e.mimeData().text())
+                            _y = e.position().y()
+                            _hh = _rw.height()
+                            _z = _hh * 0.5
+                            if _y < _z:
+                                _to = _idx
+                            elif _y > _hh - _z:
+                                _to = _idx + 1
+                            else:
+                                _to = _idx
+                            self._move_option(_fr, _to)
+                        except Exception:
+                            pass
+                    e.acceptProposedAction()
+
+                _roww.setAcceptDrops(True)
+                _roww.dragEnterEvent = _opt_enter
+                _roww.dragMoveEvent = _opt_move
+                _roww.dragLeaveEvent = lambda e: _opt_clear_hl()
+                _roww.dropEvent = _opt_drop
 
                 _thumb = QLabel()
                 _full = _os.path.join(_v._app_dir(), option.get("tpl", ""))
@@ -262,10 +347,10 @@ class ActionSettingsView(QWidget):
                     _thumb.setText("—")
                 _thumb.setFixedHeight(56)
                 _thumb.setFont(FONT13)
-                _subA.addWidget(_thumb)
-                _subA.addSpacing(2)
+                _rowL.addWidget(_thumb)
+                _rowL.addSpacing(2)
 
-                _subA.addWidget(_make_label("阈值", font=FONT13, color=Colors.DIM))
+                _rowL.addWidget(_make_label("阈值", font=FONT13, color=Colors.DIM))
                 _th = QDoubleSpinBox()
                 _th.setRange(0, 1)
                 _th.setDecimals(2)
@@ -278,8 +363,8 @@ class ActionSettingsView(QWidget):
                 _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
                 _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
                 _th.textChanged.connect(lambda _t, sp=_th: _fit_spin(sp, font=FONT13))
-                _subA.addWidget(_th)
-                _subA.addSpacing(2)
+                _rowL.addWidget(_th)
+                _rowL.addSpacing(2)
 
                 _sc = _make_btn("", font=FONT13, height=20)
                 _sc.setFixedWidth(60)
@@ -297,16 +382,17 @@ class ActionSettingsView(QWidget):
                 _m = len(option.get("scales") or [1.0, 1.25, 1.5]) > 1
                 _sc.setText("多尺度" if _m else "精确")
                 _tint_btn(_sc, Colors.BLUE if _m else Colors.DIM)
-                _subA.addWidget(_sc)
+                _rowL.addWidget(_sc)
 
-                _subA.addSpacing(14)  # 组界: 阈值组↔跳到组
-                _subA.addWidget(_make_label("跳到", font=FONT13, color=Colors.DIM))
-                _subA.addSpacing(4)
-                _subA.addWidget(_target_combo(task, option, big=True))
-                _subA.addSpacing(6)
+                _rowL.addSpacing(14)  # 组界: 阈值组↔跳到组
+                _rowL.addWidget(_make_label("跳到", font=FONT13, color=Colors.DIM))
+                _rowL.addSpacing(4)
+                _rowL.addWidget(_target_combo(task, option, big=True))
+                _rowL.addSpacing(6)
 
-                _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, font=FONT13, height=20)
-                _cap.setFixedWidth(26)
+                _cap = _make_btn("📷 重拍", bg=Colors.BLUE, hover=Colors.ACCENT, font=FONT13, height=20)
+                # emoji/空格是比例字符(字体环境相关), 宽度按13pt字宽动态算
+                _cap.setFixedWidth(int(QFontMetricsF(FONT13).horizontalAdvance("📷 重拍")) + 10)
                 _cap.setToolTip("重拍本模板（覆盖原路径）")
                 def _recap(_c=False, o=option):
                     capture_template(
@@ -315,34 +401,19 @@ class ActionSettingsView(QWidget):
                         on_done=lambda: _refresh_actions(app, task),
                         rel=o.get("tpl"))
                 _cap.clicked.connect(_recap)
-                _subA.addWidget(_cap)
+                _rowL.addWidget(_cap)
 
                 def _del_opt(_c=False, a=action, i=k):
                     (a.get("options") or []).pop(i)
                     _refresh_actions(app, task)
 
-                def _up_opt(_c=False, a=action, i=k):
-                    o = a.get("options")
-                    if i > 0:
-                        o[i - 1], o[i] = o[i], o[i - 1]
-                    _refresh_actions(app, task)
-
-                def _down_opt(_c=False, a=action, i=k):
-                    o = a.get("options")
-                    if i < len(o) - 1:
-                        o[i + 1], o[i] = o[i], o[i + 1]
-                    _refresh_actions(app, task)
-
-                for _txt, _fn, _tip in (("↑", _up_opt, "上移（列表顺序=优先级）"),
-                                        ("↓", _down_opt, "下移"),
-                                        ("✕", _del_opt, "删除本选项")):
-                    _b = _make_btn(_txt, bg=Colors.DIM, hover=Colors.ACCENT, font=FONT13, height=20)
-                    _b.setFixedWidth(24)
-                    _b.setToolTip(_tip)
-                    _b.clicked.connect(_fn)
-                    _subA.addWidget(_b)
-                _subA.addStretch(1)  # 多余空间归行尾, 防label被拉宽
-                _vbox.addLayout(_subA)
+                _b = _make_btn("✕", bg=Colors.DIM, hover=Colors.ACCENT, font=FONT13, height=20)
+                _b.setFixedWidth(24)
+                _b.setToolTip("删除本选项")
+                _b.clicked.connect(_del_opt)
+                _rowL.addWidget(_b)
+                _rowL.addStretch(1)  # 多余空间归行尾, 防label被拉宽
+                _vbox.addWidget(_roww)
 
             _subf = QHBoxLayout()
             _subf.setSpacing(3)
