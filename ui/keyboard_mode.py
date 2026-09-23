@@ -545,6 +545,13 @@ def create_card(app, task):
     add_click_btn.clicked.connect(lambda: add_click_action(app, task))
     af_layout.addWidget(add_click_btn)
 
+    from .vision_capture import add_image_wait_action
+    add_img_btn = _make_btn("+ 📷", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+    add_img_btn.setToolTip("框选等待图像：画面出现选中目标才继续")
+    add_img_btn.clicked.connect(lambda: add_image_wait_action(
+        app, task, lambda: _refresh_actions(app, task)))
+    af_layout.addWidget(add_img_btn)
+
     clear_btn = _make_btn("清空", bg=Colors.DIM, hover=Colors.ACCENT, height=25)
     clear_btn.clicked.connect(lambda: clear_actions(app, task))
     af_layout.addWidget(clear_btn)
@@ -745,39 +752,56 @@ def _refresh_actions(app, task):
         desc_lbl = _make_label(desc, font=desc_font)
         row_layout.addWidget(desc_lbl, 1)
 
-        hold_label = _make_label("持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+        # 普通行：持续(hold) + 后延(delay)；wait_image 行：超时(timeout) + 阈值(threshold)
+        is_wait = action.get("type") == "wait_image"
+
+        hold_label = _make_label("超时" if is_wait else "持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
         row_layout.addWidget(hold_label)
 
         hold_spin = QDoubleSpinBox()
-        hold_spin.setRange(0, 30)
-        hold_spin.setDecimals(1)
-        hold_spin.setSingleStep(0.1)
-        hold_spin.setValue(action.get("hold", 0))
+        if is_wait:
+            hold_spin.setRange(0, 600)
+            hold_spin.setDecimals(0)
+            hold_spin.setSingleStep(10)
+            hold_spin.setValue(action.get("timeout", 30))
+        else:
+            hold_spin.setRange(0, 30)
+            hold_spin.setDecimals(1)
+            hold_spin.setSingleStep(0.1)
+            hold_spin.setValue(action.get("hold", 0))
         hold_spin.setFixedHeight(18)
         hold_spin.setFixedWidth(38)
         hold_spin.setAlignment(Qt.AlignRight)
         hold_spin.setFont(QFont("MiSans", 10, QFont.Bold))
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
-        hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("hold", round(v, 2)))
+        hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
+            "timeout" if a.get("type") == "wait_image" else "hold", round(v, 2)))
         row_layout.addWidget(hold_spin)
         row_layout.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
-        delay_label = _make_label("后延", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+        delay_label = _make_label("阈值" if is_wait else "后延", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
         row_layout.addWidget(delay_label)
 
         delay_spin = QDoubleSpinBox()
-        delay_spin.setRange(0, 30)
-        delay_spin.setDecimals(1)
-        delay_spin.setSingleStep(0.1)
-        delay_spin.setValue(action.get("delay", 0.5))
+        if is_wait:
+            delay_spin.setRange(0, 1)
+            delay_spin.setDecimals(2)
+            delay_spin.setSingleStep(0.05)
+            delay_spin.setValue(action.get("threshold", 0.85))
+        else:
+            delay_spin.setRange(0, 30)
+            delay_spin.setDecimals(1)
+            delay_spin.setSingleStep(0.1)
+            delay_spin.setValue(action.get("delay", 0.5))
         delay_spin.setFixedHeight(18)
         delay_spin.setFixedWidth(38)
         delay_spin.setAlignment(Qt.AlignRight)
         delay_spin.setFont(QFont("MiSans", 10, QFont.Bold))
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
-        delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("delay", round(v, 2)))
+        delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
+            "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
         row_layout.addWidget(delay_spin)
-        row_layout.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+        row_layout.addWidget(_make_label("" if is_wait else "s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
         del_btn = QPushButton("✕")
         del_btn.setFixedSize(18, 18)
