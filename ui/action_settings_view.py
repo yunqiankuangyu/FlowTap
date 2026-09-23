@@ -61,7 +61,8 @@ class ActionSettingsView(QWidget):
         v = QVBoxLayout(card)
         v.setContentsMargins(16, 10, 16, 12)
         v.setSpacing(8)
-        v.addWidget(_make_label(title, font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+        if title:
+            v.addWidget(_make_label(title, font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
         self._content.addWidget(card)
         return v
 
@@ -124,11 +125,12 @@ class ActionSettingsView(QWidget):
 
             _real_capture(_app, _task, on_got, _done, rel=rel, on_cancel=_cancel)
 
-        # 卡1 等待条件: 超时/阈值(后延)/帧/尺度/超时后 (搬入段共享 _ctl)
-        _vbox = self._card("等待条件")
+        # 卡1 等待条件: 标题与参数并为一行(标题左、参数右靠), 搬入段共享 _ctl
+        _vbox = self._card(None)
         _ctl = QHBoxLayout()
         _ctl.setSpacing(0)
-        _ctl.addStretch(1)  # 第二行内容整体右靠
+        _ctl.addWidget(_make_label("等待条件", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+        _ctl.addStretch(1)  # 参数整体右靠
         hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=FONT13, color=Colors.DIM)
         _ctl.addWidget(hold_label)
 

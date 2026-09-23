@@ -949,7 +949,7 @@ def _refresh_actions(app, task):
 
         if not _inline_full:
             from .action_settings_view import open_settings_view
-            edit_btn = _make_btn("设置", bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+            edit_btn = _make_btn("编辑", bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
             edit_btn.setFixedWidth(36)
             edit_btn.setToolTip("打开设置页")
             edit_btn.clicked.connect(lambda _c=False, a=action: open_settings_view(app, task, a))
