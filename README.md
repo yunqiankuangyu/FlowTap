@@ -57,6 +57,7 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.8.2 | PySide6 | Smart branching (experimental), dark tooltip fix |
 | v3.8.1 | PySide6 | Humanized mouse movement, Start All fix |
 | v3.8.0 | PySide6 | Window binding (auto-wait on switch), rounded corners, bottom bar alignment |
 | v3.7.4 | PySide6 | Scroll kept, mini-window sync, preset load confirmation |
@@ -74,6 +75,17 @@ FlowTap/
 | v3 | PySide6 | Qt migration, solves CTk rendering flicker |
 | v2 | CustomTkinter | Unified keyboard+mouse task mode |
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
+
+### v3.8.2 — Vision Enhancements & Action Settings Page
+
+**New**
+- Smart branching (experimental): recognizes the current screen and follows the matching flow, letting a single task handle multiple scenarios
+
+**Changed**
+- Unified button heights, dropdown styling and widths
+
+**Fixed**
+- Fixed unreadable tooltips (black text on black background) in system dark mode
 
 ### v3.8.1 — Humanized Mouse & State Fixes
 
