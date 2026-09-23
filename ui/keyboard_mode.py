@@ -114,11 +114,13 @@ def _target_combo(task, container, big=False):
     from PySide6.QtWidgets import QComboBox
     combo = QComboBox()
     combo.setFixedHeight(25 if big else 18)
-    combo.setFixedWidth(104 if big else 74)
+    combo.setFixedWidth(150 if big else 110)
     _pt = 11  # big档同比缩小2px后与行内一致
     combo.setStyleSheet(f"""
         QComboBox {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none;
-            border-radius: 4px; padding: 0px 6px; font: bold {_pt}pt 'MiSans'; }}
+            border-radius: 4px; padding: 2px 8px; font: bold {_pt}pt 'MiSans'; }}
+        QComboBox::drop-down {{ border: none; width: 0px; }}
+        QComboBox::down-arrow {{ image: none; width: 0px; }}
         QComboBox QAbstractItemView {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; font: bold 9pt 'MiSans'; }}
     """)
     combo.addItem("顺序继续", None)
@@ -791,7 +793,7 @@ def _refresh_actions(app, task):
         if _inline_full:
             _ctl = QHBoxLayout()
             _ctl.setSpacing(0)  # 配对紧挨: label贴数字, 组界另加2px分组
-            _ctl.addSpacing(12)
+            _ctl.addStretch(1)  # 第二行内容整体右靠
             _vbox.addLayout(_ctl)
 
         # ☰ 拖动排序手柄
@@ -937,29 +939,27 @@ def _refresh_actions(app, task):
 
         if is_wait:
             from .vision_preview import open_preview
-            prev_btn = _make_btn("🔍", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
-            prev_btn.setFixedWidth(24)
+            prev_btn = _make_btn("预览", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+            prev_btn.setFixedWidth(36)
             prev_btn.setToolTip("实时预览匹配得分")
             prev_btn.clicked.connect(lambda checked, a=action: open_preview(
                 a, on_close=lambda: _refresh_actions(app, task)))
             row_layout.addWidget(prev_btn)
 
-        if _ctl is not None:
-            _ctl.addStretch(1)  # 控件加齐后尾部补stretch: 多余空间归行尾, 防QLabel(Preferred)被拉宽留大空白
 
         if not _inline_full:
             from .action_settings_view import open_settings_view
-            edit_btn = _make_btn("✎", bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
-            edit_btn.setFixedWidth(20)
+            edit_btn = _make_btn("设置", bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+            edit_btn.setFixedWidth(36)
             edit_btn.setToolTip("打开设置页")
             edit_btn.clicked.connect(lambda _c=False, a=action: open_settings_view(app, task, a))
             row_layout.addWidget(edit_btn)
 
-        del_btn = QPushButton("✕")
-        del_btn.setFixedSize(18, 18)
+        del_btn = QPushButton("删")
+        del_btn.setFixedSize(26, 20)
         del_btn.setCursor(QCursor(Qt.PointingHandCursor))
         del_btn.setStyleSheet(f"""
-            QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 17px 'MiSans'; }}
+            QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 13px 'MiSans'; }}
             QPushButton:hover {{ background: {Colors.RED}; }}
         """)
         del_btn.clicked.connect(lambda checked, i=idx: _delete_action(app, task, i))

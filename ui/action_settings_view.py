@@ -128,7 +128,7 @@ class ActionSettingsView(QWidget):
         _vbox = self._card("等待条件")
         _ctl = QHBoxLayout()
         _ctl.setSpacing(0)
-        _ctl.addSpacing(8)
+        _ctl.addStretch(1)  # 第二行内容整体右靠
         hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=FONT13, color=Colors.DIM)
         _ctl.addWidget(hold_label)
 
@@ -240,7 +240,6 @@ class ActionSettingsView(QWidget):
             ot_btn.setText("中止" if _stop else "跳过")
             _tint_btn(ot_btn, Colors.RED if _stop else Colors.BLUE)
             _ctl.addWidget(ot_btn)
-        _ctl.addStretch(1)
         _vbox.addLayout(_ctl)
 
         # 卡2 分支选项: 每选项 缩略图/阈值/尺度/跳到/重拍/排序 + 加分支 (搬入段共享 _vbox)
@@ -408,8 +407,8 @@ class ActionSettingsView(QWidget):
                     (a.get("options") or []).pop(i)
                     _refresh_actions(app, task)
 
-                _b = _make_btn("✕", bg=Colors.DIM, hover=Colors.ACCENT, font=FONT13, height=25)
-                _b.setFixedWidth(24)
+                _b = _make_btn("删", bg=Colors.DIM, hover=Colors.ACCENT, font=FONT13, height=25)
+                _b.setFixedWidth(28)
                 _b.setToolTip("删除本选项")
                 _b.clicked.connect(_del_opt)
                 _rowL.addWidget(_b)
