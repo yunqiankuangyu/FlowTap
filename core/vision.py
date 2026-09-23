@@ -28,6 +28,8 @@ _user32 = ctypes.windll.user32
 
 #模板缓存 path -> 灰度图
 _tpl_cache = {}
+#多尺度缩放缓存 (rel_path, scale) -> 缩放后灰度模板
+_scale_cache = {}
 _tpl_lock = threading.Lock()
 
 
@@ -44,6 +46,7 @@ def save_template(pil_img, rel_path):
     pil_img.save(full, format="PNG")
     with _tpl_lock:
         _tpl_cache.pop(rel_path, None)
+        _purge_scales(rel_path)
     return full
 
 
@@ -76,10 +79,17 @@ def _load_template(rel_path):
     return img
 
 
+def _purge_scales(rel_path):
+    """清掉某个模板的全部缩放缓存（须持锁调用）"""
+    for k in [k for k in _scale_cache if k[0] == rel_path]:
+        _scale_cache.pop(k, None)
+
+
 def invalidate_template(rel_path):
     """丢弃缓存（模板重新标定时调用）"""
     with _tpl_lock:
         _tpl_cache.pop(rel_path, None)
+        _purge_scales(rel_path)
 
 
 def client_area_bbox(hwnd):
@@ -121,11 +131,39 @@ def match_template(screen_gray, tpl_gray):
     return float(max_val), max_loc
 
 
-def match_once(rel_path, threshold=0.85):
-    """截屏并匹配一次，返回 (是否命中, 得分)。截屏/匹配异常向上抛，由调用方处理"""
+def _scaled_template(rel_path, tpl, scale):
+    """按系数缩放模板并缓存（scale=1.0 原样返回）"""
+    if scale == 1.0:
+        return tpl
+    key = (rel_path, scale)
+    with _tpl_lock:
+        cached = _scale_cache.get(key)
+    if cached is None:
+        import cv2
+        interp = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR
+        cached = cv2.resize(tpl, None, fx=scale, fy=scale, interpolation=interp)
+        with _tpl_lock:
+            _scale_cache[key] = cached
+    return cached
+
+
+def match_once(rel_path, threshold=0.85, scales=(1.0,)):
+    """截屏并匹配一次，返回 (是否命中, 最高得分)。
+    scales 为模板缩放系数序列，按序尝试，命中即停（列表顺序=优先级）。
+    截屏/匹配异常向上抛，由调用方处理"""
     tpl = _load_template(rel_path)
     if tpl is None:
         return False, 0.0
     screen = grab_gray(search_bbox())
-    score, _ = match_template(screen, tpl)
-    return (score >= threshold and score >= 0), score
+    best = -1.0
+    for s in (scales or (1.0,)):
+        t = _scaled_template(rel_path, tpl, s)
+        if (screen.shape[0] < t.shape[0]
+                or screen.shape[1] < t.shape[1]):
+            continue  # 该尺度模板比画面大，跳过
+        score, _ = match_template(screen, t)
+        if score > best:
+            best = score
+        if score >= threshold:
+            return True, score  # 首个达标尺度即返回
+    return (best >= threshold and best >= 0), best
