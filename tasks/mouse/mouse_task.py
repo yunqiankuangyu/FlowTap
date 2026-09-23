@@ -52,8 +52,7 @@ class MouseTask:
                     dx, dy = cur[0]-self.position[0], cur[1]-self.position[1]
                     if (dx*dx+dy*dy)**0.5 > self._safe_radius:
                         self.stop(callback, "安全停止"); return
-                sim.move_mouse(*self.position)
-                random_delay(0.05, 0.3)
+            #移动由click_mouse内部的拟人化move一次完成，避免画两道弧
             try: sim.click_mouse(*self.position); self.done_count += 1
             except: pass
             first = False

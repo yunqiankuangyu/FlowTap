@@ -147,10 +147,67 @@ class MouseSimulator:
         self._send(self._make_mouse_input(ax, ay, flags_u))
 
     def move_mouse(self, x, y):
-        """移动鼠标到指定位置"""
+        #拟人化移动，弧线轨迹+钟形速度+落点微偏+概率过冲修正
+        import time, random, math
         sw, sh = self.user32.GetSystemMetrics(0), self.user32.GetSystemMetrics(1)
-        ax, ay = int(x * 65535 / sw), int(y * 65535 / sh)
-        self._send(self._make_mouse_input(ax, ay, MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE))
+
+        def to_abs(px, py):
+            return int(px * 65535 / sw), int(py * 65535 / sh)
+
+        move_flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE
+        sx, sy = self.get_mouse_pos()
+        dist = math.hypot(x - sx, y - sy)
+        #距离过近直接归位
+        if dist < 3:
+            self._send(self._make_mouse_input(*to_abs(x, y), move_flags))
+            return
+
+        #时长随距离增长，80ms~400ms，±15%抖动
+        dur = min(0.4, max(0.08, 0.08 + dist * 0.0006)) * random.uniform(0.85, 1.15)
+
+        #真实终点先做±2px微偏，40%概率再沿运动方向过冲3~8px
+        tx = x + random.uniform(-2, 2)
+        ty = y + random.uniform(-2, 2)
+        ux, uy = (tx - sx) / dist, (ty - sy) / dist
+        gx, gy = tx, ty
+        overshoot = random.random() < 0.4
+        if overshoot:
+            gx += ux * random.uniform(3, 8)
+            gy += uy * random.uniform(3, 8)
+
+        #二次贝塞尔控制点，垂直偏移距离的5~15%
+        cx, cy = (sx + gx) / 2, (sy + gy) / 2
+        px, py = -(gy - sy), (gx - sx)
+        plen = math.hypot(px, py) or 1.0
+        off = dist * random.uniform(0.05, 0.15) * random.choice((-1, 1))
+        cx += px / plen * off
+        cy += py / plen * off
+
+        #钟形速度曲线，慢起快中收
+        def ease(t):
+            return 4 * t * t * t if t < 0.5 else 1 - (-2 * t + 2) ** 3 / 2
+
+        #主轨迹采样，每约8ms发一个绝对坐标点
+        steps = max(6, min(50, int(dur / 0.008)))
+        step_sleep = dur / steps
+        for i in range(1, steps + 1):
+            t = ease(i / steps)
+            bx = (1 - t) ** 2 * sx + 2 * (1 - t) * t * cx + t * t * gx
+            by = (1 - t) ** 2 * sy + 2 * (1 - t) * t * cy + t * t * gy
+            self._send(self._make_mouse_input(*to_abs(bx, by), move_flags))
+            time.sleep(step_sleep)
+
+        #过冲后小弧拉回微偏终点
+        if overshoot:
+            for i in range(1, 6):
+                t = 1 - (1 - i / 5) ** 2
+                fx = gx + (tx - gx) * t
+                fy = gy + (ty - gy) * t
+                self._send(self._make_mouse_input(*to_abs(fx, fy), move_flags))
+                time.sleep(0.008)
+
+        #精确归位到目标点，保证点击落点与安全半径判断准确
+        self._send(self._make_mouse_input(*to_abs(x, y), move_flags))
 
     def get_mouse_pos(self):
         """获取当前鼠标位置"""
