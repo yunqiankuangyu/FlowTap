@@ -803,6 +803,14 @@ def _refresh_actions(app, task):
         row_layout.addWidget(delay_spin)
         row_layout.addWidget(_make_label("" if is_wait else "s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
+        if is_wait:
+            from .vision_preview import open_preview
+            prev_btn = _make_btn("🔍", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+            prev_btn.setToolTip("实时预览匹配得分")
+            prev_btn.clicked.connect(lambda checked, a=action: open_preview(
+                a, on_close=lambda: _refresh_actions(app, task)))
+            row_layout.addWidget(prev_btn)
+
         del_btn = QPushButton("✕")
         del_btn.setFixedSize(18, 18)
         del_btn.setCursor(QCursor(Qt.PointingHandCursor))
