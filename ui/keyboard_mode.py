@@ -1364,7 +1364,8 @@ def load_preset(app):
     for td in p.get("tasks", []):
         task = KeyboardTask(app.next_task_id, td.get("name", f"任务{app.next_task_id}"))
         app.next_task_id += 1
-        task.actions = td.get("actions", [])
+        from tasks.keyboard.keyboard_task import _ensure_lids
+        task.actions = _ensure_lids(td.get("actions", []))
         task.loop_interval = td.get("loop_interval", 80)
         task.max_runs = td.get("max_runs", 0)
         task.relation_type = td.get("relation_type", "独立")

@@ -18,19 +18,25 @@ class TaskStatus(Enum):
     IDLE, RUNNING, WAITING = "● 就绪", "● 运行中", "● 等待触发"
 
 
+def _new_lid():
+    """动作稳定标识：预设序列化往返保留；branch/jump 按 lid 定位跳转目标"""
+    import uuid
+    return uuid.uuid4().hex[:6]
+
+
 def make_key_action(vk, delay=0.5, hold=0):
     """创建键盘动作"""
-    return {"type": "key", "vk": vk, "delay": delay, "hold": hold}
+    return {"type": "key", "vk": vk, "delay": delay, "hold": hold, "lid": _new_lid()}
 
 
 def make_combo_action(vks, delay=0.5, hold=0):
     """创建组合键动作（多个键同时按住）"""
-    return {"type": "combo", "vks": list(vks), "delay": delay, "hold": hold}
+    return {"type": "combo", "vks": list(vks), "delay": delay, "hold": hold, "lid": _new_lid()}
 
 
 def make_click_action(x, y, delay=0.5, hold=0):
     """创建鼠标点击动作"""
-    return {"type": "click", "x": x, "y": y, "delay": delay, "hold": hold}
+    return {"type": "click", "x": x, "y": y, "delay": delay, "hold": hold, "lid": _new_lid()}
 
 
 def make_wait_image_action(tpl, threshold=0.85, timeout=30, on_timeout="skip", delay=0.0,
@@ -43,7 +49,15 @@ def make_wait_image_action(tpl, threshold=0.85, timeout=30, on_timeout="skip", d
     """
     return {"type": "wait_image", "tpl": tpl, "threshold": threshold,
             "timeout": timeout, "on_timeout": on_timeout, "delay": delay,
-            "min_hits": min_hits, "scales": list(scales)}
+            "min_hits": min_hits, "scales": list(scales), "lid": _new_lid()}
+
+
+def _ensure_lids(actions):
+    """为缺 lid 的旧动作补发（幂等：已有 lid 不动）；返回原列表"""
+    for a in actions:
+        if isinstance(a, dict) and not a.get("lid"):
+            a["lid"] = _new_lid()
+    return actions
 
 
 def fmt_action(action):
@@ -242,18 +256,31 @@ class KeyboardTask:
             waited += time.monotonic() - t0
         return False
 
+    def _index_of(self, lid):
+        """按 lid 找动作下标；lid 缺失或不存在返回 None（调用方顺序继续）"""
+        if not lid:
+            return None
+        for i, a in enumerate(self.actions):
+            if a.get("lid") == lid:
+                return i
+        return None
+
     def _execute_actions(self):
-        """执行一轮动作序列"""
+        """执行一轮动作序列（索引循环：branch/jump 改写 i 实现条件跳转）"""
+        from logger import log_error, log_info
         kb_sim = KeyboardSimulator()
         ms_sim = MouseSimulator()
-        for action in self.actions:
+        i = 0
+        while i < len(self.actions):  # 每轮重取长度：运行中增删动作也能正确收尾
             if not self._running: return False
             if not self._window_gate(): return False
+            action = self.actions[i]
             try:
                 if action["type"] == "wait_image":
                     if not self._wait_for_image(action): return False
                     if not self._running: return False
                     self._pause_aware_delay(action.get("delay", 0))
+                    i += 1
                     continue
                 hold = action.get("hold", 0)
                 if action["type"] == "key":
@@ -264,6 +291,7 @@ class KeyboardTask:
                 elif action["type"] == "combo":
                     vks = action["vks"]
                     if not vks:
+                        i += 1
                         continue
                     if hold > 0:
                         kb_sim.combo_press(vks)
@@ -279,9 +307,15 @@ class KeyboardTask:
                         ms_sim.hold_click(cx, cy, hold)
                     else:
                         ms_sim.click_mouse(cx, cy)
-            except: pass
+                else:
+                    # 未知类型：不抛异常也会走到这，必须显式记日志再跳过（回查要求）
+                    log_info(f"action_{action.get('type', '?')}", "未知类型，跳过")
+            except Exception as e:
+                # 未知类型/执行异常：记日志继续（替换原裸 except: pass，回查是二期要求）
+                log_error(f"action_{action.get('type', '?')}", e)
             if not self._running: return False
             self._pause_aware_delay(action.get("delay", 0.5))
+            i += 1
         return True
 
     def _loop(self, callback, countdown_callback=None):
