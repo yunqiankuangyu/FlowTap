@@ -853,13 +853,12 @@ def _refresh_actions(app, task):
             hold_spin.setSingleStep(0.1)
             hold_spin.setValue(action.get("hold", 0))
         hold_spin.setFixedHeight(20)
-        _fit_spin(hold_spin)
+        hold_spin.setFixedWidth(31 if (is_wait or is_branch) else 46)
         hold_spin.setAlignment(Qt.AlignRight)
         hold_spin.setFont(QFont("MiSans", 11, QFont.Bold))
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "timeout" if a.get("type") in ("wait_image", "branch") else "hold", round(v, 2)))
-        hold_spin.textChanged.connect(lambda _t, sp=hold_spin: _fit_spin(sp))
         _ctl.addWidget(hold_spin)
         _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
@@ -879,13 +878,17 @@ def _refresh_actions(app, task):
             delay_spin.setSingleStep(0.1)
             delay_spin.setValue(action.get("delay", 0.5))
         delay_spin.setFixedHeight(20)
-        _fit_spin(delay_spin)
+        if is_wait:  # wait行这个框标签就是"阈值"
+            _fit_spin(delay_spin)
+        else:
+            delay_spin.setFixedWidth(46)
         delay_spin.setAlignment(Qt.AlignRight)
         delay_spin.setFont(QFont("MiSans", 11, QFont.Bold))
         delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
-        delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp))
+        if is_wait:
+            delay_spin.textChanged.connect(lambda _t, sp=delay_spin: _fit_spin(sp))
         _ctl.addWidget(delay_spin)
         if not is_wait:
             _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
@@ -900,12 +903,11 @@ def _refresh_actions(app, task):
             hit_spin.setSingleStep(1)
             hit_spin.setValue(int(action.get("min_hits", 2)))
             hit_spin.setFixedHeight(20)
-            _fit_spin(hit_spin)
+            hit_spin.setFixedWidth(16)
             hit_spin.setAlignment(Qt.AlignRight)
             hit_spin.setFont(QFont("MiSans", 11, QFont.Bold))
             hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
             hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
-            hit_spin.textChanged.connect(lambda _t, sp=hit_spin: _fit_spin(sp))
             _ctl.addWidget(hit_spin)
 
             _ctl.addSpacing(2)
