@@ -113,7 +113,7 @@ def _target_combo(task, container, big=False):
     container = 存 target 的字典（jump 动作本身 或 branch 的 option）; big=悬浮页放大档"""
     from PySide6.QtWidgets import QComboBox
     combo = QComboBox()
-    combo.setFixedHeight(22 if big else 18)
+    combo.setFixedHeight(25 if big else 18)
     combo.setFixedWidth(104 if big else 74)
     _pt = 11  # big档同比缩小2px后与行内一致
     combo.setStyleSheet(f"""
