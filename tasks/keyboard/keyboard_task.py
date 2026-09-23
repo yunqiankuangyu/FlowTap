@@ -60,6 +60,19 @@ def _ensure_lids(actions):
     return actions
 
 
+def make_branch_action(options, timeout=30, on_timeout="next", delay=0.0):
+    """创建多模板分支动作：options 列表顺序=优先级，逐项稳定命中即跳其 target
+    option 字段 {tpl, threshold, scales, min_hits, target}；target=目标lid，None=顺序继续
+    on_timeout: next=顺序继续 / stop=中止本轮"""
+    return {"type": "branch", "options": list(options), "timeout": timeout,
+            "on_timeout": on_timeout, "delay": delay, "lid": _new_lid()}
+
+
+def make_jump_action(target=None, delay=0.0):
+    """创建跳转动作：target=目标动作lid；None 或目标不存在=顺序继续"""
+    return {"type": "jump", "target": target, "delay": delay, "lid": _new_lid()}
+
+
 def fmt_action(action):
     """格式化动作为可读字符串"""
     from vk_map import VK_NAME
@@ -72,6 +85,10 @@ def fmt_action(action):
         return f"({action['x']}, {action['y']})"
     elif action["type"] == "wait_image":
         return f"📷 等图像≥{action.get('threshold', 0.85):.2f}"
+    elif action["type"] == "branch":
+        return f"🔀 分支×{len(action.get('options') or [])}"
+    elif action["type"] == "jump":
+        return "→ 跳转"
     return "?"
 
 
@@ -256,6 +273,70 @@ class KeyboardTask:
             waited += time.monotonic() - t0
         return False
 
+    def _run_branch(self, action):
+        """执行多模板分支：按 options 列表顺序找首个稳定命中项，返回其 target lid。
+        返回 "STOP"=中止本轮（超时stop/任务停止）；None=超时顺序继续。
+        每选项独立防抖计数，采样断层(>1s)全部作废——语义与 _wait_for_image 一致"""
+        from core import vision
+        from logger import log_info, log_error
+        options = action.get("options") or []
+        if not options:
+            return None
+        timeout = float(action.get("timeout", 30))
+        waited = 0.0
+        n = len(options)
+        streak = [0] * n
+        best = [-1.0] * n
+        last_sample = 0.0
+        while self._running:
+            self._pause_gate()
+            if not self._running:
+                return "STOP"
+            if not self._window_gate():
+                return "STOP"
+            t_start = time.monotonic()
+            if t_start - last_sample > 1.0:
+                streak = [0] * n
+            # 优先级=列表顺序：k0 先判，同帧多命中取最靠前者
+            for k, opt in enumerate(options):
+                try:
+                    found, score = vision.match_once(
+                        opt.get("tpl", ""),
+                        float(opt.get("threshold", 0.85)),
+                        scales=tuple(opt.get("scales") or (1.0, 1.25, 1.5)))
+                except Exception as e:
+                    log_error("branch_match", e)
+                    found, score = False, -1.0
+                if score > best[k]:
+                    best[k] = score
+                if found:
+                    streak[k] += 1
+                    if streak[k] >= max(1, int(opt.get("min_hits", 2))):
+                        tgt = opt.get("target")
+                        log_info("branch_hit",
+                                 f"opt={k} score={score:.3f} hits={streak[k]} -> {tgt or 'next'}")
+                        if self._countdown_callback:
+                            try: self._countdown_callback("● 执行中...", "#4ade80")
+                            except Exception: pass
+                        return tgt
+                else:
+                    streak[k] = 0
+            last_sample = time.monotonic()
+            if timeout > 0 and waited >= timeout:
+                log_info("branch_timeout", f"best={max(best):.3f} n={n}")
+                if action.get("on_timeout", "next") == "stop":
+                    return "STOP"
+                return None
+            if self._countdown_callback:
+                try:
+                    self._countdown_callback(
+                        f"● 分支判断... {max(max(best), 0.0):.2f}", "#facc15")
+                except Exception: pass
+            t0 = time.monotonic()
+            time.sleep(0.2)
+            waited += time.monotonic() - t0
+        return "STOP"
+
     def _index_of(self, lid):
         """按 lid 找动作下标；lid 缺失或不存在返回 None（调用方顺序继续）"""
         if not lid:
@@ -271,19 +352,39 @@ class KeyboardTask:
         kb_sim = KeyboardSimulator()
         ms_sim = MouseSimulator()
         i = 0
+        jumps = 0  # 跳转计数（每轮清零）：掐死零延迟死循环
         while i < len(self.actions):  # 每轮重取长度：运行中增删动作也能正确收尾
             if not self._running: return False
             if not self._window_gate(): return False
             action = self.actions[i]
             try:
-                if action["type"] == "wait_image":
+                hold = action.get("hold", 0)
+                if action["type"] == "jump":
+                    tgt_i = self._index_of(action.get("target"))
+                    if tgt_i is None:
+                        pass  # 目标缺失/未设置 → 落到底部顺序推进
+                    else:
+                        jumps += 1
+                        if jumps > 200:
+                            log_error("jump_guard", "跳转>200次/轮，疑似死循环，中止本轮")
+                            return False
+                        i = tgt_i
+                        continue  # 跳转不消耗 delay
+                elif action["type"] == "branch":
+                    r = self._run_branch(action)
+                    if r == "STOP":
+                        return False
+                    tgt_i = self._index_of(r) if r else None
+                    i = tgt_i if tgt_i is not None else i + 1
+                    self._pause_aware_delay(action.get("delay", 0.0))
+                    continue
+                elif action["type"] == "wait_image":
                     if not self._wait_for_image(action): return False
                     if not self._running: return False
                     self._pause_aware_delay(action.get("delay", 0))
                     i += 1
                     continue
-                hold = action.get("hold", 0)
-                if action["type"] == "key":
+                elif action["type"] == "key":
                     if hold > 0:
                         kb_sim.hold_key(action["vk"], hold)
                     else:
