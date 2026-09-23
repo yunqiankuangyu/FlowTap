@@ -954,6 +954,9 @@ def _refresh_actions(app, task):
                 a, on_close=lambda: _refresh_actions(app, task)))
             row_layout.addWidget(prev_btn)
 
+        if _ctl is not row_layout:
+            _ctl.addStretch(1)  # 控件加齐后尾部补stretch: 多余空间归行尾, 防QLabel(Preferred)被拉宽留大空白
+
         del_btn = QPushButton("✕")
         del_btn.setFixedSize(18, 18)
         del_btn.setCursor(QCursor(Qt.PointingHandCursor))
