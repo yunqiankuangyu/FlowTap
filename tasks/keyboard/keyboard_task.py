@@ -33,13 +33,17 @@ def make_click_action(x, y, delay=0.5, hold=0):
     return {"type": "click", "x": x, "y": y, "delay": delay, "hold": hold}
 
 
-def make_wait_image_action(tpl, threshold=0.85, timeout=30, on_timeout="skip", delay=0.0):
-    """创建等待图像动作（画面出现目标模板才继续）
+def make_wait_image_action(tpl, threshold=0.85, timeout=30, on_timeout="skip", delay=0.0,
+                           min_hits=2, scales=(1.0, 1.25, 1.5)):
+    """创建等待图像动作（画面稳定出现目标模板才继续）
     tpl 模板相对路径，threshold 匹配阈值，timeout 超时秒(0=无限等)
     on_timeout 超时行为 skip=跳过继续 stop=中止本轮
+    min_hits 防抖帧数（连续命中这么多次才判定出现，防闪烁误判）
+    scales 模板缩放系数序列（多尺度匹配，按序尝试命中即停）
     """
     return {"type": "wait_image", "tpl": tpl, "threshold": threshold,
-            "timeout": timeout, "on_timeout": on_timeout, "delay": delay}
+            "timeout": timeout, "on_timeout": on_timeout, "delay": delay,
+            "min_hits": min_hits, "scales": list(scales)}
 
 
 def fmt_action(action):
@@ -150,30 +154,52 @@ class KeyboardTask:
         return False
 
     def _wait_for_image(self, action):
-        """等待目标图像出现在画面中（可暂停、受窗口闸门约束）
+        """等待目标图像稳定出现在画面中（防抖、可暂停、受窗口闸门约束）
         返回 True=已出现/超时跳过，False=任务停止或超时中止本轮"""
         from core import vision
+        from logger import log_info
         rel = action.get("tpl", "")
         threshold = float(action.get("threshold", 0.85))
         timeout = float(action.get("timeout", 30))
+        min_hits = max(1, int(action.get("min_hits", 2)))
+        # 旧预设无 scales 字段 → 多尺度默认开
+        scales = tuple(action.get("scales") or (1.0, 1.25, 1.5))
         waited = 0.0  # 只累计真实等待秒，暂停/等窗口时间不计入
         announced = False
+        streak = 0        # 连续命中帧数（防抖计数）
+        best = -1.0       # 本次等待见过的最高分（超时回查用）
+        last_sample = 0.0 # 上次采样结束时刻（断层检测）
         while self._running:
             self._pause_gate()
             if not self._running: return False
             if not self._window_gate(): return False
+            # 采样断层检测：距上次采样结束 >1s（暂停/等窗口阻塞过），streak 作废重计
+            t_start = time.monotonic()
+            if t_start - last_sample > 1.0:
+                streak = 0
             try:
-                found, score = vision.match_once(rel, threshold)
+                found, score = vision.match_once(rel, threshold, scales=scales)
             except Exception as e:
                 from logger import log_error
                 log_error("wait_image_match", e)
-                found = False
+                found, score = False, -1.0
+            last_sample = time.monotonic()
+            if score > best:
+                best = score
             if found:
-                if self._countdown_callback:
-                    try: self._countdown_callback("● 执行中...", "#4ade80")
-                    except Exception: pass
-                return True
+                streak += 1
+                if streak >= min_hits:
+                    log_info("wait_image_hit",
+                             f"score={score:.3f} th={threshold} hits={streak} tpl={rel}")
+                    if self._countdown_callback:
+                        try: self._countdown_callback("● 执行中...", "#4ade80")
+                        except Exception: pass
+                    return True
+            else:
+                streak = 0
             if timeout > 0 and waited >= timeout:
+                log_info("wait_image_timeout",
+                         f"best={best:.3f} th={threshold} min_hits={min_hits} tpl={rel}")
                 if self._countdown_callback:
                     try: self._countdown_callback("● 等待图像超时，跳过...", "#facc15")
                     except Exception: pass
