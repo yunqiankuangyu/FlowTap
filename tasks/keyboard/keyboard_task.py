@@ -165,7 +165,6 @@ class KeyboardTask:
         # 旧预设无 scales 字段 → 多尺度默认开
         scales = tuple(action.get("scales") or (1.0, 1.25, 1.5))
         waited = 0.0  # 只累计真实等待秒，暂停/等窗口时间不计入
-        announced = False
         streak = 0        # 连续命中帧数（防抖计数）
         best = -1.0       # 本次等待见过的最高分（超时回查用）
         last_sample = 0.0 # 上次采样结束时刻（断层检测）
@@ -204,9 +203,11 @@ class KeyboardTask:
                     try: self._countdown_callback("● 等待图像超时，跳过...", "#facc15")
                     except Exception: pass
                 return action.get("on_timeout", "skip") != "stop"
-            if not announced and self._countdown_callback:
-                announced = True
-                try: self._countdown_callback("● 等待图像...", "#facc15")
+            if self._countdown_callback:
+                # 每拍回显置信度：调阈值时状态行直接看得见分数
+                try:
+                    self._countdown_callback(
+                        f"● 等待图像... {max(score, 0.0):.2f}", "#facc15")
                 except Exception: pass
             t0 = time.monotonic()
             time.sleep(0.2)

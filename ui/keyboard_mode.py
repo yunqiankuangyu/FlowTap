@@ -804,6 +804,68 @@ def _refresh_actions(app, task):
         row_layout.addWidget(_make_label("" if is_wait else "s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
         if is_wait:
+            # 帧：防抖连续命中次数
+            row_layout.addWidget(_make_label("帧", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+            hit_spin = QDoubleSpinBox()
+            hit_spin.setRange(1, 5)
+            hit_spin.setDecimals(0)
+            hit_spin.setSingleStep(1)
+            hit_spin.setValue(int(action.get("min_hits", 2)))
+            hit_spin.setFixedHeight(18)
+            hit_spin.setFixedWidth(28)
+            hit_spin.setAlignment(Qt.AlignRight)
+            hit_spin.setFont(QFont("MiSans", 10, QFont.Bold))
+            hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+            hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
+            row_layout.addWidget(hit_spin)
+
+            def _tint(btn, bg):
+                btn.setStyleSheet(f"""
+                    QPushButton {{ background: {bg}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+                    QPushButton:hover {{ background: {Colors.ACCENT}; }}
+                """)
+
+            # 尺度：多尺度/精确 动态切换（点击翻转 action.scales）
+            scale_btn = _make_btn("", height=25)
+            scale_btn.setFixedWidth(54)
+            scale_btn.setToolTip("多尺度：UI缩放125%/150%也识别；精确：只按标定原尺寸")
+            def _flip_scale(_checked=False, a=action, b=scale_btn):
+                cur = a.get("scales") or [1.0, 1.25, 1.5]
+                if len(cur) > 1:
+                    a["scales"] = [1.0]
+                    b.setText("精确")
+                    _tint(b, Colors.DIM)
+                else:
+                    a["scales"] = [1.0, 1.25, 1.5]
+                    b.setText("多尺度")
+                    _tint(b, Colors.BLUE)
+            scale_btn.clicked.connect(_flip_scale)
+            _multi = len(action.get("scales") or [1.0, 1.25, 1.5]) > 1
+            scale_btn.setText("多尺度" if _multi else "精确")
+            _tint(scale_btn, Colors.BLUE if _multi else Colors.DIM)
+            row_layout.addWidget(scale_btn)
+
+            # 超时后行为：跳过/中止 动态切换（中止=红）
+            row_layout.addWidget(_make_label("超时后", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+            ot_btn = _make_btn("", height=25)
+            ot_btn.setFixedWidth(44)
+            ot_btn.setToolTip("等待超时后：跳过=继续执行下一动作；中止=终止本轮")
+            def _flip_ot(_checked=False, a=action, b=ot_btn):
+                if a.get("on_timeout", "skip") == "skip":
+                    a["on_timeout"] = "stop"
+                    b.setText("中止")
+                    _tint(b, Colors.RED)
+                else:
+                    a["on_timeout"] = "skip"
+                    b.setText("跳过")
+                    _tint(b, Colors.BLUE)
+            ot_btn.clicked.connect(_flip_ot)
+            _stop = action.get("on_timeout", "skip") == "stop"
+            ot_btn.setText("中止" if _stop else "跳过")
+            _tint(ot_btn, Colors.RED if _stop else Colors.BLUE)
+            row_layout.addWidget(ot_btn)
+
+        if is_wait:
             from .vision_preview import open_preview
             prev_btn = _make_btn("🔍", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
             prev_btn.setToolTip("实时预览匹配得分")
