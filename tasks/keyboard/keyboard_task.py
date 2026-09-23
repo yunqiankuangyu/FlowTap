@@ -61,6 +61,34 @@ def fmt_action(action):
     return "?"
 
 
+def _foreground_hwnd():
+    """当前前台窗口句柄（测试可替换）"""
+    import ctypes
+    return ctypes.windll.user32.GetForegroundWindow()
+
+
+def resolve_click_pos(action):
+    """得出点击动作执行时的绝对屏幕坐标。
+    rel=True（绑定时录制的客户区坐标）→ 换算到当前目标窗口，窗口拖走仍点得准；
+    运行时未绑定或取不到窗口 → 用录制瞬间的绝对快照 sx/sy 兜底；
+    非 rel 动作原坐标直通（旧预设零影响）"""
+    if not action.get("rel"):
+        return action["x"], action["y"]
+    try:
+        from core.window_gate import get_bound_process
+        from core import vision
+        if get_bound_process():
+            bbox = vision.client_area_bbox(_foreground_hwnd())
+            if bbox:
+                return bbox[0] + action["x"], bbox[1] + action["y"]
+        from logger import log_info
+        log_info("click_rel_fallback",
+                 f"bound={get_bound_process()!r} snap=({action.get('sx')}, {action.get('sy')})")
+        return action.get("sx", action["x"]), action.get("sy", action["y"])
+    except Exception:
+        return action.get("sx", action["x"]), action.get("sy", action["y"])
+
+
 @dataclass
 class KeyboardTask:
     task_id: int
@@ -246,10 +274,11 @@ class KeyboardTask:
                         random_delay(0.05, 0.02)
                         kb_sim.combo_release(vks)
                 elif action["type"] == "click":
+                    cx, cy = resolve_click_pos(action)
                     if hold > 0:
-                        ms_sim.hold_click(action["x"], action["y"], hold)
+                        ms_sim.hold_click(cx, cy, hold)
                     else:
-                        ms_sim.click_mouse(action["x"], action["y"])
+                        ms_sim.click_mouse(cx, cy)
             except: pass
             if not self._running: return False
             self._pause_aware_delay(action.get("delay", 0.5))

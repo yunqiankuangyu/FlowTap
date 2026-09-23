@@ -1122,7 +1122,23 @@ def add_click_action(app, task):
             p = ctypes.wintypes.POINT()
             u32.GetCursorPos(ctypes.byref(p))
             from config import load_settings as _ls
-            task.actions.append(make_click_action(p.x, p.y, delay=_ls().get("default_delay", 0.5)))
+            act = make_click_action(p.x, p.y, delay=_ls().get("default_delay", 0.5))
+            # 绑定进程时：点下位置属于该进程窗口 → 存客户区相对坐标（窗口拖走仍点得准）
+            from core.window_gate import get_bound_process, window_at_point
+            bound = get_bound_process()
+            if bound:
+                hwnd = window_at_point(p.x, p.y,
+                                       exclude=int(overlay.winId()), process=bound)
+                if hwnd:
+                    rect = ctypes.wintypes.RECT()
+                    org = ctypes.wintypes.POINT(0, 0)
+                    if (u32.GetClientRect(hwnd, ctypes.byref(rect))
+                            and u32.ClientToScreen(hwnd, ctypes.byref(org))):
+                        act["rel"] = True
+                        act["x"] = p.x - org.x
+                        act["y"] = p.y - org.y
+                        act["sx"], act["sy"] = p.x, p.y
+            task.actions.append(act)
             cleanup(accepted=True)
             return
 
