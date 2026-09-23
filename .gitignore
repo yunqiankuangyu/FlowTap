@@ -9,3 +9,4 @@ build/
 dist/
 DESIGN.md
 templates/
+.hermes/
