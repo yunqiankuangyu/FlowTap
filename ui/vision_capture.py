@@ -1,5 +1,7 @@
 """
-图像标定：全屏框选目标区域 → 截取存为模板 → 生成等待图像动作
+图像标定：全屏框选目标区域 → 截取存为模板 → on_got 回调
+capture_template 为通用框选存图原语（wait 追加 / branch 选项新增与重拍共用）
+add_image_wait_action = capture_template + 追加 wait_image 动作
 """
 import os
 import sys
@@ -9,7 +11,6 @@ from PySide6.QtGui import QPainter, QPen, QColor, QCursor
 from PySide6.QtWidgets import QWidget, QLabel
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from config import Colors, FONT_B
 from core import vision
 from tasks.keyboard.keyboard_task import make_wait_image_action
@@ -31,7 +32,6 @@ class _SelectOverlay(QWidget):
         self.setGeometry(screen_rect)
         self.setCursor(QCursor(Qt.CrossCursor))
         # 背景不走 QSS：WA_TranslucentBackground 窗口上样式表背景不渲染，由 paintEvent 手画
-
         tip = QLabel("🖼 拖拽框选目标图像  |  ESC 取消  |  30秒超时", self)
         tip.setFont(FONT_B)
         tip.setAlignment(Qt.AlignCenter)
@@ -114,8 +114,10 @@ class _SelectOverlay(QWidget):
         p.end()
 
 
-def add_image_wait_action(app, task, on_done):
-    """进入框选模式，选中后把 wait_image 动作追加进 task.actions 并调 on_done 刷新"""
+def capture_template(app, task, on_got, on_done, rel=None):
+    """全屏框选 → 截取存模板 → on_got(rel)；成功才调 on_done（取消不调）
+    rel 指定=覆盖该路径（重拍，缓存自动失效），否则新建路径
+    期间把主窗移出屏幕防止截到自己；占用标记复用 task._capturing_image"""
     if not getattr(app, "_ready", False):
         return
     if getattr(task, "_capturing_image", False):
@@ -153,15 +155,9 @@ def add_image_wait_action(app, task, on_done):
                 bbox = (rect.left(), rect.top(), rect.right(), rect.bottom())
                 gray = vision.grab_gray(bbox)
                 from PIL import Image
-                rel = vision.new_template_path()
-                vision.save_template(Image.fromarray(gray), rel)
-                from config import load_settings as _ls
-                task.actions.append(make_wait_image_action(
-                    rel,
-                    threshold=0.85,
-                    timeout=30,
-                    delay=_ls().get("default_delay", 0.0),
-                ))
+                use_rel = rel or vision.new_template_path()
+                vision.save_template(Image.fromarray(gray), use_rel)
+                on_got(use_rel)
             except Exception:
                 from logger import log_error
                 import traceback
@@ -181,3 +177,18 @@ def add_image_wait_action(app, task, on_done):
     overlay.show()
     overlay.raise_()
     overlay.activateWindow()
+
+
+def add_image_wait_action(app, task, on_done):
+    """进入框选模式，选中后把 wait_image 动作追加进 task.actions 并调 on_done 刷新"""
+    from config import load_settings as _ls
+
+    def _on_got(rel_path):
+        task.actions.append(make_wait_image_action(
+            rel_path,
+            threshold=0.85,
+            timeout=30,
+            delay=_ls().get("default_delay", 0.0),
+        ))
+
+    capture_template(app, task, _on_got, on_done)

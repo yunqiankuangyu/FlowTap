@@ -108,6 +108,41 @@ def _make_btn(text, bg=None, fg=None, hover=None, font=None, height=25):
     return btn
 
 
+def _tint_btn(btn, bg):
+    """动态按钮换底色（与 _make_btn 同款样式）：状态切换按钮专用"""
+    btn.setStyleSheet(f"""
+        QPushButton {{ background: {bg}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
+        QPushButton:hover {{ background: {Colors.ACCENT}; }}
+    """)
+
+
+def _target_combo(task, container):
+    """跳转目标下拉：顺序继续(None) + 全部动作；itemData=lid，显示 动作N: 描述
+    container = 存 target 的字典（jump 动作本身 或 branch 的 option）"""
+    from PySide6.QtWidgets import QComboBox
+    combo = QComboBox()
+    combo.setFixedHeight(18)
+    combo.setStyleSheet(f"""
+        QComboBox {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none;
+            border-radius: 4px; padding: 0px 6px; font: bold 10px 'MiSans'; }}
+        QComboBox QAbstractItemView {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; }}
+    """)
+    combo.addItem("顺序继续", None)
+    cur = container.get("target")
+    sel = 0
+    for i, a in enumerate(task.actions):
+        combo.addItem(f"动作{i+1}: {fmt_action(a)}", a.get("lid"))
+        if a.get("lid") and a.get("lid") == cur:
+            sel = i + 1
+    # 初值选择只关显示不写回：目标动作被删时显示回落「顺序继续」，但存储的 target 必须保留
+    combo.blockSignals(True)
+    combo.setCurrentIndex(sel)
+    combo.blockSignals(False)
+    combo.currentIndexChanged.connect(
+        lambda _i, c=container, cb=combo: c.__setitem__("target", cb.currentData()))
+    return combo
+
+
 def _make_label(text, font=None, color=None):
     lbl = QLabel(text)
     lbl.setFont(font or FONT_M)
@@ -552,6 +587,26 @@ def create_card(app, task):
         app, task, lambda: _refresh_actions(app, task)))
     af_layout.addWidget(add_img_btn)
 
+    from tasks.keyboard.keyboard_task import make_branch_action, make_jump_action
+
+    def _add_branch(_c=False):
+        task.actions.append(make_branch_action([]))
+        _refresh_actions(app, task)
+
+    def _add_jump(_c=False):
+        task.actions.append(make_jump_action())
+        _refresh_actions(app, task)
+
+    add_br_btn = _make_btn("+ 🔀", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+    add_br_btn.setToolTip("多模板分支：挂N张图带优先级，命中即跳转")
+    add_br_btn.clicked.connect(_add_branch)
+    af_layout.addWidget(add_br_btn)
+
+    add_jp_btn = _make_btn("+ ↳", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+    add_jp_btn.setToolTip("跳转：无条件跳到指定动作（分支路线用它收口）")
+    add_jp_btn.clicked.connect(_add_jump)
+    af_layout.addWidget(add_jp_btn)
+
     clear_btn = _make_btn("清空", bg=Colors.DIM, hover=Colors.ACCENT, height=25)
     clear_btn.clicked.connect(lambda: clear_actions(app, task))
     af_layout.addWidget(clear_btn)
@@ -732,9 +787,18 @@ def _refresh_actions(app, task):
     for idx, action in enumerate(task.actions):
         row = DraggableRow()
         row.setStyleSheet(f"DraggableRow {{ background: {Colors.ACCENT}; border-radius: 8px; }}")
-        row_layout = QHBoxLayout(row)
-        row_layout.setContentsMargins(6, 4, 6, 4)
-        row_layout.setSpacing(4)
+        if action.get("type") == "branch":
+            # 分支行：纵向容器——头行 + N 条选项子行 + 加分支尾行
+            _vbox = QVBoxLayout(row)
+            _vbox.setContentsMargins(6, 4, 6, 4)
+            _vbox.setSpacing(4)
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(4)
+            _vbox.addLayout(row_layout)
+        else:
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(6, 4, 6, 4)
+            row_layout.setSpacing(4)
 
         # ☰ 拖动排序手柄
         drag_btn = QPushButton("☰")
@@ -752,14 +816,20 @@ def _refresh_actions(app, task):
         desc_lbl = _make_label(desc, font=desc_font)
         row_layout.addWidget(desc_lbl, 1)
 
-        # 普通行：持续(hold) + 后延(delay)；wait_image 行：超时(timeout) + 阈值(threshold)
-        is_wait = action.get("type") == "wait_image"
+        if action.get("type") == "jump":
+            row_layout.addWidget(_make_label("跳到", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+            row_layout.addWidget(_target_combo(task, action))
 
-        hold_label = _make_label("超时" if is_wait else "持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+        # 动作行形态：wait(等图像) / branch(分支) / jump(跳转) / 普通
+        is_wait = action.get("type") == "wait_image"
+        is_branch = action.get("type") == "branch"
+        is_jump = action.get("type") == "jump"
+
+        hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
         row_layout.addWidget(hold_label)
 
         hold_spin = QDoubleSpinBox()
-        if is_wait:
+        if is_wait or is_branch:
             hold_spin.setRange(0, 600)
             hold_spin.setDecimals(0)
             hold_spin.setSingleStep(10)
@@ -775,7 +845,7 @@ def _refresh_actions(app, task):
         hold_spin.setFont(QFont("MiSans", 10, QFont.Bold))
         hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
         hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
-            "timeout" if a.get("type") == "wait_image" else "hold", round(v, 2)))
+            "timeout" if a.get("type") in ("wait_image", "branch") else "hold", round(v, 2)))
         row_layout.addWidget(hold_spin)
         row_layout.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
@@ -819,12 +889,6 @@ def _refresh_actions(app, task):
             hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
             row_layout.addWidget(hit_spin)
 
-            def _tint(btn, bg):
-                btn.setStyleSheet(f"""
-                    QPushButton {{ background: {bg}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-                    QPushButton:hover {{ background: {Colors.ACCENT}; }}
-                """)
-
             # 尺度：多尺度/精确 动态切换（点击翻转 action.scales）
             scale_btn = _make_btn("", height=25)
             scale_btn.setFixedWidth(54)
@@ -834,17 +898,18 @@ def _refresh_actions(app, task):
                 if len(cur) > 1:
                     a["scales"] = [1.0]
                     b.setText("精确")
-                    _tint(b, Colors.DIM)
+                    _tint_btn(b, Colors.DIM)
                 else:
                     a["scales"] = [1.0, 1.25, 1.5]
                     b.setText("多尺度")
-                    _tint(b, Colors.BLUE)
+                    _tint_btn(b, Colors.BLUE)
             scale_btn.clicked.connect(_flip_scale)
             _multi = len(action.get("scales") or [1.0, 1.25, 1.5]) > 1
             scale_btn.setText("多尺度" if _multi else "精确")
-            _tint(scale_btn, Colors.BLUE if _multi else Colors.DIM)
+            _tint_btn(scale_btn, Colors.BLUE if _multi else Colors.DIM)
             row_layout.addWidget(scale_btn)
 
+        if is_wait or is_branch:
             # 超时后行为：跳过/中止 动态切换（中止=红）
             row_layout.addWidget(_make_label("超时后", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
             ot_btn = _make_btn("", height=25)
@@ -854,15 +919,15 @@ def _refresh_actions(app, task):
                 if a.get("on_timeout", "skip") == "skip":
                     a["on_timeout"] = "stop"
                     b.setText("中止")
-                    _tint(b, Colors.RED)
+                    _tint_btn(b, Colors.RED)
                 else:
                     a["on_timeout"] = "skip"
                     b.setText("跳过")
-                    _tint(b, Colors.BLUE)
+                    _tint_btn(b, Colors.BLUE)
             ot_btn.clicked.connect(_flip_ot)
             _stop = action.get("on_timeout", "skip") == "stop"
             ot_btn.setText("中止" if _stop else "跳过")
-            _tint(ot_btn, Colors.RED if _stop else Colors.BLUE)
+            _tint_btn(ot_btn, Colors.RED if _stop else Colors.BLUE)
             row_layout.addWidget(ot_btn)
 
         if is_wait:
@@ -882,6 +947,127 @@ def _refresh_actions(app, task):
         """)
         del_btn.clicked.connect(lambda checked, i=idx: _delete_action(app, task, i))
         row_layout.addWidget(del_btn)
+
+        if is_branch:
+            # 分支子行：每选项 缩略图/阈值/尺度/跳到/📷重拍/✕删/↑↓优先级 + 加分支尾行
+            from core import vision as _v
+            import os as _os
+            options = action.get("options") or []
+            if not options:
+                _sub0 = QHBoxLayout()
+                _sub0.setSpacing(4)
+                _sub0.addSpacing(26)
+                _sub0.addWidget(_make_label("还没有模板 — 点下方 + 加分支 开始框选", color=Colors.DIM))
+                _sub0.addStretch(1)
+                _vbox.addLayout(_sub0)
+            for k, option in enumerate(options):
+                _sub = QHBoxLayout()
+                _sub.setSpacing(4)
+                _sub.addSpacing(26)
+
+                _thumb = QLabel()
+                _full = _os.path.join(_v._app_dir(), option.get("tpl", ""))
+                if _os.path.isfile(_full):
+                    from PySide6.QtGui import QPixmap
+                    _pm = QPixmap(_full)
+                    if not _pm.isNull():
+                        _thumb.setPixmap(_pm.scaledToHeight(20))
+                if _thumb.pixmap() is None or _thumb.pixmap().isNull():
+                    _thumb.setText("—")
+                _thumb.setFixedWidth(30)
+                _sub.addWidget(_thumb)
+
+                _sub.addWidget(_make_label("阈值", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                _th = QDoubleSpinBox()
+                _th.setRange(0, 1)
+                _th.setDecimals(2)
+                _th.setSingleStep(0.05)
+                _th.setValue(float(option.get("threshold", 0.85)))
+                _th.setFixedHeight(18)
+                _th.setFixedWidth(38)
+                _th.setAlignment(Qt.AlignRight)
+                _th.setFont(QFont("MiSans", 10, QFont.Bold))
+                _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+                _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
+                _sub.addWidget(_th)
+
+                _sc = _make_btn("", height=25)
+                _sc.setFixedWidth(54)
+                def _flip_sc(_c=False, o=option, b=_sc):
+                    cur = o.get("scales") or [1.0, 1.25, 1.5]
+                    if len(cur) > 1:
+                        o["scales"] = [1.0]
+                        b.setText("精确")
+                        _tint_btn(b, Colors.DIM)
+                    else:
+                        o["scales"] = [1.0, 1.25, 1.5]
+                        b.setText("多尺度")
+                        _tint_btn(b, Colors.BLUE)
+                _sc.clicked.connect(_flip_sc)
+                _m = len(option.get("scales") or [1.0, 1.25, 1.5]) > 1
+                _sc.setText("多尺度" if _m else "精确")
+                _tint_btn(_sc, Colors.BLUE if _m else Colors.DIM)
+                _sub.addWidget(_sc)
+
+                _sub.addStretch(1)
+                _sub.addWidget(_make_label("跳到", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                _sub.addWidget(_target_combo(task, option))
+
+                _cap = _make_btn("📷", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+                _cap.setFixedWidth(30)
+                _cap.setToolTip("重拍本模板（覆盖原路径）")
+                def _recap(_c=False, o=option):
+                    from .vision_capture import capture_template
+                    capture_template(
+                        app, task,
+                        on_got=lambda rel, oo=o: oo.__setitem__("tpl", rel),
+                        on_done=lambda: _refresh_actions(app, task),
+                        rel=o.get("tpl"))
+                _cap.clicked.connect(_recap)
+                _sub.addWidget(_cap)
+
+                def _del_opt(_c=False, a=action, i=k):
+                    (a.get("options") or []).pop(i)
+                    _refresh_actions(app, task)
+
+                def _up_opt(_c=False, a=action, i=k):
+                    o = a.get("options")
+                    if i > 0:
+                        o[i - 1], o[i] = o[i], o[i - 1]
+                    _refresh_actions(app, task)
+
+                def _down_opt(_c=False, a=action, i=k):
+                    o = a.get("options")
+                    if i < len(o) - 1:
+                        o[i + 1], o[i] = o[i], o[i + 1]
+                    _refresh_actions(app, task)
+
+                for _txt, _fn, _tip in (("↑", _up_opt, "上移（列表顺序=优先级）"),
+                                        ("↓", _down_opt, "下移"),
+                                        ("✕", _del_opt, "删除本选项")):
+                    _b = _make_btn(_txt, bg=Colors.DIM, hover=Colors.ACCENT, height=25)
+                    _b.setFixedWidth(22)
+                    _b.setToolTip(_tip)
+                    _b.clicked.connect(_fn)
+                    _sub.addWidget(_b)
+                _vbox.addLayout(_sub)
+
+            _subf = QHBoxLayout()
+            _subf.setSpacing(4)
+            _subf.addSpacing(26)
+            _addopt = _make_btn("+ 加分支", bg=Colors.BLUE, hover=Colors.ACCENT, height=25)
+            def _add_option(_c=False, a=action):
+                from .vision_capture import capture_template
+                capture_template(
+                    app, task,
+                    on_got=lambda rel, aa=a: aa.setdefault("options", []).append(
+                        {"tpl": rel, "threshold": 0.85, "scales": [1.0, 1.25, 1.5],
+                         "min_hits": 2, "target": None}),
+                    on_done=lambda: _refresh_actions(app, task))
+            _addopt.clicked.connect(_add_option)
+            _subf.addWidget(_addopt)
+            _subf.addStretch(1)
+            _vbox.addLayout(_subf)
 
         # 拖动排序（检测区=行高30%，UI不变）
         def _drag_start(e, _idx=idx, _row=row):
