@@ -407,8 +407,8 @@ class ActionSettingsView(QWidget):
                     (a.get("options") or []).pop(i)
                     _refresh_actions(app, task)
 
-                _b = _make_btn("删", bg=Colors.DIM, hover=Colors.ACCENT, font=FONT13, height=25)
-                _b.setFixedWidth(28)
+                _b = _make_btn("✕", bg=Colors.DIM, hover=Colors.ACCENT, font=FONT13, height=25)
+                _b.setFixedWidth(24)
                 _b.setToolTip("删除本选项")
                 _b.clicked.connect(_del_opt)
                 _rowL.addWidget(_b)

@@ -955,11 +955,11 @@ def _refresh_actions(app, task):
             edit_btn.clicked.connect(lambda _c=False, a=action: open_settings_view(app, task, a))
             row_layout.addWidget(edit_btn)
 
-        del_btn = QPushButton("删")
-        del_btn.setFixedSize(26, 20)
+        del_btn = QPushButton("✕")
+        del_btn.setFixedSize(18, 18)
         del_btn.setCursor(QCursor(Qt.PointingHandCursor))
         del_btn.setStyleSheet(f"""
-            QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 13px 'MiSans'; }}
+            QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 17px 'MiSans'; }}
             QPushButton:hover {{ background: {Colors.RED}; }}
         """)
         del_btn.clicked.connect(lambda checked, i=idx: _delete_action(app, task, i))
