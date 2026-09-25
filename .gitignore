@@ -11,3 +11,5 @@ dist/
 DESIGN.md
 templates/
 .hermes/
+tools/ui_editor/
+flowtap_ui_scan.json
