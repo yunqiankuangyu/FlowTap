@@ -27,17 +27,33 @@ jobs:
       - name: Build exe
         run: python -m PyInstaller FlowTap.spec --noconfirm --clean
 
+      - name: Build onedir
+        run: python -m PyInstaller FlowTap_onedir.spec --noconfirm --clean
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $ver = "${{ github.ref_name }}".TrimStart('v')
+          & $iscc /DAppVersion=$ver packaging\FlowTap.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Upload test artifact
         if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4
         with:
           name: FlowTap-test
-          path: dist/FlowTap.exe
+          path: |
+            dist/FlowTap.exe
+            dist/FlowTap-Setup-*.exe
           if-no-files-found: error
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/FlowTap.exe
+          files: |
+            dist/FlowTap.exe
+            dist/FlowTap-Setup-*.exe
           name: FlowTap ${{ github.ref_name }}
