@@ -8,7 +8,7 @@ import sys
 
 from PySide6.QtCore import Qt, QRect, QPoint, QPointF, QTimer, QEvent
 from PySide6.QtGui import QPainter, QPen, QColor, QCursor
-from PySide6.QtWidgets import QWidget, QLabel
+from PySide6.QtWidgets import QWidget, QLabel, QMessageBox
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import Colors, FONT_B
@@ -16,6 +16,15 @@ from core import vision
 from tasks.keyboard.keyboard_task import make_wait_image_action
 
 MIN_SIZE = 8  # 框选最小边长(px)，小于视为误触
+
+
+def _phys_bbox(rect, dpr):
+    """框选矩形(逻辑坐标) → ImageGrab物理bbox。
+    ImageGrab按物理像素取景, Qt鼠标矩形是逻辑坐标, 物理 = 逻辑 x dpr(所在屏)——
+    150%缩放下不换算会截到左上方错位且偏小的区域"""
+    return (int(round(rect.left() * dpr)), int(round(rect.top() * dpr)),
+            int(round((rect.left() + rect.width()) * dpr)),
+            int(round((rect.top() + rect.height()) * dpr)))
 
 
 class _SelectOverlay(QWidget):
@@ -150,14 +159,29 @@ def capture_template(app, task, on_got, on_done, rel=None, on_cancel=None):
             return
 
         # 先藏遮罩再截图，等 DWM 合成一帧，避免截到暗罩
+        _dpr = overlay.screen().devicePixelRatio()  # hide前取屏dpr(隐藏后screen()可能回落主屏)
+        overlay.hide()
+
         def _grab_and_save():
+            _err = None
             try:
-                bbox = (rect.left(), rect.top(), rect.right(), rect.bottom())
-                gray = vision.grab_gray(bbox)
-                from PIL import Image
-                use_rel = rel or vision.new_template_path()
-                vision.save_template(Image.fromarray(gray), use_rel)
-                on_got(use_rel)
+                # 逻辑rect→物理bbox: 换算到遮罩所在屏的dpr, 否则150%屏截错位置
+                bbox = _phys_bbox(rect, _dpr)
+                rgb = vision.grab_rgb(bbox)
+                _std = vision.template_sigma(rgb)
+                if _std < vision.MIN_TEMPLATE_STD:
+                    # 纯色选区无法识别(σ≈0时匹配恒为1.0), 拦下提示重框; 重拍场景原模板不被覆盖
+                    _err = (f"所选区域几乎是纯色（对比度 std={_std:.1f}，低于 {vision.MIN_TEMPLATE_STD}），"
+                            "无法生成可识别的模板，请框选包含文字、图案或按钮的区域。")
+                    if rel:
+                        _err += " 原模板未被覆盖。"
+                    from logger import log_info
+                    log_info("capture_flat", f"std={_std:.2f} 拒绝保存")
+                else:
+                    from PIL import Image
+                    use_rel = rel or vision.new_template_path()
+                    vision.save_template(Image.fromarray(rgb), use_rel)
+                    on_got(use_rel)
             except Exception:
                 from logger import log_error
                 import traceback
@@ -165,6 +189,8 @@ def capture_template(app, task, on_got, on_done, rel=None, on_cancel=None):
             finally:
                 _restore()
                 on_done()
+            if _err:
+                QMessageBox.warning(None, "模板无效", _err)
 
         QTimer.singleShot(100, _grab_and_save)
 

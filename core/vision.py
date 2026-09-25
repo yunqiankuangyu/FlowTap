@@ -32,6 +32,20 @@ _tpl_cache = {}
 _scale_cache = {}
 _tpl_lock = threading.Lock()
 
+#模板最低对比度σ, 低于视为纯色。纯色模板让TM_CCOEFF_NORMED分母0/0,
+#OpenCV对任意画面恒返回~1.0(全部误报), 故标定端和匹配端双拦截。
+#彩图按逐通道σ最大值判(探针实证: 恒色(10,20,30)整体std=8.16能骗过粗闸但匹配恒1.0, 单通道平无害)
+MIN_TEMPLATE_STD = 2.0
+
+
+def template_sigma(img):
+    """纯色判定σ, 彩图取逐通道std最大值, 灰图取整体std"""
+    if img.ndim == 3:
+        return max(float(img[:, :, c].std()) for c in range(img.shape[2]))
+    return float(img.std())
+#已记过"纯色拒绝"日志的模板路径(防等待循环每0.2s刷屏)
+_flat_logged = set()
+
 
 def new_template_path():
     """生成新模板的相对路径（templates/xxxx.png）"""
@@ -47,17 +61,18 @@ def save_template(pil_img, rel_path):
     with _tpl_lock:
         _tpl_cache.pop(rel_path, None)
         _purge_scales(rel_path)
+    _flat_logged.discard(rel_path)  # 新存/重拍模板, 解除纯色日志抑制
     return full
 
 
-def _read_gray(full_path):
-    """读图转灰度（np.fromfile+imdecode，兼容中文路径）"""
+def _read_color(full_path):
+    """读图转彩色RGB（np.fromfile+imdecode兼容中文路径, 灰PNG自动升3通道, BGR→RGB与截屏侧一致）"""
     import cv2
     data = np.fromfile(full_path, dtype=np.uint8)
     if data.size == 0:
         return None
-    img = cv2.imdecode(data, cv2.IMREAD_GRAYSCALE)
-    return img
+    img = cv2.imdecode(data, cv2.IMREAD_COLOR)
+    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
 def _load_template(rel_path):
@@ -71,7 +86,7 @@ def _load_template(rel_path):
     full = os.path.join(_app_dir(), rel_path)
     if not os.path.isfile(full):
         return None
-    img = _read_gray(full)
+    img = _read_color(full)
     if img is None:
         return None
     with _tpl_lock:
@@ -90,6 +105,7 @@ def invalidate_template(rel_path):
     with _tpl_lock:
         _tpl_cache.pop(rel_path, None)
         _purge_scales(rel_path)
+    _flat_logged.discard(rel_path)
 
 
 def client_area_bbox(hwnd):
@@ -113,11 +129,11 @@ def search_bbox():
     return None
 
 
-def grab_gray(bbox=None):
-    """截取指定区域（bbox=None 为全屏）返回灰度 ndarray"""
+def grab_rgb(bbox=None):
+    """截取指定区域（bbox=None 为全屏）返回彩色RGB ndarray"""
     from PIL import ImageGrab
     img = ImageGrab.grab(bbox=bbox, all_screens=True)
-    return np.array(img.convert("L"))
+    return np.array(img)
 
 
 def match_template(screen_gray, tpl_gray):
@@ -154,7 +170,14 @@ def match_once(rel_path, threshold=0.85, scales=(1.0,)):
     tpl = _load_template(rel_path)
     if tpl is None:
         return False, 0.0
-    screen = grab_gray(search_bbox())
+    if template_sigma(tpl) < MIN_TEMPLATE_STD:
+        # 纯色模板: σ≈0→分母0/0→CCOEFF对任意画面恒1.0, 判不命中(-1与"模板过大"同语义)
+        if rel_path not in _flat_logged:
+            _flat_logged.add(rel_path)
+            from logger import log_info
+            log_info("tpl_flat", f"{rel_path} σ<{MIN_TEMPLATE_STD} 纯色模板, 拒绝匹配")
+        return False, -1.0
+    screen = grab_rgb(search_bbox())
     best = -1.0
     for s in (scales or (1.0,)):
         t = _scaled_template(rel_path, tpl, s)
