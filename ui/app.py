@@ -32,7 +32,7 @@ class App(QMainWindow):
         set_bound_process(self._settings.get("bind_process", ""))
 
         self.setWindowTitle(DISGUISE_TITLE)
-        self.setFixedSize(WIN_W, 392)
+        self.setFixedSize(WIN_W, 400)
         flags = Qt.FramelessWindowHint
         if self._settings.get("always_on_top", True):
             flags |= Qt.WindowStaysOnTopHint

@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from config import Colors, THEMES, DEFAULT_THEME, load_settings, save_settings
+from .widgets import _make_btn, spin_fill, style_label
 
 # 设置页专用字体：比全局小 3px
 _FB = QFont("MiSans", 11, QFont.Bold)
@@ -55,7 +56,7 @@ def _make_section(parent_layout, title):
     if title:
         lbl = QLabel(title)
         lbl.setFont(_FB)
-        lbl.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
+        style_label(lbl, Colors.TEXT)
         v.addWidget(lbl)
     parent_layout.addWidget(frame)
     return v
@@ -143,15 +144,9 @@ def build_settings_mode(app):
         app._title_label.setText(text or "FlowTap")
         from .keyboard_mode import show_floating_notification
         show_floating_notification(app, "✓ 标题已更新" if text else "✓ 已恢复默认标题")
-    ti_apply_btn = QPushButton("应用")
-    ti_apply_btn.setFont(_FM)
+    ti_apply_btn = _make_btn("应用", font=_FM)
     ti_apply_btn.setFixedHeight(28)
     ti_apply_btn.setFixedWidth(52)
-    ti_apply_btn.setCursor(Qt.PointingHandCursor)
-    ti_apply_btn.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {Colors.ACCENT}; }}
-    """)
     ti_apply_btn.clicked.connect(_apply_title)
     ti_row_layout.addWidget(ti_apply_btn)
 
@@ -179,7 +174,7 @@ def build_settings_mode(app):
 
     op_val = QLabel(f"{int(s['opacity'] * 100)}%")
     op_val.setFont(_FM)
-    op_val.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+    style_label(op_val, Colors.TEXT2)
     op_val.setFixedWidth(45)
     app._opacity_lbl = op_val
 
@@ -241,25 +236,19 @@ def build_settings_mode(app):
         rl.setSpacing(8)
         lbl = QLabel(f"当前: {VK_NAME.get(current_vk, hex(current_vk))}")
         lbl.setFont(_FM)
-        lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+        style_label(lbl, Colors.TEXT2)
         rl.addWidget(lbl)
         rl.addStretch()
-        btn = QPushButton("修改热键")
-        btn.setFont(_FM)
+        btn = _make_btn("修改热键", font=_FM)
         btn.setFixedHeight(28)
         btn.setFixedWidth(80)
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-            QPushButton:hover {{ background: {Colors.ACCENT}; }}
-        """)
         def on_capture():
             if app._hotkey_capturing:
                 return
             app._hotkey_capturing = True
             app._hotkey_capture_target = capture_key
             lbl.setText("按下任意键... (ESC取消)")
-            lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+            style_label(lbl, Colors.YELLOW)
         btn.clicked.connect(on_capture)
         rl.addWidget(btn)
         setattr(app, f'_{"stop" if capture_key == "stop" else "start"}hotkey_lbl', lbl)
@@ -276,7 +265,7 @@ def build_settings_mode(app):
 
     hk_hint = QLabel("任意界面按下热键立即开始/停止全部任务")
     hk_hint.setFont(QFont("MiSans", 10, QFont.Bold))
-    hk_hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+    style_label(hk_hint, Colors.DIM)
     v.addWidget(hk_hint)
 
     # 任务默认参数
@@ -288,17 +277,12 @@ def build_settings_mode(app):
     dg.setContentsMargins(0, 0, 0, 0)
     dg.setSpacing(6)
 
-    spin_style = f"""
-        QDoubleSpinBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 0px; }}
-        QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}
-    """
-
     dg.addWidget(QLabel("循环间隔"))
     loop_spin = QDoubleSpinBox()
     loop_spin.setRange(1, 999); loop_spin.setDecimals(1); loop_spin.setSingleStep(5)
     loop_spin.setValue(s.get("default_loop", 80))
     loop_spin.setFixedWidth(55); loop_spin.setFixedHeight(25)
-    loop_spin.setFont(_FM); loop_spin.setStyleSheet(spin_style)
+    loop_spin.setFont(_FM); spin_fill(loop_spin)
     app._default_loop_spin = loop_spin
     dg.addWidget(loop_spin)
     dg.addWidget(QLabel("s"))
@@ -310,19 +294,19 @@ def build_settings_mode(app):
     delay_spin.setRange(0, 30); delay_spin.setDecimals(1); delay_spin.setSingleStep(0.1)
     delay_spin.setValue(s.get("default_delay", 0.5))
     delay_spin.setFixedWidth(45); delay_spin.setFixedHeight(25)
-    delay_spin.setFont(_FM); delay_spin.setStyleSheet(spin_style)
+    delay_spin.setFont(_FM); spin_fill(delay_spin)
     app._default_delay_spin = delay_spin
     dg.addWidget(delay_spin)
     dg.addWidget(QLabel("s"))
 
     for w in defaults_grid.findChildren(QLabel):
         w.setFont(_FM)
-        w.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+        style_label(w, Colors.TEXT2)
     v.addWidget(defaults_grid)
 
     hint = QLabel("新建任务时使用的初始循环间隔和动作后延")
     hint.setFont(QFont("MiSans", 10, QFont.Bold))
-    hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+    style_label(hint, Colors.DIM)
     v.addWidget(hint)
 
     # 启动倒计时
@@ -338,14 +322,14 @@ def build_settings_mode(app):
     cd_spin.setRange(0, 10); cd_spin.setDecimals(0); cd_spin.setSingleStep(1)
     cd_spin.setValue(s.get("start_countdown", 3))
     cd_spin.setFixedWidth(40); cd_spin.setFixedHeight(25)
-    cd_spin.setFont(_FM); cd_spin.setStyleSheet(spin_style)
+    cd_spin.setFont(_FM); spin_fill(cd_spin)
     app._countdown_spin = cd_spin
     cd_layout.addWidget(cd_spin)
     cd_layout.addWidget(QLabel("秒"))
     cd_layout.addStretch()
     for w in cd_row.findChildren(QLabel):
         w.setFont(_FM)
-        w.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+        style_label(w, Colors.TEXT2)
     v.addWidget(cd_row)
 
     # 窗口行为
@@ -358,7 +342,7 @@ def build_settings_mode(app):
         rl.setContentsMargins(0, 0, 0, 0)
         lbl = QLabel(label_text)
         lbl.setFont(_FM)
-        lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+        style_label(lbl, Colors.TEXT2)
         rl.addWidget(lbl)
         rl.addStretch()
         btn = QPushButton("开" if checked else "关")
@@ -459,7 +443,7 @@ def build_settings_mode(app):
             _mq["full"] = "未绑定（不限制）"
             color = Colors.DIM
         for lbl in (bind_prefix, bind_lbl):
-            lbl.setStyleSheet(f"color: {color}; background: transparent;")
+            style_label(lbl, color)
         _mq["x"] = 0.0
         fm = bind_lbl.fontMetrics()
         if fm.horizontalAdvance(_mq["full"]) > (bind_lbl.width() or BIND_LBL_W):
@@ -558,7 +542,7 @@ def build_settings_mode(app):
 
     bind_hint = QLabel("绑定后仅目标窗口在前台时才执行，切走自动等待、切回继续")
     bind_hint.setFont(QFont("MiSans", 10, QFont.Bold))
-    bind_hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+    style_label(bind_hint, Colors.DIM)
     v.addWidget(bind_hint)
 
     # 预设导入/导出
@@ -571,14 +555,8 @@ def build_settings_mode(app):
     pe_layout.setSpacing(6)
 
     def _btn(text, handler):
-        b = QPushButton(text)
-        b.setFont(_FM)
+        b = _make_btn(text, font=_FM)
         b.setFixedHeight(30)
-        b.setCursor(Qt.PointingHandCursor)
-        b.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-            QPushButton:hover {{ background: {Colors.ACCENT}; }}
-        """)
         b.clicked.connect(handler)
         return b
 
@@ -671,11 +649,11 @@ def update_hotkey_label(app):
         stop_lbl = getattr(app, '_stophotkey_lbl', None)
         if stop_lbl and stop_lbl.parent():
             stop_lbl.setText(f"当前: {VK_NAME.get(app._stop_hotkey, hex(app._stop_hotkey))}")
-            stop_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+            style_label(stop_lbl, Colors.TEXT2)
         start_lbl = getattr(app, '_starthotkey_lbl', None)
         if start_lbl and start_lbl.parent():
             start_lbl.setText(f"当前: {VK_NAME.get(app._start_hotkey, hex(app._start_hotkey))}")
-            start_lbl.setStyleSheet(f"color: {Colors.TEXT2}; background: transparent;")
+            style_label(start_lbl, Colors.TEXT2)
     except RuntimeError:
         pass
 
@@ -705,7 +683,7 @@ def update_preview(app, theme_name):
     ]:
         lbl = QLabel(text)
         lbl.setFont(font)
-        lbl.setStyleSheet(f"color: {color}; background: transparent;")
+        style_label(lbl, color)
         bar_layout.addWidget(lbl)
 
     app._preview_layout.addWidget(bar)
@@ -727,7 +705,7 @@ def update_preview(app, theme_name):
 
     hint = QLabel("选择后点「✓ 应用」重启生效")
     hint.setFont(QFont("MiSans", 10, QFont.Bold))
-    hint.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+    style_label(hint, Colors.DIM)
     app._preview_layout.addWidget(hint)
 
 

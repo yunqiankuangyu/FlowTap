@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCursor
 
 from config import Colors, FONT_B, FONT_M, load_settings, save_settings
+from .widgets import flat_btn, ghost_btn, style_label
 
 
 def minimize_to_mini(app):
@@ -53,17 +54,14 @@ def build_mini_mode(app):
     # 与主窗口同源：读 window_title 设置，缺省 FlowTap
     title = QLabel(s.get("window_title", "") or "FlowTap")
     title.setFont(FONT_B)
-    title.setStyleSheet(f"color: {Colors.TEXT}; background: transparent;")
+    style_label(title, Colors.TEXT)
     bar_layout.addWidget(title)
     bar_layout.addStretch()
 
     close_btn = QPushButton("✕")
     close_btn.setFixedSize(22, 22)
     close_btn.setCursor(QCursor(Qt.PointingHandCursor))
-    close_btn.setStyleSheet(f"""
-        QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 17px 'MiSans'; }}
-        QPushButton:hover {{ background: {Colors.RED}; color: {Colors.TEXT}; }}
-    """)
+    ghost_btn(close_btn, hover=Colors.RED)
     close_btn.clicked.connect(app.quit_app)
     bar_layout.addWidget(close_btn)
 
@@ -105,10 +103,7 @@ def build_mini_mode(app):
     restore_btn = QPushButton("取消最小化")
     restore_btn.setFont(FONT_B)
     restore_btn.setFixedHeight(32)
-    restore_btn.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {Colors.ACCENT}; }}
-    """)
+    flat_btn(restore_btn, Colors.BLUE, hover=Colors.ACCENT)
     restore_btn.clicked.connect(lambda: restore_from_mini(app))
     app._mini_restore_btn = restore_btn
     btn_layout.addWidget(restore_btn, 1)
@@ -116,10 +111,7 @@ def build_mini_mode(app):
     all_btn = QPushButton("▶ 全部开始")
     all_btn.setFont(FONT_B)
     all_btn.setFixedHeight(32)
-    all_btn.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-    """)
+    flat_btn(all_btn, Colors.GREEN, hover=Colors.HOVER_GREEN)
     all_btn.clicked.connect(lambda: toggle_all_from_mini(app))
     app._mini_all_btn = all_btn
     btn_layout.addWidget(all_btn, 1)
@@ -206,15 +198,9 @@ def update_mini_btn(app):
         running_count = sum(1 for t in app.keyboard_tasks if t._running or getattr(t, '_countdown_active', False))
         if running_count > 0:
             app._mini_all_btn.setText("■ 全部停止")
-            app._mini_all_btn.setStyleSheet(f"""
-                QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-                QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
-            """)
+            flat_btn(app._mini_all_btn, Colors.RED, hover=Colors.HOVER_RED)
         else:
             app._mini_all_btn.setText("▶ 全部开始")
-            app._mini_all_btn.setStyleSheet(f"""
-                QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-                QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-            """)
+            flat_btn(app._mini_all_btn, Colors.GREEN, hover=Colors.HOVER_GREEN)
     except RuntimeError:
         pass  #控件在遍历间隙被销毁，下一次窗口重建后自然恢复
