@@ -18,6 +18,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import Colors, FONT_B, FONT_M, load_presets, save_presets
+from .widgets import _make_btn, _tint_btn, _make_label, state_btn, spin_fill, spin_flat, ghost_btn, style_label
 from tasks.keyboard.keyboard_task import KeyboardTask, make_key_action, make_combo_action, make_click_action, fmt_action
 from vk_map import VK_NAME
 
@@ -87,27 +88,6 @@ def _make_menu_combo(items, width=80, on_select=None):
     btn.addItems = _addItems
     return btn
 
-def _make_btn(text, bg=None, fg=None, hover=None, font=None, height=25):
-    btn = QPushButton(text)
-    btn.setFont(font or FONT_M)
-    btn.setFixedHeight(height)
-    btn.setCursor(QCursor(Qt.PointingHandCursor))
-    bg = bg or Colors.BLUE
-    fg = fg or Colors.TEXT
-    hover = hover or Colors.ACCENT
-    btn.setStyleSheet(f"""
-        QPushButton {{ background: {bg}; color: {fg}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {hover}; }}
-    """)
-    return btn
-
-def _tint_btn(btn, bg):
-    """动态按钮换底色（与 _make_btn 同款样式）：状态切换按钮专用"""
-    btn.setStyleSheet(f"""
-        QPushButton {{ background: {bg}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {Colors.ACCENT}; }}
-    """)
-
 def _target_combo(task, container, big=False):
     """跳转目标下拉：顺序继续(None) + 全部动作；itemData=lid，显示 动作N: 描述
     container = 存 target 的字典（jump 动作本身 或 branch 的 option）; big=悬浮页放大档"""
@@ -151,12 +131,6 @@ def _fit_spin(spin, font=None, extra=0):
     _fm = QFontMetricsF(font if font is not None else QFont("MiSans", 11, QFont.Bold))
     _min_w = int(_fm.horizontalAdvance("000")) + 10
     spin.setFixedWidth(max(_min_w, int(_fm.horizontalAdvance(spin.text())) + 10) + extra)
-
-def _make_label(text, font=None, color=None):
-    lbl = QLabel(text)
-    lbl.setFont(font or FONT_M)
-    lbl.setStyleSheet(f"color: {color or Colors.TEXT}; background: transparent;")
-    return lbl
 
 BF_H = 52
 
@@ -288,14 +262,14 @@ def _build_drag_handle(app):
     handle.setStyleSheet("background: transparent;")
 
     indicator = QFrame(handle)
-    indicator.setFixedSize(40, 3)
+    indicator.setFixedSize(200, 4)
     indicator.setStyleSheet("background: #555; border-radius: 2px;")
     app._drag_indicator = indicator
 
     def position_indicator():
         try:
             w = handle.width()
-            indicator.move((w - 40) // 2, (HANDLE_H - 3) // 2)
+            indicator.move((w - indicator.width()) // 2, (HANDLE_H - indicator.height()) // 2)
         except RuntimeError:
             pass  # UI重建后旧handle已销毁，忽略
     handle.resizeEvent = lambda e: position_indicator()
@@ -359,16 +333,10 @@ def update_all_btn(app):
         running = any(_task_active(t) for t in app.keyboard_tasks)
         if running:
             app._all_btn.setText("■ 全部停止")
-            app._all_btn.setStyleSheet(f"""
-                QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-                QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
-            """)
+            state_btn(app._all_btn, Colors.RED, hover=Colors.HOVER_RED)
         else:
             app._all_btn.setText("▶ 全部开始")
-            app._all_btn.setStyleSheet(f"""
-                QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-                QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-            """)
+            state_btn(app._all_btn, Colors.GREEN, hover=Colors.HOVER_GREEN)
         update_pause_btn(app)
         app._update_mini_btn()
     except RuntimeError:
@@ -382,13 +350,10 @@ def stop_all(app):
             # 同步每张任务卡片的UI
             if hasattr(t, '_go_btn') and t._go_btn:
                 t._go_btn.setText("▶ 开始")
-                t._go_btn.setStyleSheet(f"""
-                    QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-                    QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-                """)
+                state_btn(t._go_btn, Colors.GREEN, hover=Colors.HOVER_GREEN)
             if hasattr(t, '_st_lbl') and t._st_lbl:
                 (t._st_set_text if hasattr(t, "_st_set_text") else t._st_lbl.setText)(f"已完成 {t.done_count} 次")
-                t._st_lbl.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+                style_label(t._st_lbl, Colors.DIM)
     update_all_btn(app)
 
 def toggle_all(app):
@@ -414,7 +379,7 @@ def pause_all(app):
             try:
                 if lbl and lbl.parent():
                     (t._st_set_text if hasattr(t, "_st_set_text") else lbl.setText)("⏸ 已暂停")
-                    lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+                    style_label(lbl, Colors.YELLOW)
             except RuntimeError:
                 pass
 
@@ -428,7 +393,7 @@ def resume_all(app):
                 pass  # 下一次 tick 会刷新
             elif getattr(t, '_countdown_active', False) and t._st_lbl:
                 t._st_set_text("● 准备中...")
-                t._st_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+                style_label(t._st_lbl, Colors.YELLOW)
 
 def toggle_pause_all(app):
     """有未暂停的活跃任务 → 全部暂停；全在暂停中 → 全部继续"""
@@ -451,22 +416,15 @@ def update_pause_btn(app):
     if not running:
         btn.setText("⏸ 全部暂停")
         btn.setEnabled(False)
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.ACCENT}; color: {Colors.DIM}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-        """)
+        state_btn(btn, Colors.ACCENT, fg=Colors.DIM)
     elif len(paused) == len(running):
         btn.setText("▶ 全部继续")
         btn.setEnabled(True)
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-            QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-        """)
+        state_btn(btn, Colors.GREEN, hover=Colors.HOVER_GREEN)
     else:
         btn.setText("⏸ 全部暂停")
         btn.setEnabled(True)
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.YELLOW}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-        """)
+        state_btn(btn, Colors.YELLOW)
 
 def add_task(app):
     from config import load_settings as _ls
@@ -530,10 +488,7 @@ def create_card(app, task):
     del_btn = QPushButton("✕")
     del_btn.setFixedSize(22, 22)
     del_btn.setCursor(QCursor(Qt.PointingHandCursor))
-    del_btn.setStyleSheet(f"""
-        QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 17px 'MiSans'; }}
-        QPushButton:hover {{ background: {Colors.RED}; color: {Colors.TEXT}; }}
-    """)
+    ghost_btn(del_btn, hover=Colors.RED)
     del_btn.clicked.connect(lambda: del_task(app, task, card))
     hdr.addWidget(del_btn)
 
@@ -666,10 +621,7 @@ def create_card(app, task):
     spin.setFixedWidth(48)
     spin.setFixedHeight(25)
     spin.setFont(QFont("MiSans", 10, QFont.Bold))
-    spin.setStyleSheet(f"""
-        QDoubleSpinBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 0px; }}
-        QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}
-    """)
+    spin_fill(spin)
     spin.valueChanged.connect(lambda v: setattr(task, 'loop_interval', v))
     task._loop_spin = spin
 
@@ -682,10 +634,7 @@ def create_card(app, task):
     runs_spin.setFixedWidth(38)
     runs_spin.setFixedHeight(25)
     runs_spin.setFont(QFont("MiSans", 10, QFont.Bold))
-    runs_spin.setStyleSheet(f"""
-        QDoubleSpinBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 0px; }}
-        QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}
-    """)
+    spin_fill(runs_spin)
     def _on_runs_change(v):
         task.max_runs = int(v)
         # 修改限制时重置完成标记，允许重新开始
@@ -831,6 +780,8 @@ def _refresh_actions(app, task):
                 hold_spin.setDecimals(0)
                 hold_spin.setSingleStep(10)
                 hold_spin.setValue(action.get("timeout", 30))
+                hold_spin.setSpecialValueText("∞")
+                hold_spin.setToolTip("填 0 (∞) = 保持等待：一直等到图像出现才继续，永不超时")
             else:
                 hold_spin.setRange(0, 30)
                 hold_spin.setDecimals(1)
@@ -840,7 +791,7 @@ def _refresh_actions(app, task):
             hold_spin.setFixedWidth(31 if (is_wait or is_branch) else 46)
             hold_spin.setAlignment(Qt.AlignRight)
             hold_spin.setFont(QFont("MiSans", 11, QFont.Bold))
-            hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+            spin_flat(hold_spin)
             hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
                 "timeout" if a.get("type") in ("wait_image", "branch") else "hold", round(v, 2)))
             _ctl.addWidget(hold_spin)
@@ -868,7 +819,7 @@ def _refresh_actions(app, task):
                 delay_spin.setFixedWidth(46)
             delay_spin.setAlignment(Qt.AlignRight)
             delay_spin.setFont(QFont("MiSans", 11, QFont.Bold))
-            delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+            spin_flat(delay_spin)
             delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
                 "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
             if is_wait:
@@ -890,7 +841,7 @@ def _refresh_actions(app, task):
             hit_spin.setFixedWidth(16)
             hit_spin.setAlignment(Qt.AlignRight)
             hit_spin.setFont(QFont("MiSans", 11, QFont.Bold))
-            hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+            spin_flat(hit_spin)
             hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
             _ctl.addWidget(hit_spin)
 
@@ -921,30 +872,42 @@ def _refresh_actions(app, task):
             _ctl.addWidget(_make_label("超时后", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
             ot_btn = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
             ot_btn.setFixedWidth(32)
-            ot_btn.setToolTip("等待超时后：跳过=继续执行下一动作；中止=终止本轮")
+            ot_btn.setToolTip("等待超时后：跳过=继续下一动作；跳卡=整张卡片本轮作废(等循环后再来)；中止=终止任务。超时为0时不生效")
+            _OT3 = [("skip", "跳过", Colors.BLUE),
+                    ("skip_card", "跳卡", Colors.YELLOW),
+                    ("stop", "中止", Colors.RED)]
+            def _ot_cur(a):
+                v = a.get("on_timeout", "skip")
+                return "skip" if v == "next" else v  # branch旧值next归一
+            def _ot_apply(a, b, val):
+                a["on_timeout"] = val
+                for k, t, c in _OT3:
+                    if k == val:
+                        b.setText(t); _tint_btn(b, c); break
             def _flip_ot(_checked=False, a=action, b=ot_btn):
-                if a.get("on_timeout", "skip") == "skip":
-                    a["on_timeout"] = "stop"
-                    b.setText("中止")
-                    _tint_btn(b, Colors.RED)
-                else:
-                    a["on_timeout"] = "skip"
-                    b.setText("跳过")
-                    _tint_btn(b, Colors.BLUE)
+                cur = _ot_cur(a)
+                idx = next((i for i, (k, _, _) in enumerate(_OT3) if k == cur), 0)
+                _ot_apply(a, b, _OT3[(idx + 1) % 3][0])
             ot_btn.clicked.connect(_flip_ot)
-            _stop = action.get("on_timeout", "skip") == "stop"
-            ot_btn.setText("中止" if _stop else "跳过")
-            _tint_btn(ot_btn, Colors.RED if _stop else Colors.BLUE)
+            _ot_apply(action, ot_btn, _ot_cur(action))
             _ctl.addWidget(ot_btn)
+            # 超时=0(∞)=保持等待永不超时→超时后行为无意义, 置灰
+            hold_spin.valueChanged.connect(lambda v, b=ot_btn: b.setEnabled(v > 0))
+            ot_btn.setEnabled(hold_spin.value() > 0)
 
         if is_wait:
-            from .vision_preview import open_preview
+            from .vision_preview import open_preview, open_template_view
             prev_btn = _make_btn("预览", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
             prev_btn.setFixedWidth(36)
             prev_btn.setToolTip("实时预览匹配得分")
             prev_btn.clicked.connect(lambda checked, a=action: open_preview(
                 a, on_close=lambda: _refresh_actions(app, task)))
             row_layout.addWidget(prev_btn)
+            tpl_btn = _make_btn("原图", bg=Colors.DIM, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+            tpl_btn.setFixedWidth(36)
+            tpl_btn.setToolTip("查看标定时截取的原图（静态截图）")
+            tpl_btn.clicked.connect(lambda checked, a=action: open_template_view(a))
+            row_layout.addWidget(tpl_btn)
 
 
         if not _inline_full:
@@ -958,10 +921,7 @@ def _refresh_actions(app, task):
         del_btn = QPushButton("✕")
         del_btn.setFixedSize(18, 18)
         del_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        del_btn.setStyleSheet(f"""
-            QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 17px 'MiSans'; }}
-            QPushButton:hover {{ background: {Colors.RED}; }}
-        """)
+        ghost_btn(del_btn, hover=Colors.RED, hover_fg=Colors.DIM)
         del_btn.clicked.connect(lambda checked, i=idx: _delete_action(app, task, i))
         row_layout.addWidget(del_btn)
 
@@ -1078,7 +1038,7 @@ def _start_capture(app, task):
     num_lbl.setFixedWidth(22)
     wl.addWidget(num_lbl)
     desc_lbl = _make_label("⏳ 按下并保持按键，全部松开完成绑定", font=FONT_B)
-    desc_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+    style_label(desc_lbl, Colors.YELLOW)
     wl.addWidget(desc_lbl, 1)
     task._action_layout.addWidget(waiting_row)
     task._action_rows.append({"frame": waiting_row, "action": None, "desc_lbl": desc_lbl})
@@ -1254,12 +1214,9 @@ def _toggle_task(app, task, btn, lbl):
         task._countdown_active = False
         task.stop()
         btn.setText("▶ 开始")
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-            QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-        """)
+        state_btn(btn, Colors.GREEN, hover=Colors.HOVER_GREEN)
         (task._st_set_text if hasattr(task, "_st_set_text") else lbl.setText)(f"已完成 {task.done_count} 次")
-        lbl.setStyleSheet(f"color: {Colors.DIM}; background: transparent;")
+        style_label(lbl, Colors.DIM)
         update_all_btn(app)
     else:
         _start_task(app, task)
@@ -1279,31 +1236,25 @@ def _start_task(app, task):
     if task.relation_type == "在任务x后":
         task._callback = lambda: _post_to_main(lambda: (
             task._st_set_text("● 等待下次触发..."),
-            task._st_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+            style_label(task._st_lbl, Colors.YELLOW)
         ))
         def _make_cd_cb():
             def cb(t, c):
                 _post_to_main(lambda t=t, c=c: (
                     task._st_set_text(t),
-                    task._st_lbl.setStyleSheet(f"color: {c}; background: transparent;")
+                    style_label(task._st_lbl, c)
                 ))
             return cb
         task._countdown_callback = _make_cd_cb()
         task.start()
         btn.setText("■ 停止")
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-            QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
-        """)
+        state_btn(btn, Colors.RED, hover=Colors.HOVER_RED)
         task._st_set_text("● 等待前置任务")
-        lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+        style_label(lbl, Colors.YELLOW)
         update_all_btn(app)
     else:
         btn.setText("■ 停止")
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: {Colors.RED}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-            QPushButton:hover {{ background: {Colors.HOVER_RED}; }}
-        """)
+        state_btn(btn, Colors.RED, hover=Colors.HOVER_RED)
         task._countdown_active = True
 
         def _tick(count):
@@ -1315,7 +1266,7 @@ def _start_task(app, task):
                     return
                 if count > 0:
                     task._st_set_text(f"● 准备中 {count}...")
-                    task._st_lbl.setStyleSheet(f"color: {Colors.YELLOW}; background: transparent;")
+                    style_label(task._st_lbl, Colors.YELLOW)
                     QTimer.singleShot(1000, lambda: _tick(count - 1))
                 else:
                     task._countdown_active = False
@@ -1324,7 +1275,7 @@ def _start_task(app, task):
                             try:
                                 _post_to_main(lambda t=t, c=c: (
                                     task._st_set_text(t),
-                                    task._st_lbl.setStyleSheet(f"color: {c}; background: transparent;")
+                                    style_label(task._st_lbl, c)
                                 ))
                             except Exception as e:
                                 from logger import log_error
@@ -1335,7 +1286,7 @@ def _start_task(app, task):
                         countdown_callback=task._countdown_callback
                     )
                     task._st_set_text(task.status.value)
-                    task._st_lbl.setStyleSheet(f"color: {Colors.GREEN}; background: transparent;")
+                    style_label(task._st_lbl, Colors.GREEN)
                     update_all_btn(app)
             except Exception as e:
                 from logger import log_error
@@ -1375,13 +1326,10 @@ def _check_limit_finished(app):
                 try:
                     if btn and btn.parent():
                         btn.setText("▶ 开始")
-                        btn.setStyleSheet(f"""
-                            QPushButton {{ background: {Colors.GREEN}; color: {Colors.TEXT}; border: none; border-radius: 4px; font: bold 17px 'MiSans'; }}
-                            QPushButton:hover {{ background: {Colors.HOVER_GREEN}; }}
-                        """)
+                        state_btn(btn, Colors.GREEN, hover=Colors.HOVER_GREEN)
                     if lbl and lbl.parent():
                         (t._st_set_text if hasattr(t, "_st_set_text") else lbl.setText)(f"✓ 已达上限 {t.done_count} 次")
-                        lbl.setStyleSheet(f"color: {Colors.BLUE}; background: transparent;")
+                        style_label(lbl, Colors.BLUE)
                 except RuntimeError:
                     pass
                 update_all_btn(app)

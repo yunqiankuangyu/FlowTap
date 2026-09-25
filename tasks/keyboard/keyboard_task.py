@@ -43,7 +43,7 @@ def make_wait_image_action(tpl, threshold=0.85, timeout=30, on_timeout="skip", d
                            min_hits=2, scales=(1.0, 1.25, 1.5)):
     """创建等待图像动作（画面稳定出现目标模板才继续）
     tpl 模板相对路径，threshold 匹配阈值，timeout 超时秒(0=无限等)
-    on_timeout 超时行为 skip=跳过继续 stop=中止本轮
+    on_timeout 超时行为 skip=跳过本步 skip_card=跳过整卡(本轮作废) stop=中止任务
     min_hits 防抖帧数（连续命中这么多次才判定出现，防闪烁误判）
     scales 模板缩放系数序列（多尺度匹配，按序尝试命中即停）
     """
@@ -63,7 +63,7 @@ def _ensure_lids(actions):
 def make_branch_action(options, timeout=30, on_timeout="next", delay=0.0):
     """创建多模板分支动作：options 列表顺序=优先级，逐项稳定命中即跳其 target
     option 字段 {tpl, threshold, scales, min_hits, target}；target=目标lid，None=顺序继续
-    on_timeout: next=顺序继续 / stop=中止本轮"""
+    on_timeout: next=顺序继续 skip_card=跳过整卡(本轮作废) stop=中止任务"""
     return {"type": "branch", "options": list(options), "timeout": timeout,
             "on_timeout": on_timeout, "delay": delay, "lid": _new_lid()}
 
@@ -261,7 +261,10 @@ class KeyboardTask:
                 if self._countdown_callback:
                     try: self._countdown_callback("● 等待图像超时，跳过...", "#facc15")
                     except Exception: pass
-                return action.get("on_timeout", "skip") != "stop"
+                _ot = action.get("on_timeout", "skip")
+                if _ot == "skip_card":
+                    return "SKIP_CARD"  # 跳过整卡: 冒泡给主循环作废本轮
+                return _ot != "stop"
             if self._countdown_callback:
                 # 每拍回显置信度：调阈值时状态行直接看得见分数
                 try:
@@ -324,8 +327,11 @@ class KeyboardTask:
             last_sample = time.monotonic()
             if timeout > 0 and waited >= timeout:
                 log_info("branch_timeout", f"best={max(best):.3f} n={n}")
-                if action.get("on_timeout", "next") == "stop":
+                _ot = action.get("on_timeout", "next")
+                if _ot == "stop":
                     return "STOP"
+                if _ot == "skip_card":
+                    return "SKIP_CARD"
                 return None
             if self._countdown_callback:
                 try:
@@ -347,7 +353,8 @@ class KeyboardTask:
         return None
 
     def _execute_actions(self):
-        """执行一轮动作序列（索引循环：branch/jump 改写 i 实现条件跳转）"""
+        """执行一轮动作序列（索引循环：branch/jump 改写 i 实现条件跳转）
+        返回 True=完成 False=中止 "SKIP_CARD"=超时跳过整卡(调用方作废本轮)"""
         from logger import log_error, log_info
         kb_sim = KeyboardSimulator()
         ms_sim = MouseSimulator()
@@ -374,12 +381,17 @@ class KeyboardTask:
                     r = self._run_branch(action)
                     if r == "STOP":
                         return False
+                    if r == "SKIP_CARD":
+                        return "SKIP_CARD"
                     tgt_i = self._index_of(r) if r else None
                     i = tgt_i if tgt_i is not None else i + 1
                     self._pause_aware_delay(action.get("delay", 0.0))
                     continue
                 elif action["type"] == "wait_image":
-                    if not self._wait_for_image(action): return False
+                    r = self._wait_for_image(action)
+                    if r == "SKIP_CARD":
+                        return "SKIP_CARD"
+                    if not r: return False
                     if not self._running: return False
                     self._pause_aware_delay(action.get("delay", 0))
                     i += 1
@@ -434,11 +446,17 @@ class KeyboardTask:
                     return
                 if not self._window_gate(): return  # 窗口不在前台：本轮不计数
                 self.done_count += 1
-                if not self._execute_actions(): return
-                # 触发依赖此任务的其他任务
-                for dep_task in self._dependents:
-                    if dep_task._running:
-                        threading.Thread(target=dep_task._run_once, daemon=True).start()
+                r = self._execute_actions()
+                if r == "SKIP_CARD":
+                    # 跳过整卡: 本轮剩余动作作废, 不触发依赖任务, 直接进入循环等待
+                    pass
+                elif not r:
+                    return
+                else:
+                    # 触发依赖此任务的其他任务
+                    for dep_task in self._dependents:
+                        if dep_task._running:
+                            threading.Thread(target=dep_task._run_once, daemon=True).start()
                 # 循环倒计时显示（暂停时秒数冻结，继续后接着倒数）
                 countdown_secs = int(self.loop_interval)
                 if countdown_secs >= 1:

@@ -4,8 +4,9 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPainter, QBrush, QColor, QFont, QCursor, QPixmap, QFontMetricsF
 from config.themes import Colors
 from tasks.keyboard.keyboard_task import fmt_action
-from .keyboard_mode import (_make_btn, _make_label, _tint_btn, _fit_spin, _target_combo,
+from .keyboard_mode import (_fit_spin, _target_combo,
                             DraggableRow, _refresh_actions as _refresh_main)
+from .widgets import _make_btn, _make_label, _tint_btn, spin_flat
 
 RADIUS = 16
 FONT13 = QFont("MiSans", 13, QFont.Bold)
@@ -20,6 +21,7 @@ def open_settings_view(app, task, action):
     v.show()
     v.raise_()
     v.activateWindow()
+    app._settings_view = v  # 强引用: 槽里丢弃返回值会被PySide6 GC销毁, 主窗已隐藏→全屏消失
     app.hide()
     return v
 
@@ -62,7 +64,7 @@ class ActionSettingsView(QWidget):
         v.setContentsMargins(16, 10, 16, 12)
         v.setSpacing(8)
         if title:
-            v.addWidget(_make_label(title, font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+            v.addWidget(_make_label(title, font=QFont("MiSans", 12, QFont.Bold), color=Colors.DIM))
         self._content.addWidget(card)
         return v
 
@@ -140,6 +142,8 @@ class ActionSettingsView(QWidget):
             hold_spin.setDecimals(0)
             hold_spin.setSingleStep(10)
             hold_spin.setValue(action.get("timeout", 30))
+            hold_spin.setSpecialValueText("∞")
+            hold_spin.setToolTip("填 0 (∞) = 保持等待：一直等到图像出现/分支命中才继续，永不超时")
         else:
             hold_spin.setRange(0, 30)
             hold_spin.setDecimals(1)
@@ -150,7 +154,7 @@ class ActionSettingsView(QWidget):
         hold_spin.textChanged.connect(lambda _t, sp=hold_spin: _fit_spin(sp, font=FONT13))
         hold_spin.setAlignment(Qt.AlignRight)
         hold_spin.setFont(FONT13)
-        hold_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+        spin_flat(hold_spin)
         hold_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "timeout" if a.get("type") in ("wait_image", "branch") else "hold", round(v, 2)))
         _ctl.addWidget(hold_spin)
@@ -175,7 +179,7 @@ class ActionSettingsView(QWidget):
         _fit_spin(delay_spin, font=FONT13, extra=6 if is_wait else 0)  # 只有wait行这个框是阈值  # wait=阈值, branch=后延, 都按13pt字宽贴
         delay_spin.setAlignment(Qt.AlignRight)
         delay_spin.setFont(FONT13)
-        delay_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+        spin_flat(delay_spin)
         delay_spin.valueChanged.connect(lambda v, a=action: a.__setitem__(
             "threshold" if a.get("type") == "wait_image" else "delay", round(v, 2)))
         delay_spin.textChanged.connect(lambda _t, sp=delay_spin, _x=(6 if is_wait else 0): _fit_spin(sp, font=FONT13, extra=_x))
@@ -196,7 +200,7 @@ class ActionSettingsView(QWidget):
             hit_spin.textChanged.connect(lambda _t, sp=hit_spin: _fit_spin(sp, font=FONT13))
             hit_spin.setAlignment(Qt.AlignRight)
             hit_spin.setFont(FONT13)
-            hit_spin.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+            spin_flat(hit_spin)
             hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
             _ctl.addWidget(hit_spin)
 
@@ -227,21 +231,28 @@ class ActionSettingsView(QWidget):
             _ctl.addWidget(_make_label("超时后", font=FONT13, color=Colors.DIM))
             ot_btn = _make_btn("", font=FONT13, height=25)
             ot_btn.setFixedWidth(43)
-            ot_btn.setToolTip("等待超时后：跳过=继续执行下一动作；中止=终止本轮")
+            ot_btn.setToolTip("等待超时后：跳过=继续下一动作；跳卡=整张卡片本轮作废(等循环后再来)；中止=终止任务。超时为0时不生效")
+            _OT3 = [("skip", "跳过", Colors.BLUE),
+                    ("skip_card", "跳卡", Colors.YELLOW),
+                    ("stop", "中止", Colors.RED)]
+            def _ot_cur(a):
+                v = a.get("on_timeout", "skip")
+                return "skip" if v == "next" else v  # branch旧值next归一
+            def _ot_apply(a, b, val):
+                a["on_timeout"] = val
+                for k, t, c in _OT3:
+                    if k == val:
+                        b.setText(t); _tint_btn(b, c); break
             def _flip_ot(_checked=False, a=action, b=ot_btn):
-                if a.get("on_timeout", "skip") == "skip":
-                    a["on_timeout"] = "stop"
-                    b.setText("中止")
-                    _tint_btn(b, Colors.RED)
-                else:
-                    a["on_timeout"] = "skip"
-                    b.setText("跳过")
-                    _tint_btn(b, Colors.BLUE)
+                cur = _ot_cur(a)
+                idx = next((i for i, (k, _, _) in enumerate(_OT3) if k == cur), 0)
+                _ot_apply(a, b, _OT3[(idx + 1) % 3][0])
             ot_btn.clicked.connect(_flip_ot)
-            _stop = action.get("on_timeout", "skip") == "stop"
-            ot_btn.setText("中止" if _stop else "跳过")
-            _tint_btn(ot_btn, Colors.RED if _stop else Colors.BLUE)
+            _ot_apply(action, ot_btn, _ot_cur(action))
             _ctl.addWidget(ot_btn)
+            # 超时=0(∞)=保持等待永不超时→超时后行为无意义, 置灰(disabled态tooltip仍可见)
+            hold_spin.valueChanged.connect(lambda v, b=ot_btn: b.setEnabled(v > 0))
+            ot_btn.setEnabled(hold_spin.value() > 0)
         _vbox.addLayout(_ctl)
 
         # 卡2 分支选项: 每选项 缩略图/阈值/尺度/跳到/重拍/排序 + 加分支 (搬入段共享 _vbox)
@@ -362,7 +373,7 @@ class ActionSettingsView(QWidget):
                 _fit_spin(_th, font=FONT13, extra=6)
                 _th.setAlignment(Qt.AlignRight)
                 _th.setFont(FONT13)
-                _th.setStyleSheet(f"QDoubleSpinBox {{ background: transparent; color: {Colors.TEXT}; border: none; padding: 0px; }} QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0px; border: none; }}")
+                spin_flat(_th)
                 _th.valueChanged.connect(lambda v, o=option: o.__setitem__("threshold", round(v, 2)))
                 _th.textChanged.connect(lambda _t, sp=_th: _fit_spin(sp, font=FONT13, extra=6))
                 _rowL.addWidget(_th)
