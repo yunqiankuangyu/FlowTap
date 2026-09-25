@@ -10,10 +10,21 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['PySide6.QtQuick', 'PySide6.QtQml', 'PySide6.QtPdf',
+              'PySide6.QtNetwork', 'PySide6.QtOpenGL', 'PySide6.QtVirtualKeyboard'],
     noarchive=False,
     optimize=0,
 )
+# FlowTap 只用 QtWidgets/Gui/Core——以下为打包器自动收集的未引用模块, 剔除省约10MB
+_GONE = ("qml", "qt6quick", "qtquick", "qt6pdf", "qtpdf", "qt6network", "qtnetwork",
+         "qt6opengl", "qtopengl", "virtualkeyboard",
+         "plugins\\tls", "plugins\\networkinformation", "plugins\\generic", "qpdf.dll")
+def _drop(entries):
+    return [e for e in entries
+            if not any(g in e[0].replace("/", "\\").lower() for g in _GONE)]
+a.binaries = _drop(a.binaries)
+a.datas = _drop(a.datas)
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
