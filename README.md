@@ -57,6 +57,7 @@ FlowTap/
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
 | v3.8.2 | PySide6 | Smart branching (experimental), dark tooltip fix |
 | v3.8.1 | PySide6 | Humanized mouse movement, Start All fix |
 | v3.8.0 | PySide6 | Window binding (auto-wait on switch), rounded corners, bottom bar alignment |
@@ -75,6 +76,20 @@ FlowTap/
 | v3 | PySide6 | Qt migration, solves CTk rendering flicker |
 | v2 | CustomTkinter | Unified keyboard+mouse task mode |
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
+
+### v3.8.3 — Color Templates & Wait Enhancements
+
+**New**
+- View the captured reference image for image-wait conditions
+- Templates now use full-color matching
+- Option to skip the whole task card on timeout
+- Option to keep waiting on timeout
+
+**Fixed**
+- Fixed screenshot position offset at high display scaling
+- Fixed templates captured with overlay dimming
+- Fixed solid-color regions being easily misdetected
+- Fixed window disappearing after clicking the Edit button
 
 ### v3.8.2 — Vision Enhancements & Action Settings Page
 
