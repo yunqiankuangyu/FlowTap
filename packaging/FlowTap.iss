@@ -27,6 +27,9 @@ Name: "chinesesimplified"; MessagesFile: "Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
+; 覆盖ISL自带模板, 程序列表/向导标题显示为 FlowTap v3.8.3 形式
+chinesesimplified.NameAndVersion=%1 v%2
+english.NameAndVersion=%1 v%2
 chinesesimplified.TasksDesc=附加任务:
 english.TasksDesc=Additional tasks:
 chinesesimplified.DesktopIcon=创建桌面快捷方式
