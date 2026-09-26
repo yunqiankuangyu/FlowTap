@@ -35,7 +35,7 @@ chinesesimplified.LaunchApp=启动 FlowTap
 english.LaunchApp=Launch FlowTap
 
 [Tasks]
-Name: "desktopicon"; Description: "%DesktopIcon%"; GroupDescription: "%TasksDesc%"
+Name: "desktopicon"; Description: "{cm:DesktopIcon}"; GroupDescription: "{cm:TasksDesc}"
 
 [Files]
 Source: "..\dist\FlowTap\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
@@ -45,7 +45,7 @@ Name: "{autoprograms}\FlowTap"; Filename: "{app}\FlowTap.exe"
 Name: "{autodesktop}\FlowTap"; Filename: "{app}\FlowTap.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\FlowTap.exe"; Description: "%LaunchApp%"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\FlowTap.exe"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 ; 卸载时清掉运行期生成的数据(模板/预设/日志)
