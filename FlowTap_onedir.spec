@@ -34,6 +34,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='FlowTap',
+    icon='packaging/FlowTap.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -17,6 +17,7 @@ OutputBaseFilename=FlowTap-Setup-{#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=FlowTap.ico
 ShowLanguageDialog=no
 CloseApplications=yes
 DisableProgramGroupPage=yes
