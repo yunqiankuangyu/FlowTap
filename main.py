@@ -61,6 +61,11 @@ if __name__ == "__main__":
         from ui.app import App
 
         app = QApplication(sys.argv)
+        #任务栏/窗口图标, 源码跑时读packaging下的ico, 打包版自动用exe内嵌图标
+        _icon = os.path.join(project_root, "packaging", "FlowTap.ico")
+        if os.path.exists(_icon):
+            from PySide6.QtGui import QIcon
+            app.setWindowIcon(QIcon(_icon))
         app.setQuitOnLastWindowClosed(False)  # 遮罩关闭时不退出
         window = App()
         window.show()
