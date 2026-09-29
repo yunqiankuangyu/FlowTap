@@ -32,171 +32,122 @@ python main.py
 
 ```
 FlowTap/
-├── main.py              # Entry point
-├── core/                # Keyboard & mouse simulation (Win32 SendInput)
-│   └── __init__.py
-├── tasks/               # Task logic
+├── main.py                     # Entry point
+├── logger.py                   # Runtime log (errors only, writes runtime.log)
+├── vk_map.py                   # Virtual key code mapping
+├── core/                       # Low-level capabilities
+│   ├── __init__.py             # Key/mouse injection (Win32 SendInput)
+│   ├── vision.py               # Screen capture + template matching
+│   └── window_gate.py          # Foreground gate (run only while target is focused)
+├── tasks/                      # Task execution
 │   ├── keyboard/
+│   │   └── keyboard_task.py    # Task runner (loop / wait / branch / readout)
 │   └── mouse/
-├── ui/                  # Interface
-│   ├── app.py           # Main window
-│   ├── titlebar.py      # Custom titlebar
-│   ├── keyboard_mode.py # Keyboard mode
-│   ├── settings_mode.py # Settings page
-│   └── mini_mode.py     # Mini window
-├── config/              # Configuration
-│   ├── themes.py
-│   ├── settings.py
-│   └── presets.py
-└── vk_map.py            # Virtual key code mapping
+│       └── mouse_task.py       # Mouse task
+├── ui/                         # Interface
+│   ├── app.py                  # Main window, bottom bar, page switching
+│   ├── titlebar.py             # Custom titlebar
+│   ├── keyboard_mode.py        # Task page (cards, action rows)
+│   ├── action_settings_view.py # Action settings page
+│   ├── settings_mode.py        # Settings page
+│   ├── mini_mode.py            # Mini window
+│   ├── vision_capture.py       # Region capture
+│   ├── vision_preview.py       # Template preview
+│   └── widgets.py              # Shared widgets
+├── config/                     # Configuration
+│   ├── themes.py               # Color themes
+│   ├── settings.py             # Settings
+│   └── presets.py              # Preset storage
+├── templates/                  # Captured template images
+├── packaging/                  # Packaging assets (icon, installer script)
+├── tools/ui_editor/            # UI editor (not in git)
+├── ARCHITECTURE.md             # Architecture overview
+├── FlowTap*.spec               # PyInstaller specs (one-file / one-dir)
+├── settings.json               # Settings (generated at runtime)
+├── presets.json                # Presets (generated at runtime)
+└── 启动.bat                    # One-click launcher
 ```
+
+## Usage Tutorial
+
+### 1. Create a task
+
+**Purpose:** One card = one kind of idle-farming need; all actions are arranged inside the card, and multiple cards run side by side.
+
+Hit **"＋ 新建任务"** on the bottom bar to generate a task card.
+
+### 2. Add actions
+
+**Purpose:** Actions are the building blocks of a task; the three dropdowns add input actions, flow control, and variable logic.
+
+| Dropdown | Actions | Description |
+|----------|---------|-------------|
+| **"+ 键鼠"** | ⌨ Keyboard, 🖱 Click | Binds keyboard keys and mouse clicks |
+| **"+ 插入"** | 📷 等图像, 🔀 分支, ↳ 跳转 | Inserts screen-related actions: 📷 等图像 (waits until the target screen appears), 🔀 分支 (picks the flow by matching the current screen), ↳ 跳转 (jumps to a chosen action and continues from there) |
+| **"+ 变量"** | 🔢 读数, ➕ 变量运算, ⚖ 条件分支 | Inserts numeric actions: 🔢 读数 (OCR reads a region into a variable), ➕ 变量运算 (arithmetic on variables), ⚖ 条件分支 (takes a different path when a condition is met) |
+
+**How to add one:** ⌨ press and hold, release all keys to confirm (W+D combos supported); 🖱 click a spot under the fullscreen overlay — ESC cancels, 15s timeout; for 等图像 / 分支 click **"编辑"** at the end of the row to box-select the screen (section 4), for 读数 use **"框选"** + **"试读"** on the row (section 5), and for 跳转 pick the target step right on the row.
+
+### 3. Arrange actions
+
+**Purpose:** Decide execution order and pacing, plus which task waits for which.
+
+- Drag the **☰** handle on the left of a row to reorder (list order = execution order = branch priority)
+- **✕** at the end of a row deletes that action
+- Row parameters: **持续** (how long a key is held) and **后延** (pause after the action) — shown depending on the action type
+- Card parameters: **循环** (pause before the next round; switch the relation to "在任务N后" and the same box becomes **延迟**, the wait after the previous task), **次数** (run limit, 0 = unlimited, auto-stop when reached)
+- **关系:** pick "在任务N后" to run this task after the previous one finishes, or "独立" to run independently
+
+### 4. Image wait / branch (screen recognition)
+
+**Purpose:** Solves "pressing keys before the screen has loaded" — wait until the target screen appears, or follow a different flow depending on what's on screen, so one task handles multiple scenarios.
+
+Click **"编辑"** on an action row to open its settings page:
+
+- **"框选"** to mark the screen region, **"原图"** to view the captured reference, **"预览"** for a live match score
+- **阈值** (threshold): higher = stricter; switch **精确 / 多尺度** (multi-scale adapts to 125%/150% display scaling)
+- **超时** (timeout): 0 (∞) keeps waiting until the screen matches; on timeout pick **跳过 / 跳卡 / 中止**
+- Branch: multiple template options, list order = priority, drag to reorder, **"重拍"** to re-capture
+
+### 5. Numeric readout (OCR)
+
+**Purpose:** Lets the task recognize on-screen numbers — the value goes into a variable, where arithmetic and numeric conditions act on it.
+
+- **"框选"** the number region → **"试读"** shows the raw OCR text and the extracted number immediately
+- Change the extraction regex via the "取数方式" dropdown; when a window is bound, the region is stored in client-area coordinates so it stays accurate after the window moves
+
+### 6. Run control
+
+**Purpose:** Start, pause and stop tasks; hotkeys let you control everything without switching back to FlowTap.
+
+- Bottom bar **▶ 全部开始 / ⏸ 全部暂停 / ■ 全部停止** (pause keeps progress and countdowns, stop resets them)
+- Per-card **▶ 开始 / ■ 停止**, starts with a countdown (3s default, configurable in Settings, 0 disables)
+- Global hotkeys **F7 start / F8 stop** — works anywhere, even in games (rebindable in Settings)
+- **◀/▶** on the card title row collapses or expands the card
+
+### 7. Window binding
+
+**Purpose:** Locks a task to its target window — it only acts while that window is focused, so nothing gets pressed into other programs when you switch away.
+
+Settings → 功能设置 → **"捕获窗口"**: once bound, the task only runs while the target window is in the foreground — it waits when you switch away and resumes when you come back. Click **"解除"** to unbind.
+
+### 8. Presets
+
+**Purpose:** Save a whole task setup for reuse — switch setups with one click across games or scenes, and carry them to another machine.
+
+- Use the dropdown at the top of a card to **load / save / delete** presets; loading asks for confirmation so current tasks aren't overwritten
+- Settings → 功能设置 → **导出预设 / 导入预设**: back up all presets as JSON and merge them on another machine
+
+### 9. Mini mode & settings
+
+**Purpose:** How FlowTap sits in the background while farming, plus appearance and behavior personalization.
+
+- The **"—"** button on the title bar minimizes to a borderless floating mini window, start/stop stays in sync with the main window
+- Settings is split into **外观设置** (window title, opacity, theme) and **功能设置** (hotkeys, new-task defaults, start countdown, always-on-top, remember window height, preset import/export); click **"✓ 应用"** at the bottom to apply
 
 ## Changelog
 
-### Version History
-
-| Version | Framework | Highlights |
-|---------|-----------|------------|
-| v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
-| v3.8.2 | PySide6 | Smart branching (experimental), dark tooltip fix |
-| v3.8.1 | PySide6 | Humanized mouse movement, Start All fix |
-| v3.8.0 | PySide6 | Window binding (auto-wait on switch), rounded corners, bottom bar alignment |
-| v3.7.4 | PySide6 | Scroll kept, mini-window sync, preset load confirmation |
-| v3.7.3 | PySide6 | Preset dependency fix, window height fix |
-| v3.7.2 | PySide6 | UI refinements |
-| v3.7.1 | PySide6 | Window height fix, UI stability |
-| v3.7 | PySide6 | Drag-and-drop reorder for action rows |
-| v3.6.1 | PySide6 | Stability fixes for long idle sessions |
-| v3.6 | PySide6 | Pause all tasks, collapse task cards |
-| v3.5 | PySide6 | Key combos, settings pages, portable exe |
-| v3.4 | PySide6 | Global stop hotkey & run-count limit |
-| v3.3 | PySide6 | Optimized partial font display |
-| v3.2 | PySide6 | Hold-to-press for key & mouse bindings |
-| v3.1 | PySide6 | Bug fixes & cleanup |
-| v3 | PySide6 | Qt migration, solves CTk rendering flicker |
-| v2 | CustomTkinter | Unified keyboard+mouse task mode |
-| v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
-
-### v3.8.3 — Color Templates & Wait Enhancements
-
-**New**
-- View the captured reference image for image-wait conditions
-- Templates now use full-color matching
-- Option to skip the whole task card on timeout
-- Option to keep waiting on timeout
-
-**Fixed**
-- Fixed screenshot position offset at high display scaling
-- Fixed templates captured with overlay dimming
-- Fixed solid-color regions being easily misdetected
-- Fixed window disappearing after clicking the Edit button
-
-### v3.8.2 — Vision Enhancements & Action Settings Page
-
-**New**
-- Smart branching (experimental): recognizes the current screen and follows the matching flow, letting a single task handle multiple scenarios
-
-**Changed**
-- Unified button heights, dropdown styling and widths
-
-**Fixed**
-- Fixed unreadable tooltips (black text on black background) in system dark mode
-
-### v3.8.1 — Humanized Mouse & State Fixes
-
-**New**
-- **Humanized mouse movement** — Arc trajectories with easing, random jitter and overshoot
-
-**Fixed**
-- Fixed "Start All" button doing nothing after switching pages
-- Mini window title now follows the custom title setting
-
-### v3.7.4 — Page Switch & Theme Fixes
-
-**Added**
-- Confirmation prompt before loading a preset, to avoid overwriting current tasks
-
-**Fixed**
-- Task list scroll position is kept when switching pages
-- Mini window start/stop state stays in sync with the main window
-- Unreadable button text in the Cat Pudding (purple) theme
-
-### v3.7.3 — Preset & Window Fixes
-
-**Fixed**
-- Fixed preset dependency display after loading
-- Fixed window height shrinking when deleting tasks
-- Fixed theme switching not working correctly in certain situations
-- General stability improvements
-
-### v3.7.2 — UI Refinements
-
-**Changed**
-- UI refinements and polish
-
-### v3.7.1 — Window Height & UI Fixes
-
-**Changed**
-- Increased initial window height for better visibility
-- Window height no longer recalculates when content height is unchanged, reducing visual flicker
-
-**Fixed**
-- Single task card no longer stretches to fill the entire task area
-- Fold/unfold animation now uses correct height values
-- Removed black tooltip artifact on drag handle hover
-
-### v3.7 — Action Row Drag-and-Drop
-
-**New**
-- **Drag-and-drop reorder for action rows** — A ☰ handle on the left side of each row lets you drag to reorder actions
-
-### v3.6.1 — Stability Fixes
-
-**Fixed**
-- **Silent crash during long idle sessions** — Fixed the program occasionally exiting without warning during extended idle runtime; added runtime logging to record exceptions
-- **Task cannot restart after abnormal stop** — Fixed the loop thread not being properly released after an abnormal stop, preventing the task from being restarted
-
-### v3.6 — Pause All & Card Collapse
-
-**New**
-- **Pause/resume all tasks** — A new "⏸ 全部暂停" button on the bottom bar freezes all running tasks; click again to resume from where they left off. Progress and countdowns are preserved while paused (unlike "Stop" which resets everything)
-- **Collapse/expand task cards** — Each task card has a fold button (◀/▶) on the title row to collapse it down to just the header, or expand it to show the full action list. Collapsed cards save vertical space so you can see more tasks at once
-
-**Changed**
-- Collapsed card padding unified with expanded state (11px all sides) for consistent look
-- Window height calculation updated to match actual card measurements
-
-### v3.5 — Key Combos, Settings Pages & Portable Build
-
-**New**
-- **Arbitrary key combos** — Bind W+D style combinations: press and hold any keys (ESC included), release all to confirm. Playback presses them together, holds for the "持续" duration, releases in reverse. Single keys behave exactly as before; old presets fully compatible
-- **Settings split into two pages** — 外观设置 (window title, opacity, theme) and 功能设置 (global start F7 & stop F8 hotkeys, new-task defaults, start countdown, always-on-top, remember window height, preset import/export), switched by a dropdown
-- **Global start hotkey** — F7 (customizable) mirrors the stop hotkey
-- **Preset import/export** — Back up all presets to a JSON file and merge them back on another machine
-- **Portable exe** — Single-file Windows build; settings/presets/logs live next to the exe; auto-elevation and apply-restart work frozen
-
-**Changed**
-- Default theme is now 冰川蓝 at 90% opacity for fresh installs
-- Bottom bar & drag handle are window-level persistent widgets — pixel-identical geometry across pages, only the buttons swap (新建任务/全部开始 ↔ 应用)
-- Settings page gets the same bottom bar and drag handle as the task page
-- Window height is governed by one source (task-page auto-size + user drag); switching pages never resizes the window
-- Task-area height only grows once content exceeds the initial viewport (~3 collapsed cards), per-task growth halved
-- Appearance page order: 窗口标题 → 窗口透明度 → 色彩主题
-- Settings fonts slimmed, tighter section spacing, slimmer apply button
-
-**Fixed**
-- Opacity label showed 8900% instead of 89% (percent-format multiplied the already-percent value)
-
-### v3.4 — Global Stop Hotkey & Run Limit
-
-**New**
-- **Global stop hotkey** — Press F8 (customizable) anywhere, even while gaming, to instantly stop all tasks. Configure it in Settings → "全局停止热键"; click "修改热键" and press any key to rebind (ESC cancels). The choice is saved to `settings.json`
-- **Run-count limit** — Each task card has a new "次数" input (0 = unlimited). When the task reaches its limit it stops automatically: the button resets to "▶ 开始", the status shows "✓ 已达上限 N 次", and a floating notification pops up
-
-### v3.3 — Keyboard Task & UI Tweaks
-**Changed**
-- Optimized keyboard‑task execution logic for better stability
-- Adjusted partial UI font sizes for improved readability
+Full version history and detailed release notes → **[CHANGELOG.md](CHANGELOG.md)**
 
 ## License
 
