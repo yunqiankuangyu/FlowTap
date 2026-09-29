@@ -1,0 +1,155 @@
+<p align="right">
+  <a href="CHANGELOG.zh.md">🇨🇳 中文</a> | <b>🇬🇧 English</b>
+</p>
+
+# 📋 FlowTap Changelog
+
+> Back to [README](README.md) · Full version history and detailed release notes for every version
+
+## Version History
+
+| Version | Framework | Highlights |
+|---------|-----------|------------|
+| v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
+| v3.8.2 | PySide6 | Smart branching (experimental), dark tooltip fix |
+| v3.8.1 | PySide6 | Humanized mouse movement, Start All fix |
+| v3.8.0 | PySide6 | Window binding (auto-wait on switch), rounded corners, bottom bar alignment |
+| v3.7.4 | PySide6 | Scroll kept, mini-window sync, preset load confirmation |
+| v3.7.3 | PySide6 | Preset dependency fix, window height fix |
+| v3.7.2 | PySide6 | UI refinements |
+| v3.7.1 | PySide6 | Window height fix, UI stability |
+| v3.7 | PySide6 | Drag-and-drop reorder for action rows |
+| v3.6.1 | PySide6 | Stability fixes for long idle sessions |
+| v3.6 | PySide6 | Pause all tasks, collapse task cards |
+| v3.5 | PySide6 | Key combos, settings pages, portable exe |
+| v3.4 | PySide6 | Global stop hotkey & run-count limit |
+| v3.3 | PySide6 | Optimized partial font display |
+| v3.2 | PySide6 | Hold-to-press for key & mouse bindings |
+| v3.1 | PySide6 | Bug fixes & cleanup |
+| v3 | PySide6 | Qt migration, solves CTk rendering flicker |
+| v2 | CustomTkinter | Unified keyboard+mouse task mode |
+| v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
+
+## Release Notes
+
+### v3.8.3 — Color Templates & Wait Enhancements
+
+**New**
+- View the captured reference image for image-wait conditions
+- Templates now use full-color matching
+- Option to skip the whole task card on timeout
+- Option to keep waiting on timeout
+
+**Fixed**
+- Fixed screenshot position offset at high display scaling
+- Fixed templates captured with overlay dimming
+- Fixed solid-color regions being easily misdetected
+- Fixed window disappearing after clicking the Edit button
+
+### v3.8.2 — Vision Enhancements & Action Settings Page
+
+**New**
+- Smart branching (experimental): recognizes the current screen and follows the matching flow, letting a single task handle multiple scenarios
+
+**Changed**
+- Unified button heights, dropdown styling and widths
+
+**Fixed**
+- Fixed unreadable tooltips (black text on black background) in system dark mode
+
+### v3.8.1 — Humanized Mouse & State Fixes
+
+**New**
+- **Humanized mouse movement** — Arc trajectories with easing, random jitter and overshoot
+
+**Fixed**
+- Fixed "Start All" button doing nothing after switching pages
+- Mini window title now follows the custom title setting
+
+### v3.7.4 — Page Switch & Theme Fixes
+
+**Added**
+- Confirmation prompt before loading a preset, to avoid overwriting current tasks
+
+**Fixed**
+- Task list scroll position is kept when switching pages
+- Mini window start/stop state stays in sync with the main window
+- Unreadable button text in the Cat Pudding (purple) theme
+
+### v3.7.3 — Preset & Window Fixes
+
+**Fixed**
+- Fixed preset dependency display after loading
+- Fixed window height shrinking when deleting tasks
+- Fixed theme switching not working correctly in certain situations
+- General stability improvements
+
+### v3.7.2 — UI Refinements
+
+**Changed**
+- UI refinements and polish
+
+### v3.7.1 — Window Height & UI Fixes
+
+**Changed**
+- Increased initial window height for better visibility
+- Window height no longer recalculates when content height is unchanged, reducing visual flicker
+
+**Fixed**
+- Single task card no longer stretches to fill the entire task area
+- Fold/unfold animation now uses correct height values
+- Removed black tooltip artifact on drag handle hover
+
+### v3.7 — Action Row Drag-and-Drop
+
+**New**
+- **Drag-and-drop reorder for action rows** — A ☰ handle on the left side of each row lets you drag to reorder actions
+
+### v3.6.1 — Stability Fixes
+
+**Fixed**
+- **Silent crash during long idle sessions** — Fixed the program occasionally exiting without warning during extended idle runtime; added runtime logging to record exceptions
+- **Task cannot restart after abnormal stop** — Fixed the loop thread not being properly released after an abnormal stop, preventing the task from being restarted
+
+### v3.6 — Pause All & Card Collapse
+
+**New**
+- **Pause/resume all tasks** — A new "⏸ 全部暂停" button on the bottom bar freezes all running tasks; click again to resume from where they left off. Progress and countdowns are preserved while paused (unlike "Stop" which resets everything)
+- **Collapse/expand task cards** — Each task card has a fold button (◀/▶) on the title row to collapse it down to just the header, or expand it to show the full action list. Collapsed cards save vertical space so you can see more tasks at once
+
+**Changed**
+- Collapsed card padding unified with expanded state (11px all sides) for consistent look
+- Window height calculation updated to match actual card measurements
+
+### v3.5 — Key Combos, Settings Pages & Portable Build
+
+**New**
+- **Arbitrary key combos** — Bind W+D style combinations: press and hold any keys (ESC included), release all to confirm. Playback presses them together, holds for the "持续" duration, releases in reverse. Single keys behave exactly as before; old presets fully compatible
+- **Settings split into two pages** — 外观设置 (window title, opacity, theme) and 功能设置 (global start F7 & stop F8 hotkeys, new-task defaults, start countdown, always-on-top, remember window height, preset import/export), switched by a dropdown
+- **Global start hotkey** — F7 (customizable) mirrors the stop hotkey
+- **Preset import/export** — Back up all presets to a JSON file and merge them back on another machine
+- **Portable exe** — Single-file Windows build; settings/presets/logs live next to the exe; auto-elevation and apply-restart work frozen
+
+**Changed**
+- Default theme is now 冰川蓝 at 90% opacity for fresh installs
+- Bottom bar & drag handle are window-level persistent widgets — pixel-identical geometry across pages, only the buttons swap (新建任务/全部开始 ↔ 应用)
+- Settings page gets the same bottom bar and drag handle as the task page
+- Window height is governed by one source (task-page auto-size + user drag); switching pages never resizes the window
+- Task-area height only grows once content exceeds the initial viewport (~3 collapsed cards), per-task growth halved
+- Appearance page order: 窗口标题 → 窗口透明度 → 色彩主题
+- Settings fonts slimmed, tighter section spacing, slimmer apply button
+
+**Fixed**
+- Opacity label showed 8900% instead of 89% (percent-format multiplied the already-percent value)
+
+### v3.4 — Global Stop Hotkey & Run Limit
+
+**New**
+- **Global stop hotkey** — Press F8 (customizable) anywhere, even while gaming, to instantly stop all tasks. Configure it in Settings → "全局停止热键"; click "修改热键" and press any key to rebind (ESC cancels). The choice is saved to `settings.json`
+- **Run-count limit** — Each task card has a new "次数" input (0 = unlimited). When the task reaches its limit it stops automatically: the button resets to "▶ 开始", the status shows "✓ 已达上限 N 次", and a floating notification pops up
+
+### v3.3 — Keyboard Task & UI Tweaks
+
+**Changed**
+- Optimized keyboard‑task execution logic for better stability
+- Adjusted partial UI font sizes for improved readability
