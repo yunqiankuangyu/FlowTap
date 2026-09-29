@@ -12,8 +12,8 @@ from config import Colors, FONT_B, load_settings, save_settings
 from tasks import MouseTask
 from ui.keyboard_mode import WIN_W
 
-# 伪装标题
-DISGUISE_TITLE = "svchost"
+# 窗口标题(任务栏/Alt-Tab 显示)
+WINDOW_TITLE = "FlowTap"
 WIN_RADIUS = 16   # 窗口圆角半径（自绘）
 
 DEFAULT_STOP_HOTKEY = 0x77  # F8
@@ -31,7 +31,7 @@ class App(QMainWindow):
         from core.window_gate import set_bound_process
         set_bound_process(self._settings.get("bind_process", ""))
 
-        self.setWindowTitle(DISGUISE_TITLE)
+        self.setWindowTitle(WINDOW_TITLE)
         self.setFixedSize(WIN_W, 400)
         flags = Qt.FramelessWindowHint
         if self._settings.get("always_on_top", True):

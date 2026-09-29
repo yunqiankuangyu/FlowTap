@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('packaging/FlowTap.ico', 'packaging')],
     hiddenimports=['cv2'],
     hookspath=[],
     hooksconfig={},
