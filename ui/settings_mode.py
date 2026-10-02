@@ -14,7 +14,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from config import Colors, THEMES, DEFAULT_THEME, load_settings, save_settings
-from .widgets import _make_btn, spin_fill, style_label
+from .widgets import (_make_btn, spin_fill, style_label, btn_qss, card_qss,
+                        scroll_qss, set_bg, line_fill, dot_qss, slider_qss)
 
 # 设置页专用字体：比全局小 3px
 _FB = QFont("MiSans", 11, QFont.Bold)
@@ -29,10 +30,7 @@ def _page_btn_style(active):
     """分页切换按钮样式：选中蓝底，未选中灰底"""
     from config import Colors as _C
     bg = _C.BLUE if active else _C.ACCENT
-    return f"""
-        QPushButton {{ background: {bg}; color: {_C.TEXT}; border: none; border-radius: 4px; }}
-        QPushButton:hover {{ background: {_C.BLUE}; }}
-    """
+    return btn_qss(bg, _C.TEXT, hover=_C.BLUE)
 
 
 def install_wheel_guard(app):
@@ -49,7 +47,7 @@ def install_wheel_guard(app):
 def _make_section(parent_layout, title):
     """通用 section 卡片骨架，返回内部 layout"""
     frame = QFrame()
-    frame.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
+    frame.setStyleSheet(card_qss())
     v = QVBoxLayout(frame)
     v.setContentsMargins(11, 6, 11, 6)
 
@@ -70,7 +68,7 @@ def build_settings_mode(app):
 
     # ── 页面切换按钮（两个等宽按钮，选中高亮）──
     nav_row = QWidget()
-    nav_row.setStyleSheet("background: transparent;")
+    set_bg(nav_row, "transparent")
     nav = QHBoxLayout(nav_row)
     nav.setContentsMargins(0, 0, 0, 2)
     nav.setSpacing(4)
@@ -97,7 +95,7 @@ def build_settings_mode(app):
 
     # ── 外观页容器 ──
     appearance_page = QWidget()
-    appearance_page.setStyleSheet("background: transparent;")
+    set_bg(appearance_page, "transparent")
     ap_layout = QVBoxLayout(appearance_page)
     ap_layout.setContentsMargins(0, 0, 0, 0)
     ap_layout.setSpacing(2)
@@ -105,7 +103,7 @@ def build_settings_mode(app):
 
     # ── 功能页容器 ──
     function_page = QWidget()
-    function_page.setStyleSheet("background: transparent;")
+    set_bg(function_page, "transparent")
     fn_layout = QVBoxLayout(function_page)
     fn_layout.setContentsMargins(0, 0, 0, 0)
     fn_layout.setSpacing(10)
@@ -117,7 +115,7 @@ def build_settings_mode(app):
     v2 = _make_section(ap_layout, "🏷 窗口标题")
 
     ti_row = QWidget()
-    ti_row.setStyleSheet("background: transparent;")
+    set_bg(ti_row, "transparent")
     ti_row_layout = QHBoxLayout(ti_row)
     ti_row_layout.setContentsMargins(0, 0, 0, 0)
     ti_row_layout.setSpacing(6)
@@ -126,9 +124,7 @@ def build_settings_mode(app):
     app._title_edit.setPlaceholderText("FlowTap（默认）")
     app._title_edit.setFixedHeight(28)
     app._title_edit.setFont(QFont("MiSans", 10, QFont.Bold))
-    app._title_edit.setStyleSheet(f"""
-        QLineEdit {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
-    """)
+    line_fill(app._title_edit)
     ti_row_layout.addWidget(app._title_edit, 1)
 
     def _apply_title():
@@ -157,7 +153,7 @@ def build_settings_mode(app):
     v = _make_section(ap_layout, "👁 窗口透明度")
 
     op_row = QWidget()
-    op_row.setStyleSheet("background: transparent;")
+    set_bg(op_row, "transparent")
     op_row_layout = QHBoxLayout(op_row)
     op_row_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -165,11 +161,7 @@ def build_settings_mode(app):
     slider.setMinimum(30)
     slider.setMaximum(100)
     slider.setValue(int(s["opacity"] * 100))
-    slider.setStyleSheet(f"""
-        QSlider::groove:horizontal {{ background: {Colors.ACCENT}; height: 6px; border-radius: 3px; }}
-        QSlider::handle:horizontal {{ background: {Colors.BLUE}; width: 16px; height: 16px; margin: -5px 0; border-radius: 8px; }}
-        QSlider::sub-page:horizontal {{ background: {Colors.BLUE}; border-radius: 3px; }}
-    """)
+    slider.setStyleSheet(slider_qss())
     app._opacity_slider = slider
 
     op_val = QLabel(f"{int(s['opacity'] * 100)}%")
@@ -188,7 +180,7 @@ def build_settings_mode(app):
     v = _make_section(ap_layout, "🎨 色彩主题")
 
     themes_grid = QWidget()
-    themes_grid.setStyleSheet("background: transparent;")
+    set_bg(themes_grid, "transparent")
     grid = QGridLayout(themes_grid)
     grid.setContentsMargins(0, 0, 0, 0)
     grid.setSpacing(4)
@@ -201,10 +193,7 @@ def build_settings_mode(app):
         btn = QPushButton(name)
         btn.setFont(_FM)
         btn.setFixedHeight(30)
-        btn.setStyleSheet(f"""
-            QPushButton {{ background: {t["CARD"]}; color: {t["TEXT"]}; border: none; border-radius: 4px; }}
-            QPushButton:hover {{ background: {t["ACCENT"]}; }}
-        """)
+        btn.setStyleSheet(btn_qss(t["CARD"], t["TEXT"], hover=t["ACCENT"]))
         btn.clicked.connect(lambda checked, n=name: on_theme_change(app, n))
         app._theme_buttons[name] = btn
         grid.addWidget(btn, i // 3, i % 3)
@@ -215,7 +204,7 @@ def build_settings_mode(app):
     v.addWidget(themes_grid)
 
     app._preview_frame = QWidget()
-    app._preview_frame.setStyleSheet("background: transparent;")
+    set_bg(app._preview_frame, "transparent")
     app._preview_layout = QVBoxLayout(app._preview_frame)
     app._preview_layout.setContentsMargins(0, 0, 0, 0)
     v.addWidget(app._preview_frame)
@@ -230,7 +219,7 @@ def build_settings_mode(app):
     def _make_hotkey_row(label_text, current_vk, capture_key):
         """一行热键显示 + 修改按钮"""
         row = QWidget()
-        row.setStyleSheet("background: transparent;")
+        set_bg(row, "transparent")
         rl = QHBoxLayout(row)
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(8)
@@ -272,7 +261,7 @@ def build_settings_mode(app):
     v = _make_section(fn_layout, "📋 新建任务默认值")
 
     defaults_grid = QWidget()
-    defaults_grid.setStyleSheet("background: transparent;")
+    set_bg(defaults_grid, "transparent")
     dg = QHBoxLayout(defaults_grid)
     dg.setContentsMargins(0, 0, 0, 0)
     dg.setSpacing(6)
@@ -313,7 +302,7 @@ def build_settings_mode(app):
     v = _make_section(fn_layout, "⏱ 启动倒计时")
 
     cd_row = QWidget()
-    cd_row.setStyleSheet("background: transparent;")
+    set_bg(cd_row, "transparent")
     cd_layout = QHBoxLayout(cd_row)
     cd_layout.setContentsMargins(0, 0, 0, 0)
     cd_layout.setSpacing(6)
@@ -337,7 +326,7 @@ def build_settings_mode(app):
 
     def _make_toggle(label_text, checked, key):
         row = QWidget()
-        row.setStyleSheet("background: transparent;")
+        set_bg(row, "transparent")
         rl = QHBoxLayout(row)
         rl.setContentsMargins(0, 0, 0, 0)
         lbl = QLabel(label_text)
@@ -353,10 +342,7 @@ def build_settings_mode(app):
         def _style(on):
             color = Colors.GREEN if on else Colors.DIM
             hover = Colors.HOVER_GREEN if on else Colors.ACCENT
-            return f"""
-                QPushButton {{ background: {color}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-                QPushButton:hover {{ background: {hover}; }}
-            """
+            return btn_qss(color, hover=hover)
         btn.setStyleSheet(_style(checked))
 
         def toggle():
@@ -392,7 +378,7 @@ def build_settings_mode(app):
     import bisect as _bisect
 
     bind_row = QWidget()
-    bind_row.setStyleSheet("background: transparent;")
+    set_bg(bind_row, "transparent")
     brl = QHBoxLayout(bind_row)
     brl.setContentsMargins(0, 0, 0, 0)
     brl.setSpacing(6)
@@ -466,11 +452,7 @@ def build_settings_mode(app):
     brl.addStretch()
 
     def _btn_style(bg, hover):
-        return f"""
-            QPushButton {{ background: {bg}; color: {Colors.TEXT}; border: none; border-radius: 4px; }}
-            QPushButton:hover {{ background: {hover}; }}
-            QPushButton:disabled {{ background: {Colors.ACCENT}; color: {Colors.DIM}; }}
-        """
+        return btn_qss(bg, hover=hover, disabled=(Colors.ACCENT, Colors.DIM))
 
     capture_btn = QPushButton("捕获窗口")
     capture_btn.setFont(_FM)
@@ -549,7 +531,7 @@ def build_settings_mode(app):
     v = _make_section(fn_layout, "💾 预设备份")
 
     pe_row = QWidget()
-    pe_row.setStyleSheet("background: transparent;")
+    set_bg(pe_row, "transparent")
     pe_layout = QHBoxLayout(pe_row)
     pe_layout.setContentsMargins(0, 0, 0, 0)
     pe_layout.setSpacing(6)
@@ -672,7 +654,7 @@ def update_preview(app, theme_name):
     # 文字预览条
     bar = QFrame()
     bar.setFixedHeight(50)
-    bar.setStyleSheet(f"background: {t['CARD']}; border-radius: 8px;")
+    bar.setStyleSheet(card_qss(t["CARD"], radius=8, sel=""))
     bar_layout = QHBoxLayout(bar)
     bar_layout.setContentsMargins(8, 8, 8, 8)
 
@@ -690,7 +672,7 @@ def update_preview(app, theme_name):
 
     # 色条
     colors_row = QWidget()
-    colors_row.setStyleSheet("background: transparent;")
+    set_bg(colors_row, "transparent")
     colors_layout = QHBoxLayout(colors_row)
     colors_layout.setContentsMargins(0, 0, 0, 0)
     colors_layout.setSpacing(2)
@@ -698,7 +680,7 @@ def update_preview(app, theme_name):
     for color in [t["BLUE"], t["GREEN"], t["RED"], t["YELLOW"]]:
         c = QFrame()
         c.setFixedHeight(20)
-        c.setStyleSheet(f"background: {color}; border-radius: 4px;")
+        c.setStyleSheet(dot_qss(color, radius=4))
         colors_layout.addWidget(c, 1)
 
     app._preview_layout.addWidget(colors_row)
@@ -780,7 +762,7 @@ def _rebuild_ui(app):
 
     # ── 3. 创建全新 central + 全新布局 ──
     new_central = QWidget()
-    new_central.setStyleSheet(f"background: {Colors.CARD};")
+    set_bg(new_central, "transparent")  # 圆角由主窗口 paintEvent 统一画(同首次构建)
     app.setCentralWidget(new_central)
 
     lay = QVBoxLayout(new_central)
@@ -793,7 +775,7 @@ def _rebuild_ui(app):
 
     # 键盘模式页面
     app.keyboard_frame = QWidget()
-    app.keyboard_frame.setStyleSheet(f"background: {Colors.CARD};")
+    set_bg(app.keyboard_frame, "transparent")  # 圆角由主窗口 paintEvent 统一画(同首次构建)
     app.keyboard_layout = QVBoxLayout(app.keyboard_frame)
     app.keyboard_layout.setContentsMargins(10, 0, 10, 0)
     app.keyboard_layout.setSpacing(0)
@@ -801,7 +783,7 @@ def _rebuild_ui(app):
 
     # 设置模式页面
     app.settings_frame = QWidget()
-    app.settings_frame.setStyleSheet(f"background: {Colors.CARD};")
+    set_bg(app.settings_frame, "transparent")  # 圆角由主窗口 paintEvent 统一画(同首次构建)
     app.settings_layout = QVBoxLayout(app.settings_frame)
     app.settings_layout.setContentsMargins(10, 0, 10, 4)
     app.settings_layout.setSpacing(8)
@@ -809,30 +791,23 @@ def _rebuild_ui(app):
     install_wheel_guard(app)
 
     # 滚动容器
-    scroll_qss = f"""
-        QScrollArea {{ background: {Colors.CARD}; border: none; }}
-        QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
-        QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
-        QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
-        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
-    """
+    sq = scroll_qss(Colors.CARD)
 
     app._keyboard_scroll = QScrollArea()
     app._keyboard_scroll.setWidgetResizable(True)
     app._keyboard_scroll.setFrameShape(QFrame.NoFrame)
-    app._keyboard_scroll.setStyleSheet(scroll_qss)
+    app._keyboard_scroll.setStyleSheet(sq)
     app._keyboard_scroll.setWidget(app.keyboard_frame)
 
     app._settings_scroll = QScrollArea()
     app._settings_scroll.setWidgetResizable(True)
     app._settings_scroll.setFrameShape(QFrame.NoFrame)
-    app._settings_scroll.setStyleSheet(scroll_qss)
+    app._settings_scroll.setStyleSheet(sq)
     app._settings_scroll.setWidget(app.settings_frame)
 
     # content stack
     app.content_stack = QStackedWidget()
-    app.content_stack.setStyleSheet(f"background: {Colors.CARD};")
+    set_bg(app.content_stack, "transparent")  # 圆角由主窗口 paintEvent 统一画(同首次构建)
     app.content_stack.addWidget(app._keyboard_scroll)
     app.content_stack.addWidget(app._settings_scroll)
 

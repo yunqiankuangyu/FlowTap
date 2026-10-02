@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCursor
 
 from config import Colors, FONT_B, FONT_M, load_settings, save_settings
-from .widgets import flat_btn, ghost_btn, style_label
+from .widgets import flat_btn, ghost_btn, style_label, set_bg, label_qss
 
 
 def minimize_to_mini(app):
@@ -35,7 +35,7 @@ def build_mini_mode(app):
     from core.window_gate import apply_round_corners
     apply_round_corners(mini)
     mini.move(x, y)
-    mini.setStyleSheet(f"background-color: {Colors.ACCENT};")
+    set_bg(mini, Colors.ACCENT)
     if app._settings["opacity"] < 1.0:
         mini.setWindowOpacity(app._settings["opacity"])
     app._mini_window = mini
@@ -47,7 +47,7 @@ def build_mini_mode(app):
     # 标题栏
     bar = QWidget()
     bar.setFixedHeight(32)
-    bar.setStyleSheet(f"background-color: {Colors.CARD};")
+    set_bg(bar, Colors.CARD)
     bar_layout = QHBoxLayout(bar)
     bar_layout.setContentsMargins(8, 0, 6, 0)
 
@@ -95,7 +95,7 @@ def build_mini_mode(app):
 
     # 按钮区（2列 grid，sticky="ew"）
     btn_frame = QWidget()
-    btn_frame.setStyleSheet("background: transparent;")
+    set_bg(btn_frame, "transparent")
     btn_layout = QHBoxLayout(btn_frame)
     btn_layout.setContentsMargins(8, 8, 8, 4)
     btn_layout.setSpacing(3)
@@ -122,7 +122,7 @@ def build_mini_mode(app):
     status = QLabel("● 就绪")
     status.setFont(FONT_M)
     status.setAlignment(Qt.AlignCenter)
-    status.setStyleSheet(f"color: {Colors.DIM}; background: transparent; padding-bottom: 6px;")
+    status.setStyleSheet(label_qss(Colors.DIM, extra="padding-bottom: 6px;"))
     app._mini_status = status
     main_layout.addWidget(status)
 
@@ -178,7 +178,7 @@ def update_mini_status(app):
 
         if hasattr(app, '_mini_status') and app._mini_status:
             app._mini_status.setText(text)
-            app._mini_status.setStyleSheet(f"color: {color}; background: transparent; padding-bottom: 6px;")
+            app._mini_status.setStyleSheet(label_qss(color, extra="padding-bottom: 6px;"))
 
         update_mini_btn(app)
 

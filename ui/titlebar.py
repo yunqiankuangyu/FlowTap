@@ -10,30 +10,15 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor
 
 from config import Colors, FONT_B
+from .widgets import btn_qss, titlebar_qss, F17
 
 
 def build_titlebar(app):
     """构建标题栏"""
     bar = QWidget()
     bar.setFixedHeight(32)
-    bar.setStyleSheet(f"""
-        QWidget {{
-            background-color: transparent;
-        }}
-        QPushButton {{
-            background-color: transparent;
-            color: {Colors.DIM};
-            border: none;
-            font: bold 17px 'MiSans';
-        }}
-        QPushButton:hover {{
-            background-color: {Colors.RED};
-            color: {Colors.TEXT};
-        }}
-        QLabel {{
-            color: {Colors.TEXT};
-        }}
-    """)
+    #底色透明+标题字色(三按钮各自make_title_btn设样式, bar级兜底是死规则已删)
+    bar.setStyleSheet(titlebar_qss())
 
     layout = QHBoxLayout(bar)
     layout.setContentsMargins(11, 0, 4, 0)
@@ -59,18 +44,8 @@ def build_titlebar(app):
         btn.setFixedSize(23, 23)
         btn.setCursor(QCursor(Qt.PointingHandCursor))
         if hover_color:
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    color: {Colors.DIM};
-                    border: none;
-                    font: bold 17px 'MiSans';
-                }}
-                QPushButton:hover {{
-                    background-color: {hover_color};
-                    color: {Colors.TEXT};
-                }}
-            """)
+            btn.setStyleSheet(btn_qss("transparent", Colors.DIM, hover=hover_color,
+                                      hover_fg=Colors.TEXT, font=F17, radius=None))
         btn.clicked.connect(on_click)
         return btn
 

@@ -46,10 +46,9 @@ class Colors:
         from PySide6.QtWidgets import QApplication
         _app = QApplication.instance()
         if _app is not None:
-            _app.setStyleSheet(
-                f"QToolTip {{ background: {cls.ACCENT}; color: {cls.TEXT}; "
-                f"border: 1px solid {cls.BLUE}; padding: 3px 7px; border-radius: 3px; }}"
-            )
+            #(tooltip_qss在ui.widgets, 局部import防config与ui循环)
+            from ui.widgets import tooltip_qss
+            _app.setStyleSheet(tooltip_qss())
 
 
 # 字体
