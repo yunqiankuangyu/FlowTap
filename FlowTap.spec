@@ -1,17 +1,36 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_data_files
 
+# OCR(rapidocr)在函数内延迟导入, 静态分析扫不到, 必须显式声明(只列RapidOCR实际用到的子模块, 不用collect_submodules以免牵入torch/CUDA)
+_hidden = [
+    'cv2',
+    'rapidocr_onnxruntime',
+    'rapidocr_onnxruntime.main',
+    'rapidocr_onnxruntime.cal_rec_boxes',
+    'rapidocr_onnxruntime.ch_ppocr_cls',
+    'rapidocr_onnxruntime.ch_ppocr_cls.text_cls',
+    'rapidocr_onnxruntime.ch_ppocr_det',
+    'rapidocr_onnxruntime.ch_ppocr_det.text_detect',
+    'rapidocr_onnxruntime.ch_ppocr_rec',
+    'rapidocr_onnxruntime.ch_ppocr_rec.text_recognize',
+    'rapidocr_onnxruntime.utils',
+    'rapidocr_onnxruntime.utils.infer_engine',
+]
+# onnx模型与字典文件(collect_data_files只收数据文件, 不牵模块依赖)
+_datas = [('packaging/FlowTap.ico', 'packaging')] + collect_data_files('rapidocr_onnxruntime')
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('packaging/FlowTap.ico', 'packaging')],
-    hiddenimports=['cv2'],
+    datas=_datas,
+    hiddenimports=_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=['PySide6.QtQuick', 'PySide6.QtQml', 'PySide6.QtPdf',
-              'PySide6.QtNetwork', 'PySide6.QtOpenGL', 'PySide6.QtVirtualKeyboard'],
+              'PySide6.QtNetwork', 'PySide6.QtOpenGL', 'PySide6.QtVirtualKeyboard',
+              'torch', 'torchvision', 'torchaudio', 'tensorflow', 'jax', 'llvmlite', 'IPython'],
     noarchive=False,
     optimize=0,
 )
