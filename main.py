@@ -2,7 +2,7 @@
 FlowTap
 依赖: pip install PySide6
 """
-__version__ = "3.8.3"
+__version__ = "3.9.0"
 
 import sys
 import os
@@ -44,15 +44,14 @@ if __name__ == "__main__":
 
     ensure_admin()
 
-    # DPI 感知：确保坐标系统一致
-    import ctypes
+    # DPI 感知 + 坐标体系自检(统一走 core.coords, 缩放相关问题一眼可见)
+    from core.coords import ensure_dpi_aware, probe_dpi_report
+    ensure_dpi_aware()
     try:
-        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        from logger import log_info
+        log_info("dpi", "\n" + probe_dpi_report())
     except Exception:
-        try:
-            ctypes.windll.user32.SetProcessDPIAware()
-        except Exception:
-            pass
+        pass
 
     import traceback
 
