@@ -146,6 +146,12 @@ class MouseSimulator:
             random_delay(duration, 0.05)
         self._send(self._make_mouse_input(ax, ay, flags_u))
 
+    def move_mouse_exact(self, x, y):
+        """精确移动到指定点(不点击)——定位/调试用, 不做拟人化偏移(±2px微偏与过冲会让落点漂移, 定位必须准)"""
+        sw, sh = self.user32.GetSystemMetrics(0), self.user32.GetSystemMetrics(1)
+        ax, ay = int(x * 65535 / sw), int(y * 65535 / sh)
+        self._send(self._make_mouse_input(ax, ay, MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE))
+
     def move_mouse(self, x, y):
         #拟人化移动，弧线轨迹+钟形速度+落点微偏+概率过冲修正
         import time, random, math

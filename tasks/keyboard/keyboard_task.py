@@ -1,6 +1,7 @@
 """
 键盘任务模块（支持键鼠混合动作）
 """
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from core import KeyboardSimulator, MouseSimulator, random_delay
+from core import vision
 
 
 class TaskStatus(Enum):
@@ -52,6 +54,64 @@ def make_wait_image_action(tpl, threshold=0.85, timeout=30, on_timeout="skip", d
             "min_hits": min_hits, "scales": list(scales), "lid": _new_lid()}
 
 
+def pattern_label(pattern):
+    """正则 → 用户可读的下拉标签；不在预设表 = 自定义（UI只显示大白话，正则藏幕后）
+    含旧版正则别名: 早期"取最后一个数字"写的是 .*(\\d+(?:\\.\\d+)?)（贪婪前缀会只取到末位数字），
+    老预设里存着它——映射到新标签，用户看到标签不变、重新选择即升级为修正后的正则"""
+    p = pattern or ""
+    for lab, pat in PATTERN_PRESETS:
+        if pat == p:
+            return lab
+    for lab, pat in _LEGACY_PATTERNS:
+        if pat == p:
+            return lab
+    return "自定义…"
+
+
+# 旧版正则 → 现行标签（只用于显示反查，不再用于新选择）
+_LEGACY_PATTERNS = [
+    ("取最后一个数字", r".*(\d+(?:\.\d+)?)"),
+]
+
+
+# 取数方式预设：标签(下拉显示) → 提取正则；空串=默认剥千分位抽首个数字
+PATTERN_PRESETS = [
+    ("取第一个数字", ""),
+    ("取斜杠前数字", r"(\d+(?:\.\d+)?)\s*/"),
+    ("取斜杠后数字", r"/\s*(\d+(?:\.\d+)?)"),
+    ("取冒号后数字", r"[:：]\s*(\d+(?:\.\d+)?)"),
+    ("取最后一个数字", r"(\d+(?:\.\d+)?)(?!.*\d)"),
+]
+
+
+def read_region(action):
+    """按读数动作的框选区域截屏并OCR，返回原始文本（识别失败抛给调用方处理）
+    「试读」按钮与执行逻辑共用此入口，保证所见即所得"""
+    c2s = None
+    from core.window_gate import get_bound_process
+    if get_bound_process() and action.get("rel"):
+        bb = vision.client_area_bbox(_foreground_hwnd())
+        if bb:
+            def c2s(x, y, _bb=bb):
+                return _bb[0] + x, _bb[1] + y
+    bbox = region_bbox(action, c2s)
+    img = vision.grab_rgb(bbox)
+    return _ocr_text(img)
+
+
+def next_var_name(actions, task_vars=None):
+    """给新动作挑默认变量名：v1 起递增，跳过已用名（task.vars + 动作里引用的 var）"""
+    used = set(task_vars or ())
+    for a in actions:
+        v = a.get("var")
+        if v:
+            used.add(v)
+    i = 1
+    while f"v{i}" in used:
+        i += 1
+    return f"v{i}"
+
+
 def _ensure_lids(actions):
     """为缺 lid 的旧动作补发（幂等：已有 lid 不动）；返回原列表"""
     for a in actions:
@@ -73,6 +133,74 @@ def make_jump_action(target=None, delay=0.0):
     return {"type": "jump", "target": target, "delay": delay, "lid": _new_lid()}
 
 
+def make_ocr_read_action(region, var, pattern="", delay=0.0):
+    """创建读数动作：OCR识别region=[x,y,w,h]客户区区域写入变量var
+    pattern 提取正则（空=抽首个数字，千分位逗号自动剥）；识别失败写0不中断"""
+    return {"type": "ocr_read", "region": list(region), "var": var,
+            "pattern": pattern, "delay": delay, "lid": _new_lid()}
+
+
+def make_cond_branch_action(var, cmp, value=0, target=None, delay=0.0):
+    """创建数值条件分支：vars[var] <cmp> value 成立返回target，否则顺序继续
+    cmp: > >= < <= == != ；未知变量按0；target=None 或不存在=顺序继续（语义与branch一致）"""
+    return {"type": "cond_branch", "var": var, "cmp": cmp, "value": float(value),
+            "target": target, "delay": delay, "lid": _new_lid()}
+
+
+def make_var_set_action(var, op="+", value=0, delay=0.0):
+    """创建变量运算动作：vars[var] = vars[var] <op> value
+    op: + - * / = （=为直接赋值）；新变量从0起步；除零/未知op记日志不中断且变量保持原值"""
+    return {"type": "var_set", "var": var, "op": op, "value": float(value),
+            "delay": delay, "lid": _new_lid()}
+
+
+def _parse_num(text, pattern=None):
+    """OCR文本→数值：默认抽首个数字（先剥千分位逗号）；pattern 有捕获组取组1；失败返回0"""
+    if not text:
+        return 0.0
+    try:
+        s = str(text).replace(",", "")
+        if pattern:
+            m = re.search(pattern, s)
+            if not m:
+                return 0.0
+            s = m.group(1) if m.groups() else m.group(0)
+        else:
+            m = re.search(r"\d+(?:\.\d+)?", s)
+            if not m:
+                return 0.0
+            s = m.group(0)
+        return float(s)
+    except Exception:
+        return 0.0
+
+
+def region_bbox(action, c2s=None):
+    """读数区→屏幕bbox=(x0,y0,x1,y1)。
+    c2s=客户区→屏幕换算（绑定窗口时由调用方传入）；否则用录制快照sx/sy；再无则相对坐标直通"""
+    x, y, w, h = action["region"]
+    if c2s:
+        x0, y0 = c2s(x, y)
+        return (x0, y0, x0 + w, y0 + h)
+    sx, sy = action.get("sx", x), action.get("sy", y)
+    return (sx, sy, sx + w, sy + h)
+
+
+_ocr_engine = None
+
+
+def _ocr_text(img):
+    """RapidOCR 单行纯识别——use_det 跳过检测网络（小ROI 12ms，且避免检测框切碎数字）"""
+    global _ocr_engine
+    if _ocr_engine is None:
+        from rapidocr_onnxruntime import RapidOCR
+        _ocr_engine = RapidOCR()
+    res, _ = _ocr_engine(img, use_det=False, use_cls=False)
+    if not res:
+        return ""
+    return "".join(str(r[0]) for r in res)
+
+
 def fmt_action(action):
     """格式化动作为可读字符串"""
     from vk_map import VK_NAME
@@ -89,6 +217,19 @@ def fmt_action(action):
         return f"🔀 分支×{len(action.get('options') or [])}"
     elif action["type"] == "jump":
         return "→ 跳转"
+    elif action["type"] == "ocr_read":
+        return f"🔢 读数→{action.get('var', '?')}"
+    elif action["type"] == "var_set":
+        op = action.get("op", "=")
+        v = action.get("value", 0)
+        lhs = action.get("var", "?")
+        #存储用ASCII运算符(* /), 描述转数学符号(× ÷)与UI下拉显示一致
+        disp = {"*": "×", "/": "÷"}.get(op, op)
+        return f"🔢 {lhs}={lhs}{disp}{v:g}" if op != "=" else f"🔢 {lhs}={v:g}"
+    elif action["type"] == "cond_branch":
+        # 条件分支行内摘要: 条件 + 跳转目标序号(目标未设/失效时给出可读提示, 行内不显示下拉)
+        cond = f"{action.get('var', '?')}{action.get('cmp', '==')}{action.get('value', 0):g}"
+        return f"⚖ {cond}"
     return "?"
 
 
@@ -139,6 +280,7 @@ class KeyboardTask:
     _dependents: List['KeyboardTask'] = field(default_factory=list, repr=False)
     _callback: object = field(default=None, repr=False)
     _countdown_callback: object = field(default=None, repr=False)
+    vars: dict = field(default_factory=dict, repr=False)  # 运行时变量表（任务内局部，不序列化）
 
     def start(self, callback=None, countdown_callback=None):
         """启动任务"""
@@ -343,6 +485,67 @@ class KeyboardTask:
             waited += time.monotonic() - t0
         return "STOP"
 
+    def _run_var_set(self, action):
+        """变量运算：vars[var] = vars[var] <op> value；异常记日志，变量保持原值不中断"""
+        from logger import log_error
+        var, op, val = action.get("var", "_"), action.get("op", "="), float(action.get("value", 0))
+        op = {"−": "-", "×": "*", "÷": "/"}.get(op, op)  # UI显示字形归一到运算符
+        try:
+            cur = float(self.vars.get(var, 0.0))
+            if op == "=":
+                r = val
+            elif op == "+":
+                r = cur + val
+            elif op == "-":
+                r = cur - val
+            elif op == "*":
+                r = cur * val
+            elif op == "/":
+                if val == 0:
+                    raise ZeroDivisionError("var_set 除数为0")
+                r = cur / val
+            else:
+                raise ValueError(f"未知op: {op!r}")
+            self.vars[var] = r
+        except Exception as e:
+            log_error("var_set", e)
+        return True
+
+    def _run_cond_branch(self, action):
+        """数值条件判断：成立→返回target lid，不成立/未知op→None（顺序继续）"""
+        from logger import log_error
+        var, cmp, val = action.get("var", ""), action.get("cmp", "=="), float(action.get("value", 0))
+        cur = float(self.vars.get(var, 0.0))
+        try:
+            if cmp == ">":   hit = cur > val
+            elif cmp == ">=": hit = cur >= val
+            elif cmp == "<":  hit = cur < val
+            elif cmp == "<=": hit = cur <= val
+            elif cmp == "==": hit = cur == val
+            elif cmp == "!=": hit = cur != val
+            else:
+                raise ValueError(f"未知cmp: {cmp!r}")
+        except ValueError as e:
+            log_error("cond_branch", e)
+            return None
+        if hit:
+            return action.get("target")
+        return None
+
+    def _run_ocr_read(self, action):
+        """读数：截取读数区→OCR→数值写入 self.vars[var]；任何异常写0记日志，不中断任务"""
+        from logger import log_error, log_info
+        var = action.get("var", "_")
+        try:
+            raw = read_region(action)
+            num = _parse_num(raw, action.get("pattern") or None)
+            self.vars[var] = num
+            log_info("ocr_read", f"{var}={num} raw={raw!r}")
+        except Exception as e:
+            log_error("ocr_read", e)
+            self.vars[var] = 0.0
+        return True
+
     def _index_of(self, lid):
         """按 lid 找动作下标；lid 缺失或不存在返回 None（调用方顺序继续）"""
         if not lid:
@@ -395,6 +598,29 @@ class KeyboardTask:
                     if not self._running: return False
                     self._pause_aware_delay(action.get("delay", 0))
                     i += 1
+                    continue
+                elif action["type"] == "ocr_read":
+                    self._run_ocr_read(action)
+                    self._pause_aware_delay(action.get("delay", 0))
+                    i += 1
+                    continue
+                elif action["type"] == "var_set":
+                    self._run_var_set(action)
+                    self._pause_aware_delay(action.get("delay", 0))
+                    i += 1
+                    continue
+                elif action["type"] == "cond_branch":
+                    r = self._run_cond_branch(action)
+                    tgt_i = self._index_of(r) if r else None
+                    if tgt_i is not None:
+                        jumps += 1
+                        if jumps > 200:
+                            log_error("cond_guard", "条件跳转>200次/轮，疑似死循环，中止本轮")
+                            return False
+                        i = tgt_i
+                    else:
+                        i += 1
+                    self._pause_aware_delay(action.get("delay", 0.0))
                     continue
                 elif action["type"] == "key":
                     if hold > 0:
