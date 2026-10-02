@@ -41,6 +41,10 @@
 - **Variable math** — add, subtract, multiply or divide on variables
 - **Conditional branch** — jump to an action when a variable reaches a threshold
 
+**Improved**
+- Click actions gain a Locate button that moves the cursor to the recorded point without clicking
+- Old presets can be loaded right after upgrading
+
 **Fixed**
 - Dropdown items now select on the first click
 - Scroll wheel no longer changes values when hovering a numeric field or slider
