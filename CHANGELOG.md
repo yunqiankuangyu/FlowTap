@@ -10,6 +10,7 @@
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.9.0 | PySide6 | Read numbers, variable math, conditional branch |
 | v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
 | v3.8.2 | PySide6 | Smart branching (experimental), dark tooltip fix |
 | v3.8.1 | PySide6 | Humanized mouse movement, Start All fix |
@@ -31,6 +32,19 @@
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
 
 ## Release Notes
+
+### v3.9.0 — Read Numbers · Variables · Conditional Branch
+
+**New**
+- **Read number** — recognize digits from a screen region, pick the extraction method from a dropdown, no regex needed
+- **Test read** — see the recognized text and the extracted number right after picking a region
+- **Variable math** — add, subtract, multiply or divide on variables
+- **Conditional branch** — jump to an action when a variable reaches a threshold
+
+**Fixed**
+- Dropdown items now select on the first click
+- Scroll wheel no longer changes values when hovering a numeric field or slider
+- Rounded corners no longer turn square after applying a theme
 
 ### v3.8.3 — Color Templates & Wait Enhancements
 
