@@ -7,10 +7,10 @@ import ctypes
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QFrame, QScrollArea, QComboBox, QDoubleSpinBox,
+    QLineEdit, QFrame, QScrollArea, QDoubleSpinBox,
     QInputDialog, QMenu, QMessageBox
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QObject
+from PySide6.QtCore import Qt, QTimer, Signal, QObject, QPoint
 from PySide6.QtGui import QFont, QCursor, QFontMetricsF
 
 import sys
@@ -18,7 +18,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import Colors, FONT_B, FONT_M, load_presets, save_presets
-from .widgets import _make_btn, _tint_btn, _make_label, state_btn, spin_fill, spin_flat, ghost_btn, style_label
+from .widgets import (_make_btn, _tint_btn, _make_label, state_btn, spin_fill, spin_flat,
+                        line_flat, line_fill, ghost_btn, style_label,
+                        btn_qss, card_qss, scroll_qss, tip_qss, dot_qss, set_bg, label_qss, menu_qss, menu_btn_qss, F12)
 from tasks.keyboard.keyboard_task import KeyboardTask, make_key_action, make_combo_action, make_click_action, fmt_action
 from vk_map import VK_NAME
 
@@ -46,84 +48,228 @@ class _Signal:
         for slot in self._slots:
             slot(*args)
 
-def _make_menu_combo(items, width=80, on_select=None):
-    """用 QPushButton+QMenu 替代 QComboBox，避免 frameless 窗口双击 bug"""
-    btn = QPushButton(items[0])
+class _Signal:
+    """极简信号替身: QPushButton 没有 currentTextChanged, 这里补一个"""
+    def __init__(self):
+        self._slots = []
+
+    def connect(self, fn):
+        self._slots.append(fn)
+
+    def emit(self, *a):
+        for fn in list(self._slots):
+            fn(*a)
+
+
+def _make_menu_combo(items, width=80, on_select=None, height=25):
+    """下拉控件(QPushButton+QMenu 实现, 全app下拉唯一种类)
+    为何不用 QComboBox: 无边框置顶窗口里 QComboBox 的弹窗拿不到输入焦点,
+    展开后必须点两次才选中(第一次只激活弹窗)。QMenu 走原生菜单不受影响。
+    本类实现 QComboBox 的完整常用接口(setItemData/setCurrentIndex/count/itemText 等),
+    调用方无感切换, 样式正源 widgets.menu_btn_qss"""
+    from PySide6.QtWidgets import QComboBox  # noqa: F401  (类型参照, 保持调用方 import 习惯)
+    btn = QPushButton(items[0] if items else "")
+    _qt_set_text = btn.setText   # Qt 原生 setText(内部刷新用, 避免与兼容层 btn.setText 自递归)
     btn.setFixedWidth(width)
-    btn.setFixedHeight(25)
+    btn.setFixedHeight(height)
+    btn.setCursor(QCursor(Qt.PointingHandCursor))
     btn.setFont(QFont("MiSans", 10, QFont.Bold))
-    btn.setStyleSheet(f"""
-        QPushButton {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 20px 2px 6px; text-align: left; }}
-        QPushButton::menu-indicator {{ image: none; subcontrol-origin: padding; subcontrol-position: right center; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid {Colors.DIM}; width: 0; height: 0; }}
-    """)
+    btn.setStyleSheet(menu_btn_qss())
+    # 不用 btn.setMenu(): 一旦挂上 menu, Qt 的 QSS padding 就不生效(padding 被 menu 布局吃掉,
+    # 实测左内边距 5px vs 无 menu 的 14px)。改为 clicked 手动 exec, padding 恢复且行为一致。
     menu = QMenu(btn)
-    menu.setStyleSheet(f"""
-        QMenu {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: 1px solid {Colors.DIM}; border-radius: 4px; }}
-        QMenu::item {{ padding: 4px 12px; min-height: 22px; }}
-        QMenu::item:selected {{ background: {Colors.BLUE}; }}
-    """)
-    for item in items:
-        menu.addAction(item)
-    btn.setMenu(menu)
-    btn._current_text = items[0]
-    btn._items = list(items)
+    menu.setStyleSheet(menu_qss())
+
+    btn._items = []          # 全部选项文本
+    btn._datas = []          # 与 _items 一一对应的 itemData
+    btn._cur = -1            # 当前选中下标
+    btn._text = ""           # 显示文本(可被 setText 改成与选项不同的常驻标签)
+    btn._fixed_text = False  # True=显示用 _text, 不跟随选项
     btn.currentTextChanged = _Signal()
+
+    def _rebuild():
+        menu.clear()
+        for it in btn._items:
+            menu.addAction(it)
+        # 宽度 = 最长选项完整展示所需宽度(按与框同档字号10pt度量) + 菜单内边距
+        # QMenu 自己的 sizeHint 不可靠: 像素实测它给 299px 而最长项仅需 220px, 最紧行右边只剩 1px(文字被切)
+        if btn._items:
+            _fmw = QFontMetricsF(QFont("MiSans", 10, QFont.Bold))
+            _w = max(_fmw.horizontalAdvance(it) for it in btn._items)
+            menu.setFixedWidth(int(_w) + 26)   # 26 = QMenu::item 左右 padding 各12 + 边框各1
+
+    def _sync_display():
+        _qt_set_text(btn._text)
+
+    def _pick(idx, emit=True):
+        """选中第 idx 项: 只在真正切换时发信号(与 QComboBox 一致)"""
+        if idx < 0 or idx >= len(btn._items):
+            return
+        changed = (idx != btn._cur)
+        btn._cur = idx
+        if not btn._fixed_text:
+            btn._text = btn._items[idx]
+        _sync_display()
+        if changed and emit:
+            btn.currentTextChanged.emit(btn.currentText())
+            _on_index_changed(idx)
+
     def _on_action(action):
-        btn._current_text = action.text()
-        btn.setText(action.text())
-        btn.currentTextChanged.emit(action.text())
+        try:
+            idx = btn._items.index(action.text())
+        except ValueError:
+            return
+        _pick(idx)
         if on_select:
             on_select(action.text())
+
     menu.triggered.connect(_on_action)
-    # 补 QComboBox 兼容接口
-    btn.currentText = lambda: btn._current_text
+
+    def _open_menu():
+        menu.exec(btn.mapToGlobal(QPoint(0, btn.height())))
+    btn.clicked.connect(_open_menu)
+
+    def _addItems(new_items):
+        btn._items.extend(new_items)
+        btn._datas.extend([None] * len(new_items))
+        if btn._cur < 0 and btn._items:
+            _pick(0, emit=False)
+
+    def _addItem(text, data=None):
+        btn._items.append(text)
+        btn._datas.append(data)
+        if btn._cur < 0:
+            _pick(0, emit=False)
+
     def _clear():
         menu.clear()
         btn._items.clear()
-    btn.clear = _clear
-    def _addItems(items):
-        for i in items:
-            menu.addAction(i)
-        btn._items.extend(items)
+        btn._datas.clear()
+        btn._cur = -1
+
+    def _setCurrentIndex(idx, emit=True):
+        _pick(idx, emit=emit)
+
+    def _setCurrentText(t, emit=True):
+        try:
+            idx = btn._items.index(t)
+        except ValueError:
+            return
+        _pick(idx, emit=emit)
+
+    def _itemText(idx):
+        return btn._items[idx] if 0 <= idx < len(btn._items) else ""
+
+    def _itemData(idx):
+        return btn._datas[idx] if 0 <= idx < len(btn._datas) else None
+
+    def _setItemData(idx, d):
+        if 0 <= idx < len(btn._datas):
+            btn._datas[idx] = d
+
+    def _setText(t):
+        btn._text = t
+        btn._fixed_text = True
+        _sync_display()
+
+    def _currentData():
+        return btn._datas[btn._cur] if 0 <= btn._cur < len(btn._datas) else None
+
+    def _on_index_changed(_i, _cb=btn):
+        # 与 currentTextChanged 同步发一份, 供按 index 监听的调用方(jump/branch option)使用
+        _cb.currentIndexChanged.emit(_cb.currentIndex())
+
+    # ── QComboBox 兼容接口 ──
+    btn.currentIndexChanged = _Signal()
     btn.addItems = _addItems
+    btn.addItem = _addItem
+    btn.clear = _clear
+    btn.setCurrentIndex = _setCurrentIndex
+    btn.setCurrentText = _setCurrentText
+    btn.currentText = lambda: btn._text
+    btn.currentIndex = lambda: btn._cur
+    btn.count = lambda: len(btn._items)
+    btn.itemText = _itemText
+    btn.itemData = _itemData
+    btn.setItemData = _setItemData
+    btn.currentData = _currentData
+    btn.setText = _setText
+    btn.view = lambda: menu   # 兼容 QComboBox 的 view()
+    btn.menu = lambda: menu   # 兼容 QComboBox 的 menu(): 供 aboutToShow 等钩子取真实 QMenu
+
+    def _set_items(new_items):
+        """整体替换选项并重建菜单(动态下拉如关系钮用); 宽度随之按最长项重算"""
+        btn._items = list(new_items)
+        btn._datas = [None] * len(new_items)
+        _rebuild()
+        if btn._items:
+            _pick(0, emit=False)
+        else:
+            btn._cur = -1
+    btn.set_items = _set_items
+
+    btn._items = list(items)
+    btn._datas = [None] * len(items)
+    if items:
+        btn._cur = 0
+        btn._text = items[0]
+    _rebuild()
     return btn
+
+
+def _action_summary(action, task=None):
+    """动作行摘要文字。条件分支额外补跳转目标(行内不显示跳到下拉, 目标必须在摘要可见);
+    目标未设/已失效时给出可读警示, 不让"条件成立也不跳"静默发生"""
+    desc = fmt_action(action)
+    if action.get("type") == "cond_branch" and task is not None:
+        tgt = action.get("target")
+        if tgt:
+            ti = next((i for i, a in enumerate(task.actions) if a.get("lid") == tgt), None)
+            desc += f" → 动作{ti + 1}" if ti is not None else " → ⚠目标已失效"
+        else:
+            desc += " → ⚠未设目标"
+    return desc
+
 
 def _target_combo(task, container, big=False):
     """跳转目标下拉：顺序继续(None) + 全部动作；itemData=lid，显示 动作N: 描述
-    container = 存 target 的字典（jump 动作本身 或 branch 的 option）; big=悬浮页放大档"""
-    from PySide6.QtWidgets import QComboBox
-    combo = QComboBox()
-    combo.setFixedHeight(25 if big else 18)
-    combo.setFixedWidth(150 if big else 110)
-    _pt = 11  # big档同比缩小2px后与行内一致
-    combo.setStyleSheet(f"""
-        QComboBox {{ background: {Colors.BLUE}; color: {Colors.TEXT}; border: none;
-            border-radius: 4px; padding: 2px 8px; font: bold {_pt}pt 'MiSans'; }}
-        QComboBox::drop-down {{ border: none; width: 0px; }}
-        QComboBox::down-arrow {{ image: none; width: 0px; }}
-        QComboBox QAbstractItemView {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; font: bold 9pt 'MiSans'; }}
-    """)
-    combo.addItem("顺序继续", None)
+    container = 存 target 的字典（jump 动作本身 或 branch 的 option）; big=悬浮页放大档
+    控件构造走 _mini_combo(全app下拉唯一样式), 本函数只管填跳转选项与警示逻辑"""
+    items, datas = ["顺序继续"], [None]
     cur = container.get("target")
     sel = 0
     for i, a in enumerate(task.actions):
-        combo.addItem(f"动作{i+1}: {fmt_action(a)}", a.get("lid"))
+        items.append(f"动作{i+1}: {fmt_action(a)}")
+        datas.append(a.get("lid"))
         if a.get("lid") and a.get("lid") == cur:
             sel = i + 1
-    # 初值选择只关显示不写回：目标动作被删时显示回落「顺序继续」，但存储的 target 必须保留
+    combo = _mini_combo(items, items[sel], 150 if big else 110, h=25 if big else 18)
+    for i, d in enumerate(datas):
+        combo.setItemData(i, d)
+    # 初值已在 _mini_combo 里定好, 不触发信号: 目标动作被删时显示回落「顺序继续」，但存储的 target 必须保留
     combo.blockSignals(True)
     combo.setCurrentIndex(sel)
     combo.blockSignals(False)
-    combo.currentIndexChanged.connect(
-        lambda _i, c=container, cb=combo: c.__setitem__("target", cb.currentData()))
-    combo.setToolTip(combo.currentText())  # 锁宽后靠tooltip看全文
-    combo.currentIndexChanged.connect(lambda _i, c=combo: c.setToolTip(c.currentText()))
-    # 弹出列表与combo框宽解耦: 选项11pt, 宽按最长项(至少280)完整展示每一行
-    _fm9 = QFontMetricsF(QFont("MiSans", 9, QFont.Bold))
-    _pw = 280
-    for _i in range(combo.count()):
-        _pw = max(_pw, _fm9.horizontalAdvance(combo.itemText(_i)) + 34)
-    combo.view().setMinimumWidth(int(_pw * 0.75))  # 宽度=原75%
+    # 未设目标 = 条件成立也不会跳(执行时按顺序继续)，这是用户最容易踩的坑，明确警示
+    def _set_tip(_tip):
+        combo.setToolTip(_tip)
+    if cur and sel == 0:
+        _set_tip("⚠ 跳转目标已失效（原动作被删），当前按「顺序继续」执行，请重新选择目标")
+    elif not cur:
+        _set_tip("⚠ 未设跳转目标：条件成立也不会跳转（等同顺序继续）。请选择一个目标动作")
+    else:
+        _set_tip(combo.currentText())
+    # 选目标: 写回 + 同步警示态 + tooltip（未设目标时提示语优先于文本全文）
+    def _on_target_changed(_i, c=container, cb=combo):
+        data = cb.currentData()
+        c["target"] = data
+        warn = data is None
+        if warn:
+            cb.setToolTip("⚠ 未设跳转目标：条件成立也不会跳转（等同顺序继续）。请选择一个目标动作")
+        else:
+            cb.setToolTip(cb.currentText())
+    combo.currentIndexChanged.connect(_on_target_changed)
+    # 弹出列表宽度由 _make_menu_combo 统一按最长选项算, 此处不再另设
     return combo
 
 def _fit_spin(spin, font=None, extra=0):
@@ -145,23 +291,15 @@ def build_keyboard_mode(app):
 
     # ── 预设栏（顶部）──
     pf = QFrame()
-    pf.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
+    pf.setStyleSheet(card_qss())
     pf_layout = QHBoxLayout(pf)
     pf_layout.setContentsMargins(7, 7, 7, 7)
     pf_layout.setSpacing(4)
 
     presets = load_presets()
     preset_names = list(presets.keys()) if presets else ["无预设"]
-    app._preset_combo = QComboBox()
-    app._preset_combo.addItems(preset_names)
-    app._preset_combo.setFixedWidth(120)
-    app._preset_combo.setFixedHeight(25)
-    app._preset_combo.setFont(QFont("MiSans", 10, QFont.Bold))
-    app._preset_combo.setStyleSheet(f"""
-        QComboBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 8px; }}
-        QComboBox::drop-down {{ border: none; }}
-        QComboBox QAbstractItemView {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; selection-background-color: {Colors.BLUE}; }}
-    """)
+    # 预设下拉走 _make_menu_combo(QPushButton+QMenu): QComboBox 弹窗在无边框置顶窗口里点两次才选中
+    app._preset_combo = _make_menu_combo(preset_names, width=120, height=25)
     pf_layout.addWidget(app._preset_combo)
     pf_layout.addStretch()
 
@@ -200,12 +338,10 @@ def build_keyboard_mode(app):
     app._task_scroll.setFrameShape(QFrame.NoFrame)
     app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     app._task_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-    app._task_scroll.setStyleSheet(f"""
-        QScrollArea {{ background: {Colors.ACCENT}; border: none; }}
-    """)
+    app._task_scroll.setStyleSheet(scroll_qss(Colors.ACCENT))
 
     app._task_container = QWidget()
-    app._task_container.setStyleSheet("background: transparent;")
+    set_bg(app._task_container, "transparent")
     app._task_layout = QVBoxLayout(app._task_container)
     app._task_layout.setContentsMargins(0, 0, 0, 0)
     app._task_layout.setSpacing(5)
@@ -259,11 +395,11 @@ def _build_drag_handle(app):
     handle.setFixedHeight(HANDLE_H)
     handle.setMinimumHeight(HANDLE_H)
     handle.setCursor(QCursor(Qt.SizeVerCursor))
-    handle.setStyleSheet("background: transparent;")
+    set_bg(handle, "transparent")
 
     indicator = QFrame(handle)
     indicator.setFixedSize(200, 4)
-    indicator.setStyleSheet("background: #555; border-radius: 2px;")
+    indicator.setStyleSheet(dot_qss("#555"))
     app._drag_indicator = indicator
 
     def position_indicator():
@@ -281,11 +417,11 @@ def _build_drag_handle(app):
     app._drag = {"active": False, "start_y": 0, "start_h": 0}
 
     def on_handle_enter(e):
-        indicator.setStyleSheet("background: #888; border-radius: 2px;")
+        indicator.setStyleSheet(dot_qss("#888"))
 
     def on_handle_leave(e):
         if not app._drag["active"]:
-            indicator.setStyleSheet("background: #555; border-radius: 2px;")
+            indicator.setStyleSheet(dot_qss("#555"))
 
     def on_handle_press(e):
         if e.button() == Qt.LeftButton:
@@ -294,11 +430,11 @@ def _build_drag_handle(app):
             _user32.GetCursorPos(ctypes.byref(pt))
             app._drag["start_y"] = pt.y
             app._drag["start_h"] = app.height()  # 读实际窗口高度，不用缓存
-            indicator.setStyleSheet("background: #4fc3f7; border-radius: 2px;")
+            indicator.setStyleSheet(dot_qss("#4fc3f7"))
 
     def on_handle_release(e):
         app._drag["active"] = False
-        indicator.setStyleSheet("background: #555; border-radius: 2px;")
+        indicator.setStyleSheet(dot_qss("#555"))
 
     def on_handle_drag(e):
         if not app._drag["active"]:
@@ -439,7 +575,7 @@ def create_card(app, task):
     """创建任务卡片"""
     task._app = app  # 存引用，_task_index 用
     card = QFrame()
-    card.setStyleSheet(f"QFrame {{ background: {Colors.CARD}; border-radius: 11px; }}")
+    card.setStyleSheet(card_qss())
     card_layout = QVBoxLayout(card)
     card_layout.setContentsMargins(11, 11, 11, 11)
     card_layout.setSpacing(5)
@@ -451,10 +587,7 @@ def create_card(app, task):
     fold_btn = QPushButton("▼")
     fold_btn.setFixedSize(22, 22)
     fold_btn.setCursor(QCursor(Qt.PointingHandCursor))
-    fold_btn.setStyleSheet(f"""
-        QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 12px 'MiSans'; }}
-        QPushButton:hover {{ color: {Colors.TEXT}; }}
-    """)
+    fold_btn.setStyleSheet(btn_qss("transparent", Colors.DIM, hover_fg=Colors.TEXT, font=F12, radius=None))
     fold_btn.setToolTip("收起/展开任务卡片")
     fold_btn.clicked.connect(lambda: toggle_card(app, task))
     task._fold_btn = fold_btn
@@ -464,9 +597,7 @@ def create_card(app, task):
     name_e.setFont(FONT_B)
     name_e.setFixedWidth(79)
     name_e.setFixedHeight(25)
-    name_e.setStyleSheet(f"""
-        QLineEdit {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 2px 6px; }}
-    """)
+    line_fill(name_e, padding="2px 6px")
     name_e.editingFinished.connect(lambda: setattr(task, 'name', name_e.text()))
     task._name_entry = name_e
     hdr.addWidget(name_e)
@@ -502,7 +633,7 @@ def create_card(app, task):
 
     # ── 动作列表 ──
     task._action_frame = QWidget()
-    task._action_frame.setStyleSheet("background: transparent;")
+    set_bg(task._action_frame, "transparent")
     task._action_layout = QVBoxLayout(task._action_frame)
     task._action_layout.setContentsMargins(0, 0, 0, 0)
     task._action_layout.setSpacing(2)
@@ -513,13 +644,15 @@ def create_card(app, task):
 
     # ── 第二行：添加按钮 ──
     af = QWidget()
-    af.setStyleSheet("background: transparent;")
+    set_bg(af, "transparent")
     af_layout = QHBoxLayout(af)
     af_layout.setContentsMargins(0, 0, 0, 0)
     af_layout.setSpacing(3)
 
-    from .vision_capture import add_image_wait_action
-    from tasks.keyboard.keyboard_task import make_branch_action, make_jump_action
+    from .vision_capture import add_image_wait_action, add_ocr_read_action
+    from tasks.keyboard.keyboard_task import (make_branch_action, make_jump_action,
+                                              make_var_set_action, make_cond_branch_action,
+                                              next_var_name)
 
     # 添加动作区并成三控件一排：键鼠下拉 / 插入下拉 / 清空（原 6 按钮太密）
     def _pick_kb(what):
@@ -552,13 +685,31 @@ def create_card(app, task):
     dd_in.setToolTip("插入：等图像（框选等待）/ 多模板分支 / 跳转")
     af_layout.addWidget(dd_in, 1)
 
+    def _pick_var(what):
+        dd_var.setText("+ 变量")  # 同 _pick_in：菜单回写文案须复位常驻标签
+        if "读数" in what:
+            add_ocr_read_action(app, task, lambda: _refresh_actions(app, task))
+        elif "运算" in what:
+            task.actions.append(make_var_set_action(next_var_name(task.actions, task.vars), "+", 0))
+            _refresh_actions(app, task)
+        else:
+            task.actions.append(make_cond_branch_action(
+                next_var_name(task.actions, task.vars), ">=", 0, None))
+            _refresh_actions(app, task)
+
+    dd_var = _make_menu_combo(["🔢 读数", "➕ 变量运算", "⚖ 条件分支"], width=90, on_select=_pick_var)
+    dd_var.setText("+ 变量")
+    dd_var._current_text = "+ 变量"
+    dd_var.setToolTip("插入：读数（OCR写入变量）/ 变量运算 / 数值条件分支")
+    af_layout.addWidget(dd_var, 1)
+
     clear_btn = _make_btn("清空", bg=Colors.DIM, hover=Colors.ACCENT, height=25)
     clear_btn.clicked.connect(lambda: clear_actions(app, task))
     af_layout.addWidget(clear_btn, 1)
 
-    # 三等分：解除 helper 的固定宽 + 横向可伸展，stretch=1 把整行均分成三份
+    # 三等分 → 四等分：解除 helper 的固定宽 + 横向可伸展，stretch=1 把整行均分成 N 份
     from PySide6.QtWidgets import QSizePolicy
-    for _w in (dd_kb, dd_in, clear_btn):
+    for _w in (dd_kb, dd_in, dd_var, clear_btn):
         _w.setMinimumWidth(0)
         _w.setMaximumWidth(16777215)
         _w.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -566,7 +717,7 @@ def create_card(app, task):
     card_layout.addWidget(af)
     task._extra_rows = [af]  # 折叠时隐藏的附属行
     sf = QWidget()
-    sf.setStyleSheet("background: transparent;")
+    set_bg(sf, "transparent")
     sf_layout = QHBoxLayout(sf)
     sf_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -578,15 +729,12 @@ def create_card(app, task):
     rel_combo = _make_menu_combo(["独立"], width=80)
 
     def _rebuild_rel_menu():
-        """菜单弹出前重建选项，用位置索引（第几个）而非运行时 id"""
-        menu = rel_combo.menu()
-        menu.clear()
+        """菜单弹出前重建选项，用位置索引（第几个）而非运行时 id；宽度由工厂按最长项统一算"""
         opts = ["独立"]
         for i, t in enumerate(app.keyboard_tasks):
             if t.task_id != task.task_id:
                 opts.append(f"任务{i+1}后")
-        for o in opts:
-            menu.addAction(o)
+        rel_combo.set_items(opts)
     rel_combo.menu().aboutToShow.connect(_rebuild_rel_menu)
 
     def _on_rel_select(text):
@@ -717,6 +865,16 @@ class DraggableRow(QFrame):
                 p.drawLine(8, self.height() - 2, w - 8, self.height() - 2)
             p.end()
 
+def _mini_combo(items, cur, w, h=18):
+    """下拉(模块级唯一工厂, 行内与悬浮页共用)——QPushButton+QMenu 实现
+    不用 QComboBox: 无边框置顶窗口里它的弹窗拿不到输入焦点, 展开后要点两次才选中。
+    样式走 widgets.menu_btn_qss(全app下拉唯一样式正源, ACCENT 底 + 10pt Bold);
+    h 只调高度, 不改字号, 全app下拉字号一致"""
+    cb = _make_menu_combo(items, width=w, height=h)
+    cb.setCurrentText(cur)
+    return cb
+
+
 def _refresh_actions(app, task):
     """刷新动作列表UI"""
     while task._action_layout.count():
@@ -728,7 +886,7 @@ def _refresh_actions(app, task):
 
     for idx, action in enumerate(task.actions):
         row = DraggableRow()
-        row.setStyleSheet(f"DraggableRow {{ background: {Colors.ACCENT}; border-radius: 8px; }}")
+        row.setStyleSheet(card_qss(Colors.ACCENT, radius=8, sel="DraggableRow"))
         # 统一两行排版: 头行(☰ 描述 … ✕) + 参数行, 400 宽窗内不裁切
         _vbox = QVBoxLayout(row)
         _vbox.setContentsMargins(6, 4, 6, 4)
@@ -737,7 +895,8 @@ def _refresh_actions(app, task):
         row_layout.setSpacing(2)
         _vbox.addLayout(row_layout)
         # wait/branch设置搬进悬浮设置页(✎), 行内只留摘要
-        _inline_full = action.get("type") not in ("wait_image", "branch")
+        _inline_full = action.get("type") not in ("wait_image", "branch", "cond_branch", "ocr_read", "var_set")
+        # 三期类型(读数/变量运算/条件分支)已全部搬进悬浮编辑页, 不再走行内参数块
         _ctl = None
         if _inline_full:
             _ctl = QHBoxLayout()
@@ -749,19 +908,16 @@ def _refresh_actions(app, task):
         drag_btn = QPushButton("☰")
         drag_btn.setFixedSize(22, 18)
         drag_btn.setCursor(QCursor(Qt.SizeVerCursor))
-        drag_btn.setStyleSheet(f"""
-            QPushButton {{ background: transparent; color: {Colors.DIM}; border: none; font: bold 12px 'MiSans'; }}
-            QPushButton:hover {{ color: {Colors.TEXT}; background: {Colors.ACCENT}; border-radius: 4px; }}
-        """)
+        drag_btn.setStyleSheet(btn_qss("transparent", Colors.DIM, hover=Colors.ACCENT, hover_fg=Colors.TEXT, font=F12, radius=4))
         drag_btn.setToolTip("")
         row_layout.addWidget(drag_btn)
 
-        desc = fmt_action(action)
+        desc = _action_summary(action, task)
         desc_font = QFont("MiSans", 11, QFont.Bold)
         desc_lbl = _make_label(desc, font=desc_font)
         row_layout.addWidget(desc_lbl, 1)
 
-        if action.get("type") == "jump":
+        if action.get("type") in ("jump", "cond_branch") and _inline_full:
             row_layout.addWidget(_make_label("跳到", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
             row_layout.addWidget(_target_combo(task, action))
 
@@ -895,6 +1051,22 @@ def _refresh_actions(app, task):
             hold_spin.valueChanged.connect(lambda v, b=ot_btn: b.setEnabled(v > 0))
             ot_btn.setEnabled(hold_spin.value() > 0)
 
+        if action.get("type") == "click":
+            # 定位: 把鼠标移到记录的点上(不点击), 用来核对坐标录得对不对
+            loc_btn = _make_btn("定位", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
+            loc_btn.setFixedWidth(36)
+            loc_btn.setToolTip("把鼠标移到这个坐标上（不点击）——用来确认点位准不准")
+            def _locate(_c=False, a=action):
+                from core import MouseSimulator
+                _m = getattr(app, "_locate_mouse", None)
+                if _m is None:
+                    _m = MouseSimulator()
+                    app._locate_mouse = _m
+                # 精确移动: 拟人化的±2px微偏与过冲会让落点漂移, 定位必须准
+                _m.move_mouse_exact(int(a.get("x", 0)), int(a.get("y", 0)))
+            loc_btn.clicked.connect(_locate)
+            row_layout.addWidget(loc_btn)
+
         if is_wait:
             from .vision_preview import open_preview, open_template_view
             prev_btn = _make_btn("预览", bg=Colors.BLUE, hover=Colors.ACCENT, font=QFont("MiSans", 11, QFont.Bold), height=20)
@@ -909,6 +1081,7 @@ def _refresh_actions(app, task):
             tpl_btn.clicked.connect(lambda checked, a=action: open_template_view(a))
             row_layout.addWidget(tpl_btn)
 
+        # ocr_read 的「框选」「试读」在悬浮设置页内(行内只留摘要+编辑, 与 wait/branch/cond_branch 一致)
 
         if not _inline_full:
             from .action_settings_view import open_settings_view
@@ -1030,7 +1203,7 @@ def _start_capture(app, task):
 
     # 创建临时等待行
     waiting_row = QFrame()
-    waiting_row.setStyleSheet(f"QFrame {{ background: {Colors.ACCENT}; border-radius: 8px; }}")
+    waiting_row.setStyleSheet(card_qss(Colors.ACCENT, radius=8))
     wl = QHBoxLayout(waiting_row)
     wl.setContentsMargins(6, 4, 6, 4)
     wl.setSpacing(4)
@@ -1103,20 +1276,14 @@ def add_click_action(app, task):
     overlay.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
     overlay.setAttribute(Qt.WA_TranslucentBackground, True)
     overlay.setAttribute(Qt.WA_ShowWithoutActivating, True)
-    overlay.setStyleSheet("background-color: rgba(0, 0, 0, 80);")
+    set_bg(overlay, "rgba(0, 0, 0, 80)")
     overlay.setGeometry(screen)
     overlay.closeEvent = lambda e: e.ignore()
 
     tip = QLabel("🎯 点击任意位置绑定  |  ESC 取消  |  15秒超时", overlay)
     tip.setFont(FONT_B)
     tip.setAlignment(Qt.AlignCenter)
-    tip.setStyleSheet(f"""
-        background: rgba(30, 30, 30, 220);
-        color: #fff;
-        border-radius: 10px;
-        padding: 16px 32px;
-        border: 2px solid {Colors.BLUE};
-    """)
+    tip.setStyleSheet(tip_qss())
     tip.adjustSize()
     tip.move((screen.width() - tip.width()) // 2, (screen.height() - tip.height()) // 2)
     overlay.showFullScreen()
@@ -1460,19 +1627,11 @@ def show_floating_notification(app, text, duration_ms=2000):
     hide_floating_notification(app)
 
     panel = QFrame(app)
-    panel.setStyleSheet("QFrame { background: transparent; border: none; }")
+    panel.setStyleSheet(card_qss(bg="transparent", radius=None, extra="border: none;"))
 
     lbl = QLabel(text, panel)
     lbl.setFont(FONT_M)
-    lbl.setStyleSheet(f"""
-        QLabel {{
-            color: {Colors.TEXT};
-            background: {Colors.CARD};
-            border: 1px solid {Colors.BLUE};
-            border-radius: 8px;
-            padding: 8px 16px;
-        }}
-    """)
+    lbl.setStyleSheet(label_qss(Colors.TEXT, bg=Colors.CARD, extra=f"border: 1px solid {Colors.BLUE}; border-radius: 8px; padding: 8px 16px;"))
     lbl.adjustSize()
 
     panel.setFixedSize(lbl.sizeHint().width() + 4, lbl.sizeHint().height() + 4)

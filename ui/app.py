@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QTimer
 from config import Colors, FONT_B, load_settings, save_settings
 from tasks import MouseTask
 from ui.keyboard_mode import WIN_W
+from ui.widgets import set_bg, scroll_qss, WheelScrollFilter
 
 # 窗口标题(任务栏/Alt-Tab 显示)
 WINDOW_TITLE = "FlowTap"
@@ -57,6 +58,11 @@ class App(QMainWindow):
         self._hotkey_capture_target = None  # 'stop' / 'start' / None
 
         self._build_ui()
+
+        # 滚轮转发: 光标在数字框/输入框上时滚轮去滚页面, 不改控件值(用户原意是滚页面)
+        # 装在 QApplication 上才能收到所有子控件的事件(装在 App 上只收 App 自己的)
+        self._wheel_filter = WheelScrollFilter(self)
+        QApplication.instance().installEventFilter(self._wheel_filter)
         self._ready = True
 
         # 全局热键
@@ -150,7 +156,7 @@ class App(QMainWindow):
 
         # Central widget
         central = QWidget()
-        central.setStyleSheet("background: transparent;")   # 圆角由主窗口 paintEvent 统一画
+        set_bg(central, "transparent")   # 圆角由主窗口 paintEvent 统一画
         self.setCentralWidget(central)
         self._central_layout = QVBoxLayout(central)
         self._central_layout.setContentsMargins(0, 0, 0, 0)
@@ -161,18 +167,18 @@ class App(QMainWindow):
 
         # 内容区域：QStackedWidget 切换页面（不重建 widget）
         self.content_stack = QStackedWidget()
-        self.content_stack.setStyleSheet("background: transparent;")
+        set_bg(self.content_stack, "transparent")
 
         # 页面 0：键盘/任务模式
         self.keyboard_frame = QWidget()
-        self.keyboard_frame.setStyleSheet("background: transparent;")
+        set_bg(self.keyboard_frame, "transparent")
         self.keyboard_layout = QVBoxLayout(self.keyboard_frame)
         self.keyboard_layout.setContentsMargins(10, 0, 10, 0)
         self.keyboard_layout.setSpacing(0)
 
         # 页面 1：设置模式
         self.settings_frame = QWidget()
-        self.settings_frame.setStyleSheet("background: transparent;")
+        set_bg(self.settings_frame, "transparent")
         self.settings_layout = QVBoxLayout(self.settings_frame)
         self.settings_layout.setContentsMargins(10, 0, 10, 4)
         self.settings_layout.setSpacing(8)
@@ -186,21 +192,14 @@ class App(QMainWindow):
         self._keyboard_scroll = QScrollArea()
         self._keyboard_scroll.setWidgetResizable(True)
         self._keyboard_scroll.setFrameShape(QFrame.NoFrame)
-        self._keyboard_scroll.setStyleSheet(f"""
-            QScrollArea {{ background: transparent; border: none; }}
-            QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
-            QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
-            QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
-        """)
+        self._keyboard_scroll.setStyleSheet(scroll_qss())
         self._keyboard_scroll.setWidget(self.keyboard_frame)
 
         # 滚动容器包裹设置模式
         self._settings_scroll = QScrollArea()
         self._settings_scroll.setWidgetResizable(True)
         self._settings_scroll.setFrameShape(QFrame.NoFrame)
-        self._settings_scroll.setStyleSheet(self._scroll_style())
+        self._settings_scroll.setStyleSheet(scroll_qss())
         self._settings_scroll.setWidget(self.settings_frame)
 
         self.content_stack.addWidget(self._keyboard_scroll)  # index 0
@@ -253,17 +252,6 @@ class App(QMainWindow):
         return [
             ("✓ 应用", Colors.GREEN, Colors.HOVER_GREEN, lambda: apply_settings(self)),
         ]
-
-    def _scroll_style(self):
-        """设置页滚动区样式（主题相关，可重复刷新）"""
-        return f"""
-            QScrollArea {{ background: transparent; border: none; }}
-            QScrollBar:vertical {{ background: {Colors.ACCENT}; width: 6px; border-radius: 3px; margin: 2px; }}
-            QScrollBar::handle:vertical {{ background: {Colors.DIM}; border-radius: 3px; min-height: 30px; }}
-            QScrollBar::handle:vertical:hover {{ background: {Colors.BLUE}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
-        """
 
     def _ensure_bottom_bar(self, buttons):
         """常驻底部栏：全局只建一次；按钮集变化时原地重建按钮，栏/几何参数不动"""
