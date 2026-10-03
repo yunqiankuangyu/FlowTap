@@ -37,9 +37,11 @@ a = Analysis(
 )
 
 # FlowTap 只用 QtWidgets/Gui/Core——以下为打包器自动收集的未引用模块, 剔除省约10MB
+# 追加瘦身项(合计约省56MB): ffmpeg视频编解码29MB(只截图不做视频) / opengl32sw 20MB(Mesa软渲染兜底) / PIL avif 7.5MB
 _GONE = ("qml", "qt6quick", "qtquick", "qt6pdf", "qtpdf", "qt6network", "qtnetwork",
          "qt6opengl", "qtopengl", "virtualkeyboard",
-         "plugins\\tls", "plugins\\networkinformation", "plugins\\generic", "qpdf.dll")
+         "plugins\\tls", "plugins\\networkinformation", "plugins\\generic", "qpdf.dll",
+         "opencv_videoio_ffmpeg", "opengl32sw", "_avif.cp3")
 def _drop(entries):
     return [e for e in entries
             if not any(g in e[0].replace("/", "\\").lower() for g in _GONE)]
