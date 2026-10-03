@@ -143,7 +143,7 @@ Settings → 功能设置 → **"捕获窗口"**: once bound, the task only runs
 **Purpose:** How FlowTap sits in the background while farming, plus appearance and behavior personalization.
 
 - The **"—"** button on the title bar minimizes to a borderless floating mini window, start/stop stays in sync with the main window
-- Settings is split into **外观设置** (window title, opacity, theme) and **功能设置** (hotkeys, new-task defaults, start countdown, always-on-top, remember window height, preset import/export); click **"✓ 应用"** at the bottom to apply
+- Settings is split into **外观设置** (window title, opacity, always-on-top, remember window height, theme) and **功能设置** (global hotkeys, new-task defaults, start countdown, image matching, window binding, preset backup); changes apply right away, the theme needs **"✓ 应用主题"** at the bottom to rebuild the interface
 
 ## Changelog
 

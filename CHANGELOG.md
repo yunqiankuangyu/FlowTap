@@ -10,6 +10,7 @@
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.9.1 | PySide6 | Fixed-position recognition, faster preview, snappier interface |
 | v3.9.0 | PySide6 | Read numbers, variable math, conditional branch |
 | v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
 | v3.8.2 | PySide6 | Smart branching (experimental), dark tooltip fix |
@@ -32,6 +33,18 @@
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
 
 ## Release Notes
+
+### v3.9.1 — Matching Accuracy & Responsiveness
+
+**New**
+- Fixed-position recognition stops mistaking a moved target for a match
+
+**Improved**
+- Picked content no longer shifts as the live screen changes
+- Changing screen resolution no longer requires re-picking
+- Recognition preview is faster, dragging the window no longer lags
+- Imported presets appear in the dropdown right away
+- Everything except the theme applies immediately
 
 ### v3.9.0 — Read Numbers · Variables · Conditional Branch
 
