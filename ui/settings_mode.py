@@ -93,6 +93,9 @@ def build_settings_mode(app):
     layout.addWidget(nav_row)
     app._settings_page_btns = page_btns
 
+    # 页面容器不设宽度上限: QScrollArea 视口会自动收窄并重排内部内容(见 app.py 处的说明),
+    # 给容器额外设上限会凭空扣掉一段宽度, 表现为右侧多出一条空白。
+
     # ── 外观页容器 ──
     appearance_page = QWidget()
     set_bg(appearance_page, "transparent")
@@ -128,12 +131,7 @@ def build_settings_mode(app):
     ti_row_layout.addWidget(app._title_edit, 1)
 
     def _apply_title():
-        try:
-            from PySide6.QtGui import QGuiApplication
-            QGuiApplication.inputMethod().commit()  # 强制上屏，否则输入法预编辑态读到空
-        except Exception:
-            pass
-        text = app._title_edit.text().strip()
+        text = _read_title(app._title_edit)
         s2 = load_settings()
         s2["window_title"] = text
         save_settings(s2)
@@ -177,6 +175,52 @@ def build_settings_mode(app):
     v.addWidget(op_row)
 
     # 主题
+    # ── 窗口行为 ──
+    def _make_toggle(label_text, checked, key):
+        row = QWidget()
+        set_bg(row, "transparent")
+        rl = QHBoxLayout(row)
+        rl.setContentsMargins(0, 0, 0, 0)
+        lbl = QLabel(label_text)
+        lbl.setFont(_FM)
+        style_label(lbl, Colors.TEXT2)
+        rl.addWidget(lbl)
+        rl.addStretch()
+        btn = QPushButton("开" if checked else "关")
+        btn.setFont(_FM)
+        btn.setFixedSize(44, 24)
+        btn.setCursor(Qt.PointingHandCursor)
+
+        def _style(on):
+            color = Colors.GREEN if on else Colors.DIM
+            hover = Colors.HOVER_GREEN if on else Colors.ACCENT
+            return btn_qss(color, hover=hover)
+        btn.setStyleSheet(_style(checked))
+
+        def toggle():
+            now_on = btn.text() == "关"
+            btn.setText("开" if now_on else "关")
+            btn.setStyleSheet(_style(now_on))
+            s3 = load_settings()
+            s3[key] = now_on
+            save_settings(s3)
+            if key == "always_on_top":
+                flags = app.windowFlags()
+                if now_on:
+                    flags |= Qt.WindowStaysOnTopHint
+                else:
+                    flags &= ~Qt.WindowStaysOnTopHint
+                app.setWindowFlags(flags)
+                app.show()
+                # 圆角走 paintEvent 自绘，setWindowFlags 重建句柄不影响，无需补
+        btn.clicked.connect(toggle)
+        rl.addWidget(btn)
+        return row, btn
+
+    v = _make_section(ap_layout, "🪟 窗口行为")
+    v.addWidget(_make_toggle("窗口置顶", s.get("always_on_top", True), "always_on_top")[0])
+    v.addWidget(_make_toggle("记住窗口高度", s.get("remember_height", True), "remember_height")[0])
+
     v = _make_section(ap_layout, "🎨 色彩主题")
 
     themes_grid = QWidget()
@@ -321,55 +365,46 @@ def build_settings_mode(app):
         style_label(w, Colors.TEXT2)
     v.addWidget(cd_row)
 
-    # 窗口行为
-    v = _make_section(fn_layout, "🪟 窗口行为")
+    # 识图匹配
+    v = _make_section(fn_layout, "🔍 识图匹配")
 
-    def _make_toggle(label_text, checked, key):
-        row = QWidget()
-        set_bg(row, "transparent")
-        rl = QHBoxLayout(row)
-        rl.setContentsMargins(0, 0, 0, 0)
-        lbl = QLabel(label_text)
-        lbl.setFont(_FM)
-        style_label(lbl, Colors.TEXT2)
-        rl.addWidget(lbl)
-        rl.addStretch()
-        btn = QPushButton("开" if checked else "关")
-        btn.setFont(_FM)
-        btn.setFixedSize(44, 24)
-        btn.setCursor(Qt.PointingHandCursor)
+    fixed_row, _ = _make_toggle("固定位置比对", s.get("fixed_position_match", True), "fixed_position_match")
+    v.addWidget(fixed_row)
 
-        def _style(on):
-            color = Colors.GREEN if on else Colors.DIM
-            hover = Colors.HOVER_GREEN if on else Colors.ACCENT
-            return btn_qss(color, hover=hover)
-        btn.setStyleSheet(_style(checked))
+    fixed_hint = QLabel("关=整屏搜该图，开=只在框选位置比对")
+    fixed_hint.setFont(_FM)
+    style_label(fixed_hint, Colors.DIM)
+    v.addWidget(fixed_hint)
 
-        def toggle():
-            now_on = btn.text() == "关"
-            btn.setText("开" if now_on else "关")
-            btn.setStyleSheet(_style(now_on))
-            s3 = load_settings()
-            s3[key] = now_on
-            save_settings(s3)
-            if key == "always_on_top":
-                flags = app.windowFlags()
-                if now_on:
-                    flags |= Qt.WindowStaysOnTopHint
-                else:
-                    flags &= ~Qt.WindowStaysOnTopHint
-                app.setWindowFlags(flags)
-                app.show()
-                # 圆角走 paintEvent 自绘，setWindowFlags 重建句柄不影响，无需补
-        btn.clicked.connect(toggle)
-        rl.addWidget(btn)
-        return row, btn
+    tol_row = QWidget()
+    set_bg(tol_row, "transparent")
+    tol_l = QHBoxLayout(tol_row)
+    tol_l.setContentsMargins(0, 0, 0, 0)
+    tol_lbl = QLabel("位置容错")
+    tol_lbl.setFont(_FM)
+    style_label(tol_lbl, Colors.TEXT2)
+    tol_l.addWidget(tol_lbl)
+    tol_l.addStretch()
+    tol_spin = QDoubleSpinBox()
+    tol_spin.setRange(0, 10); tol_spin.setDecimals(0); tol_spin.setSingleStep(1)
+    tol_spin.setValue(int(s.get("match_tolerance", 3)))
+    # 高度用24与上方开关按钮一致(24), 宽度比开关宽以容纳数值
+    tol_spin.setFixedWidth(56); tol_spin.setFixedHeight(24)
+    tol_spin.setFont(_FM); spin_fill(tol_spin)
+    tol_l.addWidget(tol_spin)
+    px_lbl = QLabel("px")
+    px_lbl.setFont(_FM)          # 不设会走Qt默认字体, 与同排标签不一致
+    style_label(px_lbl, Colors.TEXT2)
+    tol_l.addWidget(px_lbl)
+    v.addWidget(tol_row)
 
-    top_row, _ = _make_toggle("窗口置顶", s.get("always_on_top", True), "always_on_top")
-    v.addWidget(top_row)
+    def _save_tolerance(val):
+        s4 = load_settings()
+        s4["match_tolerance"] = int(val)
+        save_settings(s4)
+    tol_spin.valueChanged.connect(_save_tolerance)
 
-    remember_row, _ = _make_toggle("记住窗口高度", s.get("remember_height", True), "remember_height")
-    v.addWidget(remember_row)
+
 
     # 窗口绑定（前台闸门）
     v = _make_section(fn_layout, "🎯 窗口绑定")
@@ -568,6 +603,14 @@ def build_settings_mode(app):
             merged = load_presets()
             merged.update(incoming)
             save_presets(merged)
+            # 导入即刷新顶部预设下拉, 不必再点底部"应用"(应用按钮只管主题)
+            try:
+                from .keyboard_mode import refresh_preset_combo
+                refresh_preset_combo(app)
+            except Exception:
+                from logger import log_error
+                import traceback
+                log_error("settings_import", traceback.format_exc())
             show_notification(app, f"✓ 已导入 {len(incoming)} 个预设")
         except Exception:
             show_notification(app, "✕ 导入失败：文件格式无效")
@@ -596,6 +639,12 @@ def build_settings_mode(app):
 def _show_page(app, name):
     """切换分页显示"""
     app._settings_current_page = name
+    # 底部栏按钮随分页变化(只有外观页有"应用主题"), 切页时同步重建
+    try:
+        if getattr(app, "_current_mode", "") == "settings" and getattr(app, "_ensure_bottom_bar", None):
+            app._ensure_bottom_bar(app._buttons_for("settings"))
+    except Exception:
+        pass
     if name == PAGE_APPEARANCE:
         app._page_appearance.show()
         app._page_function.hide()
@@ -705,24 +754,23 @@ def _read_title(ed):
 
 
 def apply_settings(app):
-    """实时应用设置：保存 → 重设颜色 → 重建全部UI（不重启进程）"""
+    """应用主题：只有主题需要显式应用。
+
+    其余设置全部改完即生效，不经过这里——
+    透明度/置顶/热键/绑定/识图参数等在各自控件的回调里直接改运行态并落盘，
+    标题走标题行的应用按钮，预设增删改与导入在操作当下就刷新下拉。
+
+    主题是唯一的例外：样式表在构建时把颜色插值进了字符串，必须重设 Colors
+    并重建全部 UI 才能生效，因此保留这个按钮。
+    """
     from config import Colors
-    s = {
-        "opacity": app._opacity_slider.value() / 100.0,
-        "theme": app._current_theme,
-        "window_title": _read_title(app._title_edit),
-        "stop_hotkey": app._stop_hotkey,
-    }
     cur = load_settings()
-    cur.update(s)
+    cur["theme"] = app._current_theme
     save_settings(cur)
-    # 窗口标题即时生效
-    app._title_label.setText(s["window_title"] or "FlowTap")
-    # 主题即时生效：重设 Colors 类属性后重建 UI（样式表都是构建时插值的）
-    Colors.apply(s["theme"])
+    Colors.apply(app._current_theme)
     _rebuild_ui(app)
     # 重建完成后再弹通知，避免通知面板随旧UI销毁而卡死常驻
-    show_notification(app, "✓ 设置已应用", duration_ms=1500)
+    show_notification(app, "✓ 主题已应用", duration_ms=1500)
 
 
 def show_notification(app, text, duration_ms=2000):
@@ -796,14 +844,19 @@ def _rebuild_ui(app):
     app._keyboard_scroll = QScrollArea()
     app._keyboard_scroll.setWidgetResizable(True)
     app._keyboard_scroll.setFrameShape(QFrame.NoFrame)
+    from core.coords import clamp_scroll_area
+    from ui.keyboard_mode import WIN_W
+
     app._keyboard_scroll.setStyleSheet(sq)
     app._keyboard_scroll.setWidget(app.keyboard_frame)
+    clamp_scroll_area(app._keyboard_scroll, WIN_W)
 
     app._settings_scroll = QScrollArea()
     app._settings_scroll.setWidgetResizable(True)
     app._settings_scroll.setFrameShape(QFrame.NoFrame)
     app._settings_scroll.setStyleSheet(sq)
     app._settings_scroll.setWidget(app.settings_frame)
+    clamp_scroll_area(app._settings_scroll, WIN_W)
 
     # content stack
     app.content_stack = QStackedWidget()

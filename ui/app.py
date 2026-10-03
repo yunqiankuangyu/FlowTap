@@ -202,6 +202,14 @@ class App(QMainWindow):
         self._settings_scroll.setStyleSheet(scroll_qss())
         self._settings_scroll.setWidget(self.settings_frame)
 
+        # 内容宽度上限: 只限滚动区, 不限内部容器。
+        # QScrollArea.setWidgetResizable(True) 下滚动区视口会自动收窄并重排内部内容,
+        # 内容再长也撑不破; 反过来给内部容器设上限会凭空扣掉一段(容器边距本就在内部),
+        # 表现为右侧多出一条空白。实测滚动区可被内容撑到640px, 必须限这层。
+        from core.coords import clamp_scroll_area
+        clamp_scroll_area(self._keyboard_scroll, WIN_W)
+        clamp_scroll_area(self._settings_scroll, WIN_W)
+
         self.content_stack.addWidget(self._keyboard_scroll)  # index 0
         self.content_stack.addWidget(self._settings_scroll)  # index 1
 
@@ -248,26 +256,38 @@ class App(QMainWindow):
                 ("▶ 全部开始", Colors.GREEN, Colors.HOVER_GREEN, self._toggle_all),
                 ("⏸ 全部暂停", Colors.YELLOW, Colors.ACCENT, self._toggle_pause),
             ]
+        # 设置页只有"外观"页需要应用按钮(主题在那里), 功能页的设置都即时生效
+        from .settings_mode import PAGE_APPEARANCE
+        if getattr(self, "_settings_current_page", PAGE_APPEARANCE) != PAGE_APPEARANCE:
+            return []
         from .settings_mode import apply_settings
         return [
-            ("✓ 应用", Colors.GREEN, Colors.HOVER_GREEN, lambda: apply_settings(self)),
+            ("✓ 应用主题", Colors.GREEN, Colors.HOVER_GREEN, lambda: apply_settings(self)),
         ]
 
     def _ensure_bottom_bar(self, buttons):
-        """常驻底部栏：全局只建一次；按钮集变化时原地重建按钮，栏/几何参数不动"""
+        """常驻底部栏：全局只建一次；按钮集变化时原地重建按钮，栏/几何参数不动。
+
+        按钮集为空(功能设置页)时整条隐藏, 让内容区占满——留着空栏会在窗口底部留一条无意义空白。
+        """
         from .keyboard_mode import build_bottom_bar
         if getattr(self, '_bottom_bar', None) is None:
             bar, btns = build_bottom_bar(self, buttons)
             self._bottom_bar = bar
             self._bottom_btns = btns
+            bar.setVisible(bool(buttons))
         else:
             # 原地换按钮：清掉旧的，按新配置重建（栏本身不动）
+            # 用 setParent(None) 立即从布局摘除——deleteLater 是异步的，
+            # 紧接着重建会出现新旧按钮并存
             bar = self._bottom_bar
             lay = bar.layout()
             while lay.count():
                 it = lay.takeAt(0)
-                if it.widget():
-                    it.widget().deleteLater()
+                wdg = it.widget()
+                if wdg is not None:
+                    wdg.setParent(None)
+                    wdg.deleteLater()
             from .keyboard_mode import _make_btn, FONT_B
             from config import Colors
             self._bottom_btns = []
@@ -276,6 +296,7 @@ class App(QMainWindow):
                 btn.clicked.connect(cb)
                 lay.addWidget(btn)
                 self._bottom_btns.append(btn)
+            self._bottom_bar.setVisible(bool(buttons))
         return self._bottom_bar
 
 

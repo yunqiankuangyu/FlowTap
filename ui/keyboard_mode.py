@@ -339,6 +339,8 @@ def build_keyboard_mode(app):
     app._task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     app._task_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     app._task_scroll.setStyleSheet(scroll_qss(Colors.ACCENT))
+    from core.coords import clamp_scroll_area as _clamp_sa
+    _clamp_sa(app._task_scroll, WIN_W)
 
     app._task_container = QWidget()
     set_bg(app._task_container, "transparent")
@@ -1514,6 +1516,19 @@ def del_task(app, task, card):
     if card in app._cards:
         app._cards.remove(card)
 
+def refresh_preset_combo(app, select=None):
+    """重建预设下拉条目(预设增删改/导入后统一走这里, 保证下拉与磁盘一致)。
+    select 指定要选中的名字; 无预设时显示占位项"无预设" """
+    from config.presets import load_presets as _lp
+    presets = _lp()
+    names = list(presets.keys()) if presets else ["无预设"]
+    cur = app._preset_combo
+    cur.clear()
+    cur.addItems(names)
+    if select and select in names:
+        cur.setCurrentText(select)
+
+
 def load_preset(app):
     """加载预设"""
     name = app._preset_combo.currentText()
@@ -1604,9 +1619,7 @@ def save_preset_dialog(app):
     }
     save_presets(presets)
 
-    app._preset_combo.clear()
-    app._preset_combo.addItems(list(presets.keys()))
-    app._preset_combo.setCurrentText(name)
+    refresh_preset_combo(app, select=name)
 
     show_floating_notification(app, f"已保存: {name}")
 
@@ -1617,9 +1630,7 @@ def delete_preset_cmd(app):
         return
     from config.presets import delete_preset
     delete_preset(name)
-    presets = load_presets()
-    app._preset_combo.clear()
-    app._preset_combo.addItems(list(presets.keys()) if presets else ["无预设"])
+    refresh_preset_combo(app)
     show_floating_notification(app, f"已删除: {name}")
 
 def show_floating_notification(app, text, duration_ms=2000):
