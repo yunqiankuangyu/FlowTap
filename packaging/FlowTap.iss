@@ -13,7 +13,8 @@ DefaultDirName={localappdata}\Programs\FlowTap
 PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
-OutputBaseFilename=FlowTap-Setup-{#AppVersion}
+; 文件名带 v 与 portable zip 命名对齐(FlowTap-Setup-v3.9.1.exe)
+OutputBaseFilename=FlowTap-Setup-v{#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern

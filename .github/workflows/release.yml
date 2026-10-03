@@ -40,14 +40,18 @@ jobs:
           & $iscc /DAppVersion=$ver packaging\FlowTap.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Pack portable zip
+      - name: Pack zips
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          # 便携版 zip: 240MB -> ~99MB(压缩率59%); zip 下载不触发 SmartScreen 的 exe 警告
+          # 两个 zip 都只装一个文件, 解压即用, 不带嵌套目录。
+          # zip 下载不触发 SmartScreen 对 exe 的"不建议保留"提示
           $ver = "${{ github.ref_name }}".TrimStart('v')
-          Compress-Archive -Path dist\FlowTap -DestinationPath "dist\FlowTap-v$ver.zip" -CompressionLevel Optimal
-          Write-Output "zip: $((Get-Item "dist\FlowTap-v$ver.zip").Length / 1MB) MB"
+          Compress-Archive -Path dist\FlowTap.exe -DestinationPath "dist\FlowTap-v$ver.zip" -CompressionLevel Optimal
+          Write-Output "portable zip: $((Get-Item "dist\FlowTap-v$ver.zip").Length / 1MB) MB"
+          $setup = "dist\FlowTap-Setup-v$ver.exe"
+          Compress-Archive -Path $setup -DestinationPath "dist\FlowTap-Setup-v$ver.zip" -CompressionLevel Optimal
+          Write-Output "setup zip:    $((Get-Item "dist\FlowTap-Setup-v$ver.zip").Length / 1MB) MB"
 
       - name: Upload test artifact
         if: "!startsWith(github.ref, 'refs/tags/')"
@@ -65,17 +69,21 @@ jobs:
         with:
           files: |
             dist/FlowTap.exe
-            dist/FlowTap-Setup-*.exe
             dist/FlowTap-v*.zip
+            dist/FlowTap-Setup-*.exe
+            dist/FlowTap-Setup-v*.zip
           name: FlowTap ${{ github.ref_name }}
           body: |
             下载说明
 
-            便携版解压即用：
-            - `FlowTap-v${{ github.ref_name }}.zip` — **推荐**，下载时不会弹"不建议保留"
-            - `FlowTap.exe` — 单文件版
+            **推荐下载 zip**，解压即用，下载时不会弹"不建议保留"。
 
-            安装版：
+            便携版（解压后只有一个 exe，双击运行）：
+            - `FlowTap-${{ github.ref_name }}.zip`
+            - `FlowTap.exe` — 不解压直接运行
+
+            安装版（解压后只有一个安装包，双击安装）：
+            - `FlowTap-Setup-${{ github.ref_name }}.zip`
             - `FlowTap-Setup-${{ github.ref_name }}.exe`
 
             注：exe 未做代码签名，Windows 可能提示"未知发布者"，
