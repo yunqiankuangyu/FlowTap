@@ -34,16 +34,22 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
-# FlowTap 只用 QtWidgets/Gui/Core——以下为打包器自动收集的未引用模块, 剔除省约10MB
-# 追加瘦身项(合计约省56MB):
-#   opencv_videoio_ffmpeg_*.dll 29MB —— 视频编解码器, FlowTap只截图做模板匹配, 从不处理视频
-#   opengl32sw.dll               20MB —— Mesa纯软件渲染兜底, FlowTap用QtWidgets不走OpenGL
-#   PIL/_avif*.pyd              7.5MB —— AVIF图片解码, 截图走PNG/BMP用不上
-# (cv2.pyd 81MB / onnxruntime 34MB / 三个ONNX模型 15MB 是OCR必需, 不可动)
-_GONE = ("qml", "qt6quick", "qtquick", "qt6pdf", "qtpdf", "qt6network", "qtnetwork",
-         "qt6opengl", "qtopengl", "virtualkeyboard",
-         "plugins\\tls", "plugins\\networkinformation", "plugins\\generic", "qpdf.dll",
-         "opencv_videoio_ffmpeg", "opengl32sw", "_avif.cp3")
+# 打包瘦身排除表——PyInstaller 自动收集但 FlowTap 从不使用的
+#   opencv_videoio_ffmpeg_*.dll  29MB —— 视频编解码器, FlowTap只截图做模板匹配, 从不处理视频
+#   opengl32sw.dll                 20MB —— Mesa纯软件渲染兜底, FlowTap用QtWidgets不走OpenGL
+#   PIL/_avif*.pyd                7.5MB —— AVIF图片解码, 截图走PNG/BMP用不上
+# 合计省约 56MB (297MB -> 240MB)
+# libscipy_openblas(19MB) 不可排除: numpy._core._multiarray_umath.pyd 静态链接了它,
+#   抽掉会导致 numpy import 失败, 程序无法启动
+# 保留不动: cv2.pyd 82MB / onnxruntime 34MB / Qt 49MB / 三个ONNX模型 15MB —— 都是OCR或UI必需
+_GONE = (
+    # Qt 未引用模块
+    "qml", "qt6quick", "qtquick", "qt6pdf", "qtpdf", "qt6network", "qtnetwork",
+    "qt6opengl", "qtopengl", "virtualkeyboard", "qpdf.dll",
+    "plugins\\tls", "plugins\\networkinformation", "plugins\\generic",
+    # OpenCV / Qt / PIL 的无用部分
+    "opencv_videoio_ffmpeg", "opengl32sw", "_avif.cp3",
+)
 def _drop(entries):
     return [e for e in entries
             if not any(g in e[0].replace("/", "\\").lower() for g in _GONE)]
