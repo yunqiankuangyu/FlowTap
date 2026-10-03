@@ -76,6 +76,36 @@ def phys_to_qt_point(x, y, dpr):
     return int(round(x / dpr)), int(round(y / dpr))
 
 
+# ── 界面宽度约束 ──
+# 无边框窗口用 setFixedSize 锁死宽度, 但 QScrollArea.setWidgetResizable(True) 会把内部widget
+# 撑到视口宽; 反过来内部内容的最小宽度需求(不换行的 QLabel、过宽的输入框/按钮)会把滚动区一起
+# 撑宽, 表现为内容溢出窗口右边界、圆角被撑成方角。
+# 关口只设在 QScrollArea 这一层: 视口收窄后 Qt 自动重排内部内容, 已足够防溢出。
+# 不要再去限内部容器(会凭空扣掉一段宽度, 右侧多出空白), 更不能用 setFixedWidth(锁死尺寸策略)。
+
+def clamp_scroll_area(scroll, window_width):
+    """给 QScrollArea 设宽度上限, 防止内容把滚动区撑宽并溢出窗口。
+
+    这是界面防超宽的唯一关口: QScrollArea.setWidgetResizable(True) 下滚动区宽度跟随内部widget,
+    内部内容宽度需求偏大时滚动区会被一起撑宽(实测可到640px), 表现为内容溢出窗口右边界。
+
+    **只限滚动区这一层, 不要再去限内部容器**: 视口收窄后 Qt 会自动重排内部内容(长文字自己换行),
+    已足够防溢出。反过来给内部容器设上限会凭空扣掉一段(容器自身的布局边距本就在其内部计算),
+    表现为右侧多出一条空白。setFixedWidth 更不能用——它锁死尺寸策略会让内部卡片高度自适应失效。
+    """
+    if scroll is None:
+        return None
+    w = max(80, int(window_width))
+    try:
+        scroll.setMaximumWidth(w)
+        viewport = scroll.viewport()
+        if viewport is not None:
+            viewport.setMaximumWidth(w)
+    except Exception:
+        return None
+    return w
+
+
 # ── 启动自检 ──
 def probe_dpi_report():
     """采集当前坐标体系实况，返回可直接打印的字符串。

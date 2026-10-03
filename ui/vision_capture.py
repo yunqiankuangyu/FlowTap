@@ -7,8 +7,8 @@ import os
 import sys
 
 from PySide6.QtCore import Qt, QRect, QPoint, QPointF, QTimer, QEvent
-from PySide6.QtGui import QPainter, QPen, QColor, QCursor
-from PySide6.QtWidgets import QWidget, QLabel, QMessageBox
+from PySide6.QtGui import QPainter, QPen, QColor, QCursor, QPixmap
+from PySide6.QtWidgets import QWidget, QLabel, QMessageBox, QApplication
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import Colors, FONT_B
@@ -26,10 +26,24 @@ def _phys_bbox(rect, dpr):
     return qt_rect_to_phys_bbox(rect, dpr)
 
 
+def _grab_frozen():
+    """抓一张全屏冻结帧(QImage, 物理像素)给遮罩垫底。
+    遮罩出现前抓, 之后画面怎么动都不影响框选与最终模板 —— 所见即所得"""
+    try:
+        from PIL import ImageGrab
+        from PySide6.QtGui import QImage
+        im = ImageGrab.grab(all_screens=True).convert("RGB")
+        data = im.tobytes("raw", "RGB")
+        q = QImage(data, im.width, im.height, im.width * 3, QImage.Format_RGB888).copy()
+        return q
+    except Exception:
+        return None
+
+
 class _SelectOverlay(QWidget):
     """全屏框选层：半透明暗罩 + 拖拽矩形，确认/取消走 on_done(accepted, global_rect)"""
 
-    def __init__(self, screen_rect, on_done):
+    def __init__(self, screen_rect, on_done, frozen=None):
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         # 关键属性：缺失时样式表 rgba 的 alpha 不生效，整块变实心黑
         self.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -37,6 +51,10 @@ class _SelectOverlay(QWidget):
         self._start = None
         self._cur = None
         self._done = False
+        # 冻结帧: 遮罩出现那一刻抓的全屏图, 用户框选与最终截图都以它为准。
+        # 动态画面(游戏/视频)下, 实时截图会拍到"框完之后"的画面, 与用户所见不符;
+        # 用冻结帧则所见即所得, 且与画面是否继续变化完全无关。
+        self._frozen = frozen
         self.setGeometry(screen_rect)
         self.setCursor(QCursor(Qt.CrossCursor))
         # 背景不走 QSS：WA_TranslucentBackground 窗口上样式表背景不渲染，由 paintEvent 手画
@@ -47,6 +65,11 @@ class _SelectOverlay(QWidget):
         tip.adjustSize()
         tip.move((self.width() - tip.width()) // 2, 40)
         tip.show()
+
+    @property
+    def frozen(self):
+        """冻结帧 QImage(物理像素), 无则 None"""
+        return self._frozen
 
     def _finish(self, accepted, rect=None):
         if self._done:
@@ -103,8 +126,22 @@ class _SelectOverlay(QWidget):
             self._cur = None
             self.update()
 
+    def set_capture_mode(self, on=True):
+        """截图模式: 暂停绘制暗罩与选区, 使截图拿到未压暗的原始画面。
+        遮罩保持可见(仍接收鼠标), 但画面瞬间变亮 —— 用截图那一刻的原图, 不等隐藏后的画面"""
+        self._capture_mode = bool(on)
+        self.update()
+
     def paintEvent(self, e):
         p = QPainter(self)
+        if getattr(self, "_capture_mode", False):
+            # 截图模式: 什么都不画, 露出原始画面
+            p.end()
+            return
+        # 冻结帧垫底: 用户看到的框选底图就是最终模板的来源, 所见即所得。
+        # 冻结帧是物理像素, 按dpr缩放铺满逻辑坐标系的窗口。
+        if self._frozen is not None:
+            p.drawPixmap(self.rect(), QPixmap.fromImage(self._frozen))
         # 暗罩必须先画且在早退判断之前——这是整个遮罩的底
         p.fillRect(self.rect(), QColor(0, 0, 0, 80))
         if self._start is not None and self._cur is not None:
@@ -151,9 +188,10 @@ def capture_template(app, task, on_got, on_done, rel=None, on_cancel=None):
             QTimer.singleShot(0, lambda: (_restore(), on_cancel and on_cancel()))
             return
 
-        # 先藏遮罩再截图，等 DWM 合成一帧，避免截到暗罩
+        # 遮罩显示期间就把画面抓下来(遮罩半透明, 只压暗不遮蔽内容),
+        # 再从里面裁出选区 —— 这样截的是"用户松手那一刻"的画面, 不会因隐藏遮罩后的
+        # 等待窗口而拍到已经变化的画面(动态界面下原内容会移位)。
         _dpr = overlay.screen().devicePixelRatio()  # hide前取屏dpr(隐藏后screen()可能回落主屏)
-        overlay.hide()
 
         def _grab_and_save():
             _err = None
@@ -161,7 +199,23 @@ def capture_template(app, task, on_got, on_done, rel=None, on_cancel=None):
             try:
                 # 逻辑rect→物理bbox: 换算到遮罩所在屏的dpr, 否则150%屏截错位置
                 bbox = _phys_bbox(rect, _dpr)
-                rgb = vision.grab_rgb(bbox)
+                # 从冻结帧裁剪选区: 与用户框选时看到的完全一致, 画面后续怎么动都不影响
+                if overlay.frozen is not None:
+                    _fx, _fy = bbox[0], bbox[1]
+                    _fw, _fh = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                    _full = overlay.frozen
+                    if (_fx >= 0 and _fy >= 0 and _fx + _fw <= _full.width()
+                            and _fy + _fh <= _full.height()):
+                        rgb = vision.qimage_to_rgb(_full, _fx, _fy, _fw, _fh)
+                    else:
+                        rgb = None
+                else:
+                    rgb = None
+                if rgb is None:
+                    # 兜底: 无冻结帧或选区越界时才走实时截图
+                    rgb = vision.grab_rgb(bbox)
+                overlay.hide()
+                _restore()  # 先恢复窗口, 避免截到主窗
                 _std = vision.template_sigma(rgb)
                 if _std < vision.MIN_TEMPLATE_STD:
                     # 纯色选区无法识别(σ≈0时匹配恒为1.0), 拦下提示重框; 重拍场景原模板不被覆盖
@@ -175,6 +229,9 @@ def capture_template(app, task, on_got, on_done, rel=None, on_cancel=None):
                     from PIL import Image
                     use_rel = rel or vision.new_template_path()
                     vision.save_template(Image.fromarray(rgb), use_rel)
+                    # 记框选时的屏幕绝对坐标, 供固定位置比对使用(不记则该模板走全屏搜索)
+                    # ref_size=搜索区域尺寸, 供分辨率变化时按比例换算坐标
+                    vision.save_template_bbox(use_rel, bbox, vision.current_screen_size())
                     on_got(use_rel)
             except Exception as e:
                 from logger import log_error
@@ -182,6 +239,7 @@ def capture_template(app, task, on_got, on_done, rel=None, on_cancel=None):
                 log_error("vision_capture", traceback.format_exc())
                 _exc = e
             finally:
+                overlay.hide()
                 _restore()
                 on_done()
             if _err:
@@ -193,9 +251,10 @@ def capture_template(app, task, on_got, on_done, rel=None, on_cancel=None):
                 show_floating_notification(
                     app, f"✕ 截图失败（{type(_exc).__name__}），详见 runtime.log", duration_ms=4000)
 
-        QTimer.singleShot(100, _grab_and_save)
+        # 遮罩已在显示状态下截完, 无需等待DWM合成一帧
+        QTimer.singleShot(0, _grab_and_save)
 
-    overlay = _SelectOverlay(screen, _finish)
+    overlay = _SelectOverlay(screen, _finish, _grab_frozen())
     safety_timer = QTimer()
     safety_timer.setSingleShot(True)
     safety_timer.timeout.connect(lambda: _finish(False))
@@ -257,10 +316,13 @@ def capture_region(app, task, on_got, on_done, on_cancel=None):
             return
 
         _dpr = overlay.screen().devicePixelRatio()
-        overlay.hide()
 
         def _deliver():
             try:
+                # 遮罩切截图模式后立即取坐标, 不等隐藏后的画面(动态界面会移位)
+                overlay.set_capture_mode(True)
+                overlay.repaint()
+                QApplication.processEvents()
                 x0, y0, x1, y1 = _phys_bbox(rect, _dpr)
                 w, h = max(1, x1 - x0), max(1, y1 - y0)
                 from core.window_gate import get_bound_process, window_at_point
@@ -281,12 +343,14 @@ def capture_region(app, task, on_got, on_done, on_cancel=None):
                 import traceback
                 log_error("capture_region", traceback.format_exc())
             finally:
+                overlay.hide()
                 _restore()
                 on_done()
 
-        QTimer.singleShot(100, _deliver)
+        # 遮罩显示状态下即可取到坐标, 无需等待DWM合成一帧
+        QTimer.singleShot(0, _deliver)
 
-    overlay = _SelectOverlay(screen, _finish)
+    overlay = _SelectOverlay(screen, _finish, _grab_frozen())
     safety_timer = QTimer()
     safety_timer.setSingleShot(True)
     safety_timer.timeout.connect(lambda: _finish(False))
