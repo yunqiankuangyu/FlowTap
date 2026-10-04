@@ -60,7 +60,6 @@ class _Signal:
         for fn in list(self._slots):
             fn(*a)
 
-
 def _make_menu_combo(items, width=80, on_select=None, height=25):
     """下拉控件(QPushButton+QMenu 实现, 全app下拉唯一种类)
     为何不用 QComboBox: 无边框置顶窗口里 QComboBox 的弹窗拿不到输入焦点,
@@ -129,23 +128,27 @@ def _make_menu_combo(items, width=80, on_select=None, height=25):
         menu.exec(btn.mapToGlobal(QPoint(0, btn.height())))
     btn.clicked.connect(_open_menu)
 
+    # 凡是改动 _items 都要跟着重建菜单, 否则 QMenu 与选项不同步
+    # (只改 _items 会让菜单留空, 表现为下拉点开是空白菜单、选不中)
     def _addItems(new_items):
         btn._items.extend(new_items)
         btn._datas.extend([None] * len(new_items))
+        _rebuild()
         if btn._cur < 0 and btn._items:
             _pick(0, emit=False)
 
     def _addItem(text, data=None):
         btn._items.append(text)
         btn._datas.append(data)
+        _rebuild()
         if btn._cur < 0:
             _pick(0, emit=False)
 
     def _clear():
-        menu.clear()
         btn._items.clear()
         btn._datas.clear()
         btn._cur = -1
+        _rebuild()
 
     def _setCurrentIndex(idx, emit=True):
         _pick(idx, emit=emit)
@@ -216,7 +219,6 @@ def _make_menu_combo(items, width=80, on_select=None, height=25):
     _rebuild()
     return btn
 
-
 def _action_summary(action, task=None):
     """动作行摘要文字。条件分支额外补跳转目标(行内不显示跳到下拉, 目标必须在摘要可见);
     目标未设/已失效时给出可读警示, 不让"条件成立也不跳"静默发生"""
@@ -229,7 +231,6 @@ def _action_summary(action, task=None):
         else:
             desc += " → ⚠未设目标"
     return desc
-
 
 def _target_combo(task, container, big=False):
     """跳转目标下拉：顺序继续(None) + 全部动作；itemData=lid，显示 动作N: 描述
@@ -876,7 +877,6 @@ def _mini_combo(items, cur, w, h=18):
     cb.setCurrentText(cur)
     return cb
 
-
 def _refresh_actions(app, task):
     """刷新动作列表UI"""
     while task._action_layout.count():
@@ -956,7 +956,7 @@ def _refresh_actions(app, task):
             _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
             delay_label = _make_label("阈值" if is_wait else "后延", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
-            _ctl.addSpacing(2)  # 组界: 配对内紧、组间松
+            _ctl.addSpacing(12)  # 组界: 配对内紧、组间松
             _ctl.addWidget(delay_label)
 
             delay_spin = QDoubleSpinBox()
@@ -987,7 +987,7 @@ def _refresh_actions(app, task):
                 _ctl.addWidget(_make_label("s", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
 
         if _inline_full and is_wait:
-            _ctl.addSpacing(2)
+            _ctl.addSpacing(12)
             # 帧：防抖连续命中次数
             _ctl.addWidget(_make_label("帧", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
             hit_spin = QDoubleSpinBox()
@@ -1003,55 +1003,21 @@ def _refresh_actions(app, task):
             hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
             _ctl.addWidget(hit_spin)
 
-            _ctl.addSpacing(2)
-            # 尺度：多尺度/精确 动态切换（点击翻转 action.scales）
-            scale_btn = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
-            scale_btn.setFixedWidth(47)
-            scale_btn.setToolTip("多尺度：UI缩放125%/150%也识别；精确：只按标定原尺寸")
-            def _flip_scale(_checked=False, a=action, b=scale_btn):
-                cur = a.get("scales") or [1.0, 1.25, 1.5]
-                if len(cur) > 1:
-                    a["scales"] = [1.0]
-                    b.setText("精确")
-                    _tint_btn(b, Colors.DIM)
-                else:
-                    a["scales"] = [1.0, 1.25, 1.5]
-                    b.setText("多尺度")
-                    _tint_btn(b, Colors.BLUE)
-            scale_btn.clicked.connect(_flip_scale)
-            _multi = len(action.get("scales") or [1.0, 1.25, 1.5]) > 1
-            scale_btn.setText("多尺度" if _multi else "精确")
-            _tint_btn(scale_btn, Colors.BLUE if _multi else Colors.DIM)
-            _ctl.addWidget(scale_btn)
-
-        if _inline_full and (is_wait or is_branch):
-            _ctl.addSpacing(2)
-            # 超时后行为：跳过/中止 动态切换（中止=红）
-            _ctl.addWidget(_make_label("超时后", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
-            ot_btn = _make_btn("", font=QFont("MiSans", 11, QFont.Bold), height=20)
-            ot_btn.setFixedWidth(32)
-            ot_btn.setToolTip("等待超时后：跳过=继续下一动作；跳卡=整张卡片本轮作废(等循环后再来)；中止=终止任务。超时为0时不生效")
-            _OT3 = [("skip", "跳过", Colors.BLUE),
-                    ("skip_card", "跳卡", Colors.YELLOW),
-                    ("stop", "中止", Colors.RED)]
-            def _ot_cur(a):
-                v = a.get("on_timeout", "skip")
-                return "skip" if v == "next" else v  # branch旧值next归一
-            def _ot_apply(a, b, val):
-                a["on_timeout"] = val
-                for k, t, c in _OT3:
-                    if k == val:
-                        b.setText(t); _tint_btn(b, c); break
-            def _flip_ot(_checked=False, a=action, b=ot_btn):
-                cur = _ot_cur(a)
-                idx = next((i for i, (k, _, _) in enumerate(_OT3) if k == cur), 0)
-                _ot_apply(a, b, _OT3[(idx + 1) % 3][0])
-            ot_btn.clicked.connect(_flip_ot)
-            _ot_apply(action, ot_btn, _ot_cur(action))
-            _ctl.addWidget(ot_btn)
-            # 超时=0(∞)=保持等待永不超时→超时后行为无意义, 置灰
-            hold_spin.valueChanged.connect(lambda v, b=ot_btn: b.setEnabled(v > 0))
-            ot_btn.setEnabled(hold_spin.value() > 0)
+            # 尺度/比对精度/超时后行为已搬进悬浮编辑页: 胶囊比旧翻转按钮宽约 100px,
+            # 行内放不下(400px 宽, 实测挤到控件重叠)。这里只留三档缩写 + 入口提示。
+            # 缩写而非全称: 三值全称要 130px, 加上行内其它控件超 376px 上限。
+            _sc_txt = "多" if len(action.get("scales") or [1.0, 1.25, 1.5]) > 1 else "精"
+            _mo_map = {"raw": "原", "strict": "精", "balanced": "衡", "loose": "粗"}
+            _ot_map = {"skip": "跳", "skip_card": "卡", "stop": "止"}
+            _sum = _make_label(
+                        f"{_sc_txt}·{_mo_map.get(action.get('match_mode'), '原')}·{_ot_map.get(action.get('on_timeout', 'skip'), '跳')}",
+                        font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
+            _sum.setToolTip(
+                        "识别参数在悬浮编辑页（点行末 ✎ 进入）\n",
+                        "尺度：精确=只按原尺寸｜多=UI缩放也识别\n",
+                        "比对精度：原=不计模糊｜精=+9%｜衡=+15%｜粗=+21%\n",
+                        "超时后：跳=继续下一动作｜卡=整卡作废｜止=终止任务")
+            _ctl.addWidget(_sum)
 
         if action.get("type") == "click":
             # 定位: 把鼠标移到记录的点上(不点击), 用来核对坐标录得对不对
@@ -1527,7 +1493,6 @@ def refresh_preset_combo(app, select=None):
     cur.addItems(names)
     if select and select in names:
         cur.setCurrentText(select)
-
 
 def load_preset(app):
     """加载预设"""

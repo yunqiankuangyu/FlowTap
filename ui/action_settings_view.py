@@ -8,10 +8,12 @@ from config.themes import Colors
 from tasks.keyboard.keyboard_task import fmt_action
 from .keyboard_mode import (_fit_spin, _target_combo, _mini_combo,
                             DraggableRow, _refresh_actions as _refresh_main)
-from .widgets import _make_btn, _make_label, _tint_btn, spin_flat, btn_qss, card_qss, F12
+from .widgets import (_make_btn, _make_label, _tint_btn, spin_flat, btn_qss,
+                     card_qss, F12, FONT_M, FONT_M as FONT13)
 
 RADIUS = 16
-FONT13 = QFont("MiSans", 13, QFont.Bold)
+# 页标题比正文大一号(标题级); 其余标签一律走 FONT13, 不在此处另写字号
+FONT_TITLE = QFont("MiSans", 15, QFont.Bold)
 
 
 
@@ -37,13 +39,16 @@ class ActionSettingsView(QWidget):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setFixedWidth(600)
+        # 跟随主窗透明度: 这是独立顶层窗, 不会继承 app 的 setWindowOpacity
+        from .window_opacity import apply_to
+        apply_to(self)
         self._root = QVBoxLayout(self)
         self._root.setContentsMargins(18, 14, 18, 20)
         self._root.setSpacing(10)
 
         head = QHBoxLayout()
         head.setSpacing(4)
-        head.addWidget(_make_label(fmt_action(action) + " 设置", font=QFont("MiSans", 15, QFont.Bold)))
+        head.addWidget(_make_label(fmt_action(action) + " 设置", font=FONT_TITLE))
         head.addStretch(1)
         close_btn = QPushButton("\u2715")
         close_btn.setFixedSize(26, 26)
@@ -67,7 +72,7 @@ class ActionSettingsView(QWidget):
         v.setContentsMargins(16, 10, 16, 12)
         v.setSpacing(8)
         if title:
-            v.addWidget(_make_label(title, font=QFont("MiSans", 12, QFont.Bold), color=Colors.DIM))
+            v.addWidget(_make_label(title, font=FONT13, color=Colors.DIM))
         self._content.addWidget(card)
         return v
 
@@ -100,6 +105,7 @@ class ActionSettingsView(QWidget):
         self.adjustSize()
 
     def _build(self):
+        from .segmented import segmented_control   # 尺度/超时后/比对精度三卡共用
         app, task, action = self._app, self._task, self._action
         is_wait = action.get("type") == "wait_image"
         is_branch = action.get("type") == "branch"
@@ -139,7 +145,7 @@ class ActionSettingsView(QWidget):
             _vbox = self._card(None)
             _ctl = QHBoxLayout()
             _ctl.setSpacing(0)
-            _ctl.addWidget(_make_label("等待条件", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+            _ctl.addWidget(_make_label("等待条件", font=FONT13, color=Colors.DIM))
             _ctl.addStretch(1)  # 参数整体右靠
             hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=FONT13, color=Colors.DIM)
             _ctl.addWidget(hold_label)
@@ -169,7 +175,7 @@ class ActionSettingsView(QWidget):
             _ctl.addWidget(_make_label("s", font=FONT13, color=Colors.DIM))
 
             delay_label = _make_label("阈值" if is_wait else "后延", font=FONT13, color=Colors.DIM)
-            _ctl.addSpacing(2)  # 组界: 配对内紧、组间松
+            _ctl.addSpacing(12)  # 组界: 配对内紧、组间松
             _ctl.addWidget(delay_label)
 
             delay_spin = QDoubleSpinBox()
@@ -195,7 +201,7 @@ class ActionSettingsView(QWidget):
             if not is_wait:
                 _ctl.addWidget(_make_label("s", font=FONT13, color=Colors.DIM))
             if is_wait:
-                _ctl.addSpacing(2)
+                _ctl.addSpacing(12)
                 # 帧：防抖连续命中次数
                 _ctl.addWidget(_make_label("帧", font=FONT13, color=Colors.DIM))
                 hit_spin = QDoubleSpinBox()
@@ -212,55 +218,75 @@ class ActionSettingsView(QWidget):
                 hit_spin.valueChanged.connect(lambda v, a=action: a.__setitem__("min_hits", int(v)))
                 _ctl.addWidget(hit_spin)
 
-                _ctl.addSpacing(2)
-                # 尺度：多尺度/精确 动态切换（点击翻转 action.scales）
-                scale_btn = _make_btn("", font=FONT13, height=25)
-                scale_btn.setFixedWidth(60)
-                scale_btn.setToolTip("多尺度：UI缩放125%/150%也识别；精确：只按标定原尺寸")
-                def _flip_scale(_checked=False, a=action, b=scale_btn):
-                    cur = a.get("scales") or [1.0, 1.25, 1.5]
-                    if len(cur) > 1:
-                        a["scales"] = [1.0]
-                        b.setText("精确")
-                        _tint_btn(b, Colors.DIM)
-                    else:
-                        a["scales"] = [1.0, 1.25, 1.5]
-                        b.setText("多尺度")
-                        _tint_btn(b, Colors.BLUE)
-                scale_btn.clicked.connect(_flip_scale)
-                _multi = len(action.get("scales") or [1.0, 1.25, 1.5]) > 1
-                scale_btn.setText("多尺度" if _multi else "精确")
-                _tint_btn(scale_btn, Colors.BLUE if _multi else Colors.DIM)
-                _ctl.addWidget(scale_btn)
 
+            # ── 卡: 比对尺度 ──
+            # 精确/多尺度搬进本页: 行内一行放不下(实测胶囊比旧翻转按钮宽约 100px,
+            # 400px 宽的行连同超时/阈值/帧会挤到重叠)。
+            if is_wait:
+                            v3 = self._card("比对尺度")
+                            v3.addWidget(_make_label(
+                                            "精确：只按标定原尺寸比对\n"
+                                            "多尺度：UI 缩放 125%/150% 也识别",
+                                            font=FONT_M, color=Colors.TEXT2))
+                            _SCALES = [("精确", "single"), ("多尺度", "multi")]
+                            _has_multi = len(action.get("scales") or [1.0, 1.25, 1.5]) > 1
+                            def _on_scale(val, a=action):
+                                            # 只更新行内摘要, 不重建本页——重建会销毁控件, 点击看起来没反应
+                                            a["scales"] = [1.0, 1.25, 1.5] if val == "multi" else [1.0]
+                                            _refresh_main(self._app, self._task)
+                            _scale_seg = segmented_control(
+                                            _SCALES, "multi" if _has_multi else "single", _on_scale, size="normal")
+                            v3.addWidget(_scale_seg)
+
+            # ── 卡: 超时后行为 ──
+            # 超时=0(∞)=永不超时 → 这一项无意义, 胶囊整体置灰(药丸也要跟着变暗)
             if is_wait or is_branch:
-                _ctl.addSpacing(2)
-                # 超时后行为：跳过/中止 动态切换（中止=红）
-                _ctl.addWidget(_make_label("超时后", font=FONT13, color=Colors.DIM))
-                ot_btn = _make_btn("", font=FONT13, height=25)
-                ot_btn.setFixedWidth(43)
-                ot_btn.setToolTip("等待超时后：跳过=继续下一动作；跳卡=整张卡片本轮作废(等循环后再来)；中止=终止任务。超时为0时不生效")
-                _OT3 = [("skip", "跳过", Colors.BLUE),
-                        ("skip_card", "跳卡", Colors.YELLOW),
-                        ("stop", "中止", Colors.RED)]
-                def _ot_cur(a):
-                    v = a.get("on_timeout", "skip")
-                    return "skip" if v == "next" else v  # branch旧值next归一
-                def _ot_apply(a, b, val):
-                    a["on_timeout"] = val
-                    for k, t, c in _OT3:
-                        if k == val:
-                            b.setText(t); _tint_btn(b, c); break
-                def _flip_ot(_checked=False, a=action, b=ot_btn):
-                    cur = _ot_cur(a)
-                    idx = next((i for i, (k, _, _) in enumerate(_OT3) if k == cur), 0)
-                    _ot_apply(a, b, _OT3[(idx + 1) % 3][0])
-                ot_btn.clicked.connect(_flip_ot)
-                _ot_apply(action, ot_btn, _ot_cur(action))
-                _ctl.addWidget(ot_btn)
-                # 超时=0(∞)=保持等待永不超时→超时后行为无意义, 置灰(disabled态tooltip仍可见)
-                hold_spin.valueChanged.connect(lambda v, b=ot_btn: b.setEnabled(v > 0))
-                ot_btn.setEnabled(hold_spin.value() > 0)
+                            v4 = self._card("超时后行为")
+                            v4.addWidget(_make_label(
+                                            "跳过：继续下一动作\n"
+                                            "跳卡：整张卡片本轮作废（等循环后再来）\n"
+                                            "中止：终止任务",
+                                            font=FONT_M, color=Colors.TEXT2))
+                            _OT3 = [("跳过", "skip"), ("跳卡", "skip_card"), ("中止", "stop")]
+                            def _ot_cur(a):
+                                            v = a.get("on_timeout", "skip")
+                                            return "skip" if v == "next" else v   # branch 旧值 next 归一
+                            def _on_ot(val, a=action):
+                                            a["on_timeout"] = val
+                                            _refresh_main(self._app, self._task)
+                            _ot_seg = segmented_control(_OT3, _ot_cur(action), _on_ot, size="normal")
+                            v4.addWidget(_ot_seg)
+                            # 超时=0(∞)=永不超时 → 超时后行为无意义, 胶囊整体置灰
+                            _ot_seg.setEnabled(hold_spin.value() > 0)
+                            hold_spin.valueChanged.connect(
+                                            lambda v, s=_ot_seg: s.setEnabled(v > 0))
+
+            # ── 卡: 比对精度(放最下) ──
+            # 放最后: 它是调容错的最终手段, 尺度与超时是基础设置, 先基础后微调
+            if is_wait:
+                            from core import vision as _vis
+                            v2 = self._card("比对精度")
+                            v2.addWidget(_make_label(
+                                            "档位越靠右越能容忍画面内变化（数字跳动、文字刷新、微小动画）",
+                                            font=FONT_M, color=Colors.TEXT2))
+                            _MODES = [(_vis.MATCH_MODE_LABEL[k], k) for k in _vis.MATCH_MODE_ORDER]
+                            _cur_mode = action.get("match_mode")
+                            if _cur_mode not in _vis.MATCH_GRANT:
+                                            _cur_mode = "raw"   # 旧动作没这字段=原版
+                            def _on_mode(val, a=action):
+                                            # 只更新行内摘要, 不重建本页——重建会把控件销毁, 点击看起来没反应
+                                            a["match_mode"] = val
+                                            _refresh_main(self._app, self._task)
+                            seg = segmented_control(_MODES, _cur_mode, _on_mode, size="normal")
+                            seg.setToolTip(
+                                            "准确率 = 原图准确率 + 模糊准确率×折扣\n"
+                                            "原版：不计模糊（0%）\n"
+                                            "精确：+9%\n"
+                                            "平衡：+15%\n"
+                                            "粗略：+21%")
+                            v2.addWidget(seg)
+                            self.match_seg = seg
+
             _vbox.addLayout(_ctl)
 
         # ═══ cond_branch(条件分支)专属卡组 ═══
@@ -323,7 +349,7 @@ class ActionSettingsView(QWidget):
             _rowA.addStretch(1)
             _vbox.addLayout(_rowA)
             _vbox.addWidget(_make_label("💡 变量来自上方「读数」动作；从未读过的变量按 0 计算",
-                                       font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                                       font=FONT13, color=Colors.DIM))
 
             # ── 卡B 条件成立时 ──
             _vbox = self._card("条件成立时")
@@ -338,9 +364,9 @@ class ActionSettingsView(QWidget):
             #未设目标时明确警示: 条件成立也不会跳, 是最易踩的坑
             if not action.get("target"):
                 _vbox.addWidget(_make_label("⚠ 还没选目标 —— 条件成立也不会跳转（等同顺序继续），请选一个目标动作",
-                                           font=QFont("MiSans", 11, QFont.Bold), color=Colors.RED))
+                                           font=FONT13, color=Colors.RED))
             _vbox.addWidget(_make_label("💡 成立 → 跳到所选动作；不成立 → 顺序继续下一行（不会跳过）",
-                                       font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                                       font=FONT13, color=Colors.DIM))
 
             # ── 卡C 用法示例 ──
             _vbox = self._card("用法示例")
@@ -349,7 +375,7 @@ class ActionSettingsView(QWidget):
             for _ln in ("① 先用「读数」把目标数字写进变量（如金币数）",
                         "② 本动作判断该变量是否达到阈值，成立就跳到对应动作（如买装备）",
                         "③ 不成立则继续往下走；想循环就在末尾用「跳转」跳回第①步"):
-                _ex.addWidget(_make_label(_ln, font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                _ex.addWidget(_make_label(_ln, font=FONT13, color=Colors.DIM))
             _vbox.addLayout(_ex)
 
             # ── 卡D 后延 ──
@@ -393,13 +419,13 @@ class ActionSettingsView(QWidget):
             if _rg:
                 _rowE.addWidget(_make_label(f"已框选：宽 {_rg[2]} × 高 {_rg[3]} 像素"
                                            f"{'（相对绑定窗口）' if action.get('rel') else '（屏幕绝对）'}",
-                                           font=QFont("MiSans", 11, QFont.Bold)))
+                                           font=FONT13))
             else:
                 _rowE.addWidget(_make_label("⚠ 还没框选区域 —— 不框选就读不到任何数字",
-                                           font=QFont("MiSans", 11, QFont.Bold), color=Colors.RED))
+                                           font=FONT13, color=Colors.RED))
             _rowE.addStretch(1)
             box_btn = _make_btn("重新框选", bg=Colors.BLUE, hover=Colors.ACCENT,
-                                font=QFont("MiSans", 11, QFont.Bold), height=25)
+                                font=FONT13, height=25)
             box_btn.setFixedWidth(78)
             box_btn.setToolTip("全屏拖拽框选读数区域（绑定窗口时存客户区相对坐标，窗口拖走仍读得准）")
 
@@ -416,7 +442,7 @@ class ActionSettingsView(QWidget):
             _rowE.addWidget(box_btn)
             _rowE.addSpacing(8)
             try_btn = _make_btn("试读", bg=Colors.GREEN, hover=Colors.ACCENT,
-                                font=QFont("MiSans", 11, QFont.Bold), height=25)
+                                font=FONT13, height=25)
             try_btn.setFixedWidth(56)
             try_btn.setToolTip("立刻按当前区域试读一次：显示OCR原文与抽取到的数字，所见即所得")
 
@@ -436,7 +462,7 @@ class ActionSettingsView(QWidget):
             _vbox.addLayout(_rowE)
 
             _vbox.addWidget(_make_label("💡 框选完先「试读」：显示识别到的原文和抽出的数字，确认对了再往下做",
-                                       font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                                       font=FONT13, color=Colors.DIM))
 
             # ── 卡B 变量 ──
             _vbox = self._card("变量")
@@ -468,7 +494,7 @@ class ActionSettingsView(QWidget):
             _rowF.addStretch(1)
             _vbox.addLayout(_rowF)
             _vbox.addWidget(_make_label("💡 变量名是给后面的「变量运算」「条件分支」用的；改这里，三处一起变",
-                                       font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                                       font=FONT13, color=Colors.DIM))
 
             # ── 卡C 取数方式 ──
             _vbox = self._card("取数方式")
@@ -496,7 +522,7 @@ class ActionSettingsView(QWidget):
             _rowG.addStretch(1)
             _vbox.addLayout(_rowG)
             _vbox.addWidget(_make_label("💡 下拉挑一种抽数字的方式；「自定义…」里可填正则",
-                                       font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                                       font=FONT13, color=Colors.DIM))
 
             # ── 卡D 后延 ──
             _vbox = self._card(None)
@@ -559,7 +585,7 @@ class ActionSettingsView(QWidget):
             _rowI.addStretch(1)
             _vbox.addLayout(_rowI)
             _vbox.addWidget(_make_label("💡 变量来自上方「读数」动作；从未读过的变量按 0 计算",
-                                       font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                                       font=FONT13, color=Colors.DIM))
 
             # ── 卡B 怎么算 ──
             _vbox = self._card("怎么算")
@@ -597,7 +623,7 @@ class ActionSettingsView(QWidget):
             _rowJ.addStretch(1)
             _vbox.addLayout(_rowJ)
             _vbox.addWidget(_make_label("💡 「=」是直接赋值（不参与运算）；「÷」遇到除以 0 会跳过这一步并保留原值",
-                                       font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                                       font=FONT13, color=Colors.DIM))
 
             # ── 卡C 例子 ──
             _vbox = self._card("例子")
@@ -606,7 +632,7 @@ class ActionSettingsView(QWidget):
             for _ln3 in ("读数把金币数写进 v1（比如 1200）",
                          "本动作选「−」值 200 → v1 变成 1000（扣掉买装备的钱）",
                          "想让后面的「条件分支」判断，v1 就得是这个算完的值"):
-                _ex3.addWidget(_make_label(_ln3, font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                _ex3.addWidget(_make_label(_ln3, font=FONT13, color=Colors.DIM))
             _vbox.addLayout(_ex3)
 
             # ── 卡D 后延 ──
@@ -643,7 +669,7 @@ class ActionSettingsView(QWidget):
                 _sub0 = QHBoxLayout()
                 _sub0.setSpacing(3)
                 _sub0.addSpacing(0)
-                _sub0.addWidget(_make_label("还没有模板 — 点下方 + 加分支 开始框选", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
+                _sub0.addWidget(_make_label("还没有模板 — 点下方 + 加分支 开始框选", font=FONT13, color=Colors.DIM))
                 _sub0.addStretch(1)
                 _vbox.addLayout(_sub0)
             for k, option in enumerate(options):
@@ -868,3 +894,12 @@ def _clear_layout(lay):
             w.deleteLater()
         elif item.layout():
             _clear_layout(item.layout())
+
+
+def find_open(app=None):
+    """当前打开的悬浮编辑页; 没开返回 None。供透明度统一关口取用。"""
+    from PySide6.QtWidgets import QApplication
+    for w in QApplication.topLevelWidgets():
+        if w.__class__.__name__ == "ActionSettingsView" and w.isVisible():
+            return w
+    return None
