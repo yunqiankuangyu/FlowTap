@@ -10,6 +10,7 @@
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.9.2 | PySide6 | Four matching tolerance levels, capsule UI |
 | v3.9.1 | PySide6 | Fixed-position recognition, faster preview, snappier interface |
 | v3.9.0 | PySide6 | Read numbers, variable math, conditional branch |
 | v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
@@ -33,6 +34,19 @@
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
 
 ## Release Notes
+
+### v3.9.2 — Image Recognition & Interface Tweaks
+
+**New**
+- Wait-for-image actions gain an accuracy setting with four levels
+
+**Improved**
+- Matching now uses Gaussian blur
+- Cleaner parameter layout in parts of the interface
+- Refined the look of some components
+
+**Fixed**
+- The floating editor no longer ignores the window opacity setting
 
 ### v3.9.1 — Matching Accuracy & Responsiveness
 
