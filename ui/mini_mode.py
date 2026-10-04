@@ -36,8 +36,9 @@ def build_mini_mode(app):
     apply_round_corners(mini)
     mini.move(x, y)
     set_bg(mini, Colors.ACCENT)
-    if app._settings["opacity"] < 1.0:
-        mini.setWindowOpacity(app._settings["opacity"])
+    # 透明度走统一关口, 与主窗/悬浮页同一来源
+    from .window_opacity import apply_to
+    apply_to(mini)
     app._mini_window = mini
 
     main_layout = QVBoxLayout(mini)
@@ -204,3 +205,17 @@ def update_mini_btn(app):
             flat_btn(app._mini_all_btn, Colors.GREEN, hover=Colors.HOVER_GREEN)
     except RuntimeError:
         pass  #控件在遍历间隙被销毁，下一次窗口重建后自然恢复
+
+
+def find_mini(app=None):
+    """当前打开的迷你窗; 没开返回 None。供透明度统一关口取用。
+
+    优先读 app._mini_window(app 关着时它是 None); app 没传时按类名兜底扫顶层窗。
+    """
+    if app is not None:
+        return getattr(app, "_mini_window", None)
+    from PySide6.QtWidgets import QApplication
+    for w in QApplication.topLevelWidgets():
+        if w.__class__.__name__.startswith("Mini"):
+            return w
+    return None

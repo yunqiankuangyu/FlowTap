@@ -5,13 +5,14 @@ import os
 import sys
 import threading
 
-from PySide6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, Slot
-from PySide6.QtGui import QPainter, QColor, QPen, QFont, QPixmap, QCursor
+from PySide6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, Slot, QRect
+from PySide6.QtGui import QPainter, QColor, QPen, QFont, QPixmap, QCursor, QGuiApplication
 from PySide6.QtWidgets import (
     QWidget, QLabel, QDoubleSpinBox, QPushButton, QHBoxLayout, QVBoxLayout, QApplication)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import Colors
+from core import coords
 from .widgets import spin_flat, _make_btn, btn_qss, label_qss, card_qss
 
 _panel = None  # 单例（幂等打开）
@@ -50,6 +51,46 @@ class _ScoreBar(QWidget):
         p.end()
 
 
+class _BBoxOverlay(QWidget):
+    """全屏透明置顶窗：在框选位置描一个虚线框。
+
+    位置就是用户当初框的那块（屏幕绝对坐标），不跟随画面内容。
+    WA_TransparentForMouseEvents 让鼠标穿透，预览期间照常操作别的窗口。
+    """
+
+    def __init__(self, bbox, dpr, vg, color, parent=None):
+        super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)   # 鼠标穿透, 不挡点击
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)       # 显示时不抢焦点
+        self.setWindowTitle("FlowTapBoxOverlay")
+        self._color = color
+        self.setGeometry(vg)
+        # bbox 是虚拟桌面物理坐标 -> Qt 全局逻辑 -> 本窗局部坐标
+        l, t, r, b = bbox
+        x0, y0 = coords.phys_to_qt_point(l, t, dpr)
+        x1, y1 = coords.phys_to_qt_point(r, b, dpr)
+        self._rect = QRect(x0 - vg.left(), y0 - vg.top(), x1 - x0, y1 - y0)
+
+    def paintEvent(self, e):
+        p = QPainter(self)
+        pen = QPen(QColor(self._color), 2, Qt.DashLine)
+        pen.setDashPattern([5, 4])
+        p.setPen(pen)
+        p.drawRect(self._rect)
+        p.setPen(QPen(QColor(self._color), 1, Qt.SolidLine))
+        # 四角加粗实线段, 虚线在浅色背景上偏弱, 加角标更容易看清位置
+        L = min(14, self._rect.width() // 3)
+        H = min(14, self._rect.height() // 3)
+        l, t, w, h = self._rect.left(), self._rect.top(), self._rect.width(), self._rect.height()
+        for x0, y0, x1, y1 in ((l, t, l + L, t), (l, t, l, t + H),
+                               (l + w, t, l + w - L, t), (l + w, t, l + w, t + H),
+                               (l, t + h, l + L, t + h), (l, t + h, l, t + h - H),
+                               (l + w, t + h, l + w - L, t + h), (l + w, t + h, l + w, t + h - H)):
+            p.drawLine(x0, y0, x1, y1)
+        p.end()
+
+
 def _score_color(score, threshold):
     if score < 0:
         return Colors.DIM
@@ -69,6 +110,9 @@ class VisionPreviewPanel(QWidget):
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self._action = action
         self._on_close = on_close
+        # 跟随主窗透明度: 独立顶层窗, 不会继承 app 的 setWindowOpacity
+        from .window_opacity import apply_to
+        apply_to(self)
 
         self._score_lbl = QLabel("--")
         self._score_lbl.setFont(QFont("MiSans", 26, QFont.Bold))
@@ -124,7 +168,6 @@ class VisionPreviewPanel(QWidget):
         # 实测偶发一次31ms的卡顿; 缩短到2ms后主线程最大延迟降到1.2ms, 无感。
         sys.setswitchinterval(0.002)
 
-        self._sc_idx = 0        # 尺度轮换游标
         self._busy = False      # 后台是否在跑, 防止任务堆积
         self._timer = QTimer(self)
         # 匹配在后台线程, UI不受影响, 间隔可以短。单轮约74ms(实测), 300ms只用25%占用。
@@ -132,6 +175,31 @@ class VisionPreviewPanel(QWidget):
         self._timer.setInterval(300)
         self._timer.timeout.connect(self._tick)
         self._timer.start()
+
+        self._overlay = self._make_overlay()
+
+    def _make_overlay(self):
+        """按框选坐标在屏幕上描一个虚线框(固定位置模式下才有框选坐标)。
+        模板是旧的无坐标/开关关掉时没有框可描, 返回 None。"""
+        try:
+            from core import vision
+            if not vision.match_mode_fixed():
+                return None
+            bbox, _ref = vision.load_template_meta(self._action.get("tpl", ""))
+            if not bbox:
+                return None
+            dpr = coords.system_dpr()
+            scr = QGuiApplication.primaryScreen()
+            if scr is None:
+                return None
+            ov = _BBoxOverlay(bbox, dpr, scr.virtualGeometry(), Colors.GREEN)
+            ov.show()
+            return ov
+        except Exception:
+            from logger import log_error
+            import traceback
+            log_error("preview_overlay", traceback.format_exc())
+            return None  # 画不出框不影响预览本身
 
     def _on_th(self, v):
         self._action["threshold"] = round(float(v), 2)
@@ -145,16 +213,20 @@ class VisionPreviewPanel(QWidget):
             return  # 上一轮还没算完, 跳过本次, 避免任务堆积
         a = self._action
         scales = tuple(a.get("scales") or (1.0, 1.25, 1.5))
-        n = len(scales)
-        i = self._sc_idx % n
-        self._sc_idx += 1
+        # 固定位置比对只认尺度 1.0(match_once 内部已固定), 这里也只跑一轮,
+        # 不做尺度轮换——轮换会让读数在不同尺度间跳变, 画面静止时也闪
+        from core import vision as _vis
+        if _vis.match_mode_fixed():
+            scales = (1.0,)
+        i = 0
         self._busy = True
 
         def _work():
             from core import vision
             try:
                 _, sc = vision.match_once(
-                    a.get("tpl", ""), float(a.get("threshold", 0.85)), scales=(scales[i],))
+                    a.get("tpl", ""), float(a.get("threshold", 0.85)),
+                    scales=(scales[i],), mode=a.get("match_mode"))
             except Exception as e:
                 sc = None
                 from logger import log_error
@@ -209,6 +281,15 @@ class VisionPreviewPanel(QWidget):
     def closeEvent(self, e):
         self._timer.stop()
         self._busy = False
+        # 虚线框随面板一起收掉, 不能留在屏幕上
+        ov = getattr(self, "_overlay", None)
+        if ov is not None:
+            try:
+                ov.close()
+                ov.deleteLater()
+            except Exception:
+                pass
+            self._overlay = None
         cb = self._on_close
         self._on_close = None
         global _panel
@@ -253,6 +334,9 @@ class TemplateViewPanel(QWidget):
     def __init__(self, action):
         # 与预览面板同理: 底色走实色, 半透明背景窗上QSS背景不渲染
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        # 跟随主窗透明度: 独立顶层窗, 不会继承 app 的 setWindowOpacity
+        from .window_opacity import apply_to
+        apply_to(self)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self._drag_off = None
 
@@ -375,3 +459,20 @@ def open_template_view(action):
     _tpl_view.activateWindow()
     _tpl_view._center()
     return _tpl_view
+
+
+def find_preview(app=None):
+    """当前打开的实时预览面板; 没开返回 None。供透明度统一关口取用。"""
+    return _panel if _panel is not None else None
+
+
+def find_tpl_panel(app=None):
+    """当前打开的模板原图面板; 没开返回 None。供透明度统一关口取用。
+
+    面板对象是 show_template_view 的局部变量, 外面拿不到, 只能扫顶层窗按类名认。
+    """
+    from PySide6.QtWidgets import QApplication
+    for w in QApplication.topLevelWidgets():
+        if w.__class__.__name__ == "TemplateViewPanel" and w.isVisible():
+            return w
+    return None

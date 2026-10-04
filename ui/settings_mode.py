@@ -177,6 +177,8 @@ def build_settings_mode(app):
     # 主题
     # ── 窗口行为 ──
     def _make_toggle(label_text, checked, key):
+        # 设置页开关一律用分段胶囊(关/开两段), 与动作卡组的档位胶囊同一套正源:
+        # 两态开关做成翻转按钮时只能看到当前状态, 不知道还有另一个选项存在。
         row = QWidget()
         set_bg(row, "transparent")
         rl = QHBoxLayout(row)
@@ -186,36 +188,25 @@ def build_settings_mode(app):
         style_label(lbl, Colors.TEXT2)
         rl.addWidget(lbl)
         rl.addStretch()
-        btn = QPushButton("开" if checked else "关")
-        btn.setFont(_FM)
-        btn.setFixedSize(44, 24)
-        btn.setCursor(Qt.PointingHandCursor)
-
-        def _style(on):
-            color = Colors.GREEN if on else Colors.DIM
-            hover = Colors.HOVER_GREEN if on else Colors.ACCENT
-            return btn_qss(color, hover=hover)
-        btn.setStyleSheet(_style(checked))
-
-        def toggle():
-            now_on = btn.text() == "关"
-            btn.setText("开" if now_on else "关")
-            btn.setStyleSheet(_style(now_on))
+        from .segmented import segmented_control
+        _ONOFF = [("关", False), ("开", True)]
+        def _apply(on):
             s3 = load_settings()
-            s3[key] = now_on
+            s3[key] = on
             save_settings(s3)
             if key == "always_on_top":
                 flags = app.windowFlags()
-                if now_on:
+                if on:
                     flags |= Qt.WindowStaysOnTopHint
                 else:
                     flags &= ~Qt.WindowStaysOnTopHint
                 app.setWindowFlags(flags)
                 app.show()
-                # 圆角走 paintEvent 自绘，setWindowFlags 重建句柄不影响，无需补
-        btn.clicked.connect(toggle)
-        rl.addWidget(btn)
-        return row, btn
+                # 圆角走 paintEvent 自绘, setWindowFlags 重建句柄不影响, 无需补
+        seg = segmented_control(_ONOFF, bool(checked), _apply, size="settings")
+        seg.setToolTip(f"{label_text}：开=启用，关=停用")
+        rl.addWidget(seg)
+        return row, seg
 
     v = _make_section(ap_layout, "🪟 窗口行为")
     v.addWidget(_make_toggle("窗口置顶", s.get("always_on_top", True), "always_on_top")[0])
@@ -659,12 +650,14 @@ def _show_page(app, name):
 
 
 def on_opacity_change(app, v):
-    """透明度变化"""
+    """透明度变化。写完设置再同步各独立窗口, 否则拖滑块时只有主窗变。"""
     app._opacity_lbl.setText(f"{v}%")  # v 是 30-100 的整数，直接拼 %（:.0% 会乘100变8900%）
-    app.setWindowOpacity(v / 100.0)
     s = load_settings()
     s["opacity"] = v / 100.0
     save_settings(s)
+    # 顺序: 先落盘再同步, 让独立窗口从 apply_all -> current_opacity 读到新值
+    from .window_opacity import apply_all
+    apply_all(app)
 
 
 def on_theme_change(app, name):
@@ -884,7 +877,9 @@ def _rebuild_ui(app):
     lay.addWidget(app._drag_handle)
 
     # ── 4. 恢复窗口状态 ──
-    app.setWindowOpacity(load_settings().get("opacity", 1.0))
+    # 走统一关口: 与拖动滑块(on_opacity_change)同一套逻辑, 不会再各写一份
+    from .window_opacity import apply_all
+    apply_all(app)
     lay.activate()
     app.setFixedSize(*frozen_size)
     app.repaint()

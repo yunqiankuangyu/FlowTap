@@ -42,8 +42,9 @@ class App(QMainWindow):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         # 圆角由下方 paintEvent 自绘；不再叠加 DWM 圆角（两层会残留一条弧线）
 
-        if self._settings["opacity"] < 1.0:
-            self.setWindowOpacity(self._settings["opacity"])
+        # 透明度走统一关口(与拖滑块、悬浮页同一来源)
+        from .window_opacity import apply_to
+        apply_to(self)
 
         self.keyboard_tasks = []
         self.mouse_task = MouseTask()
