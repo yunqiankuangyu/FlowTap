@@ -42,16 +42,18 @@ def make_click_action(x, y, delay=0.5, hold=0):
 
 
 def make_wait_image_action(tpl, threshold=0.85, timeout=30, on_timeout="skip", delay=0.0,
-                           min_hits=2, scales=(1.0, 1.25, 1.5)):
+                           min_hits=2, scales=(1.0, 1.25, 1.5), match_mode=None):
     """创建等待图像动作（画面稳定出现目标模板才继续）
     tpl 模板相对路径，threshold 匹配阈值，timeout 超时秒(0=无限等)
     on_timeout 超时行为 skip=跳过本步 skip_card=跳过整卡(本轮作废) stop=中止任务
     min_hits 防抖帧数（连续命中这么多次才判定出现，防闪烁误判）
     scales 模板缩放系数序列（多尺度匹配，按序尝试命中即停）
+    match_mode 比对精度档 raw/strict/balanced/loose; None=跟随全局设置
     """
     return {"type": "wait_image", "tpl": tpl, "threshold": threshold,
             "timeout": timeout, "on_timeout": on_timeout, "delay": delay,
-            "min_hits": min_hits, "scales": list(scales), "lid": _new_lid()}
+            "min_hits": min_hits, "scales": list(scales),
+            "match_mode": match_mode, "lid": _new_lid()}
 
 
 def pattern_label(pattern):
@@ -378,7 +380,8 @@ class KeyboardTask:
             if t_start - last_sample > 1.0:
                 streak = 0
             try:
-                found, score = vision.match_once(rel, threshold, scales=scales)
+                found, score = vision.match_once(rel, threshold, scales=scales,
+                                                 mode=action.get("match_mode"))
             except Exception as e:
                 from logger import log_error
                 log_error("wait_image_match", e)
@@ -448,7 +451,8 @@ class KeyboardTask:
                     found, score = vision.match_once(
                         opt.get("tpl", ""),
                         float(opt.get("threshold", 0.85)),
-                        scales=tuple(opt.get("scales") or (1.0, 1.25, 1.5)))
+                        scales=tuple(opt.get("scales") or (1.0, 1.25, 1.5)),
+                        mode=opt.get("match_mode"))
                 except Exception as e:
                     log_error("branch_match", e)
                     found, score = False, -1.0

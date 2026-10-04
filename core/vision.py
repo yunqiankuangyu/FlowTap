@@ -305,41 +305,93 @@ def _score_at(screen_gray, tpl_gray, x, y):
     return float((tw * iw).sum()) / den
 
 
-def match_fixed_position(screen_rgb, tpl_rgb, bbox, tolerance=TOLERANCE_PX, ref_size=None):
-    """固定位置比对: 只在框选时的屏幕绝对坐标附近(±tolerance)取最高得分。
-
-    与全屏搜索的本质区别: 不滑动。目标从框内移出时得分立刻下降, 而不是被搜索到新位置继续满分。
-    ref_size 为框选时的画面尺寸(宽,高); 当前画面尺寸与之不同时按比例换算bbox坐标,
-    这样换分辨率(且元素跟着走)仍能对上。返回 (得分0~1, 命中xy或None)。
-    坐标换算后仍越界 -> (-1.0, None)。
-    """
-    if tpl_rgb is None or bbox is None:
-        return -1.0, None
-    l, t, r, b = bbox
-    tw, th = r - l, b - t
-    if tw <= 0 or th <= 0:
-        return -1.0, None
-    tpl_gray = _to_gray(tpl_rgb)
-    screen_gray = _to_gray(screen_rgb)
-    H, W = screen_gray.shape[:2]
-    # 分辨率变化: 按比例把框选坐标换算到当前画面尺寸
-    if ref_size and ref_size[0] > 0 and ref_size[1] > 0:
-        sx, sy = W / float(ref_size[0]), H / float(ref_size[1])
-        l, t, r, b = int(round(l * sx)), int(round(t * sy)), int(round(r * sx)), int(round(b * sy))
-        tw, th = r - l, b - t
-        if tw <= 0 or th <= 0:
-            return -1.0, None
-    # 换算后仍越界 -> 目标位置已不在当前画面内(窗口被移走/分辨率大幅变化)
-    if l < 0 or t < 0 or l + tw > W or t + th > H:
-        return -1.0, None
+def _best_in_tolerance(screen_gray, tpl_gray, l, t, tolerance):
+    """在容错范围内逐px微移, 取最高分(抵消1-3px的渲染抖动/DPI取整误差)"""
     best, best_xy = -1.0, None
-    # 在容错范围内逐px微移, 取最高分(抵消1-3px的渲染抖动/DPI取整误差)
     for dy in range(-tolerance, tolerance + 1):
         for dx in range(-tolerance, tolerance + 1):
             sc = _score_at(screen_gray, tpl_gray, l + dx, t + dy)
             if sc > best:
                 best, best_xy = sc, (l + dx, t + dy)
     return best, best_xy
+
+
+def _resolve_bbox(bbox, ref_size, W, H):
+    """bbox 按参考分辨率换算到当前画面, 越界返回 None"""
+    l, t, r, b = bbox
+    tw, th = r - l, b - t
+    if tw <= 0 or th <= 0:
+        return None
+    if ref_size and ref_size[0] > 0 and ref_size[1] > 0:
+        sx, sy = W / float(ref_size[0]), H / float(ref_size[1])
+        l, t, r, b = int(round(l * sx)), int(round(t * sy)), int(round(r * sx)), int(round(b * sy))
+        tw, th = r - l, b - t
+        if tw <= 0 or th <= 0:
+            return None
+    if l < 0 or t < 0 or l + tw > W or t + th > H:
+        return None
+    return l, t, r, b
+
+
+def match_fixed_position(screen_rgb, tpl_rgb, bbox, tolerance=TOLERANCE_PX,
+                        ref_size=None, mode=None):
+    """固定位置比对: 只在框选时的屏幕绝对坐标附近(±tolerance)取最高得分。
+
+    与全屏搜索的本质区别: 不滑动。目标从框内移出时得分立刻下降, 而不是被搜索到新位置继续满分。
+    ref_size 为框选时的画面尺寸(宽,高); 当前画面尺寸与之不同时按比例换算bbox坐标,
+    这样换分辨率(且元素跟着走)仍能对上。返回 (得分0~1, 命中xy或None)。
+    坐标换算后仍越界 -> (-1.0, None)。
+
+    mode 为比对精度档(见 MATCH_MODES): 把原图分与方框模糊分按权重加权。
+    模糊通道抹平像素级差异(读秒数字/文字/动画), 保留布局结构, 让这类
+    内容持续变动的监测区域分数稳定在阈值之上, 而不必靠压低阈值换取通过
+    (压低阈值会让无关画面更容易误触发)。
+    """
+    if tpl_rgb is None or bbox is None:
+        return -1.0, None
+    tpl_gray = _to_gray(tpl_rgb)
+    screen_gray = _to_gray(screen_rgb)
+    H, W = screen_gray.shape[:2]
+    bb = _resolve_bbox(bbox, ref_size, W, H)
+    if bb is None:
+        return -1.0, None
+    l, t, r, b = bb
+
+    grant = match_weights(mode)
+    if grant <= 0:
+        return _best_in_tolerance(screen_gray, tpl_gray, l, t, tolerance)
+    k = BLUR_KERNEL
+
+    best_raw, best_xy = _best_in_tolerance(screen_gray, tpl_gray, l, t, tolerance)
+    # 模糊通道: 模板与画面同参数。
+    # 画面必须先在全图上模糊再裁选区——若先裁后模糊, 选区边缘会混入空白填充,
+    # 边缘效应把分数整体压低(实测能把0.98压到0.6上下), 等于白做。
+    scr_b = _box_blur(screen_gray, k)
+    if scr_b is None:
+        return best_raw, best_xy
+    scr_blur = scr_b[y_slice(t, b, H), x_slice(l, r, W)]
+    tpl_blur = _box_blur(tpl_gray, k)
+    if tpl_blur is None or scr_blur.shape != tpl_blur.shape:
+        return best_raw, best_xy
+    best_blur, blur_xy = _best_in_tolerance(scr_blur, tpl_blur, 0, 0, tolerance)
+    if best_blur < 0:
+        return best_raw, best_xy
+    # 赋分制: 原图分保底不动, 模糊分按折扣加成。封顶 1.0——否则静止帧会算出 1.2,
+    # UI 上显示 120% 准确率毫无意义, 且阈值比较也失去意义。
+    total = min(1.0, best_raw + best_blur * grant)
+    # 命中坐标优先取分数更高的那个通道, 保证虚线框/命中点指示的是真实位置
+    xy = blur_xy if (best_blur > best_raw and blur_xy) else best_xy
+    if xy:
+        xy = (xy[0] + l, xy[1] + t)
+    return total, xy
+
+
+def x_slice(l, r, W):
+    return slice(max(0, l), min(W, r))
+
+
+def y_slice(t, b, H):
+    return slice(max(0, t), min(H, b))
 
 
 def _to_gray(img):
@@ -383,15 +435,81 @@ def match_mode_fixed():
     return bool(load_settings().get("fixed_position_match", True))
 
 
+# 比对精度档: (原图权重, 模糊权重)
+# 数字/文字会变的监测区域(如实时读秒)原始分数会在较窄区间大幅波动, 阈值难定;
+# 掺入方框模糊通道后整段被抬到阈值之上(实测模糊通道把"内容已变"的0.77抬到0.98)。
+# 原图权重保留下限, 保证真正不相关的画面仍不会被抬到阈值附近。
+# 比对精度的赋分档: 原图分占 100%(恒定, 不因档位下降), 模糊分按折扣加成。
+# 总准确率 = min(1.0, 原图分 + 模糊分*折扣) —— 赋分不是加权平均, 模糊分不被稀释,
+# 是额外加分。折扣值小是因为模糊分本身接近1, 8%折扣约有0.08的实际贡献。
+# raw 的折扣为0, 表示根本不计算模糊通道(省掉一次全图模糊)。
+MATCH_GRANT = {
+    "raw": 0.00,        # 原版: 只算原图, 不掺模糊
+    "strict": 0.09,     # 精确: 掺一点模糊, 轻微容忍
+    "balanced": 0.15,   # 平衡: 适合数字/文字会变的区域
+    "loose": 0.21,      # 粗略: 容忍度最高
+}
+MATCH_MODE_ORDER = ["raw", "strict", "balanced", "loose"]
+MATCH_MODE_LABEL = {"raw": "原版", "strict": "精确",
+                    "balanced": "平衡", "loose": "粗略"}
+# 高斯模糊: ksize 是主参数, 直接决定观感。45 是实测下来糊得最舒服的一档。
+# sigma 传 0 让引擎按 ksize 自动推(0.3*((k-1)*0.5-1)+0.8 = 7.10):
+# 手动指定 sigma 反而会脱离您认可的观感, 且 sigma 大于自动值时 ksize=45
+# 装不下(需要 ksize >= 2*ceil(2*sigma)+1), 尾部被截断反而退化成带旁瓣的方框效果。
+BLUR_KERNEL = 45
+
+
+def match_weights(mode=None):
+    """取模糊分折扣系数。mode 省略则读设置; 未知档名退回"原版"。
+
+    保留 match_weights 这个名字是因为设置页/预览/执行器都在用它,
+    语义已从"权重对"变成"折扣率"。
+    """
+    if mode is None:
+        from config import load_settings
+        mode = load_settings().get("match_mode", "raw")
+    return MATCH_GRANT.get(mode, MATCH_GRANT["raw"])
+
+
+def set_match_mode(mode):
+    """切换比对精度档(写设置), 返回是否成功"""
+    if mode not in MATCH_GRANT:
+        return False
+    from config import load_settings, save_settings
+    s = load_settings()
+    s["match_mode"] = mode
+    save_settings(s)
+    return True
+
+
+def _box_blur(img, k=BLUR_KERNEL):
+    """高斯模糊: 抹平像素级差异(文字/数字/动画), 保留布局结构。
+
+    名字沿用 _box_blur 是历史遗留, 实际是 GaussianBlur。
+    sigma 传 0 由引擎按 ksize 自动推, ksize 太小(如 1)直接跳过。
+    模板与画面必须同参数处理, 否则原图匹配自身就会掉分。"""
+    if img is None or k is None or k <= 1:
+        return img
+    k = int(k)
+    if k % 2 == 0:
+        k += 1
+    try:
+        import cv2
+        return cv2.GaussianBlur(img, (k, k), 0)
+    except Exception:
+        return img
+
+
 def match_tolerance():
     """固定位置匹配的容错半径(px), 来自设置页"位置容错"""
     from config import load_settings
     return int(load_settings().get("match_tolerance", TOLERANCE_PX))
 
 
-def match_once(rel_path, threshold=0.85, scales=(1.0,)):
+def match_once(rel_path, threshold=0.85, scales=(1.0,), mode=None):
     """截屏并匹配一次，返回 (是否命中, 最高得分)。
     scales 为模板缩放系数序列，按序尝试，命中即停（列表顺序=优先级）。
+    mode 为比对精度档（见 MATCH_MODES），None=读全局设置；动作级可单独指定。
     截屏/匹配异常向上抛，由调用方处理"""
     tpl = _load_template(rel_path)
     if tpl is None:
@@ -402,23 +520,13 @@ def match_once(rel_path, threshold=0.85, scales=(1.0,)):
         if bbox is not None:
             screen_rgb = grab_rgb(search_bbox())
             tol = match_tolerance()
-            best = -1.0
-            hit = False
-            for s in (scales or (1.0,)):
-                # 尺度≠1 时模板尺寸变化, 按同一锚点(左上角)缩放选区后比对,
-                # 仍是定点比对而非全图搜索 —— 预览面板靠这条避免CPU跑满
-                t = _scaled_template(rel_path, tpl, s)
-                sb = _scale_bbox(bbox, s)
-                if sb is None:
-                    continue
-                sc, _ = match_fixed_position(screen_rgb, t, sb, tol, ref_size)
-                if sc > best:
-                    best = sc
-                if sc >= threshold:
-                    hit = True
-                    break
+            # 只用尺度 1.0: 框选坐标与模板是一一对应的"这块内容长这样"。
+            # 缩放模板只会拿放大后的模板去比对原尺寸内容, 分数必然暴跌;
+            # 换分辨率由 ref_size 按比例换算坐标, 与尺度无关。
+            # 多尺度是全屏搜索的需求(不知道目标多大时才需要挨个试)。
+            best, _ = match_fixed_position(screen_rgb, tpl, bbox, tol, ref_size, mode=mode)
             if best >= 0:
-                return hit, best
+                return best >= threshold, best
     if template_sigma(tpl) < MIN_TEMPLATE_STD:
         # 纯色模板: σ≈0→分母0/0→CCOEFF对任意画面恒1.0, 判不命中(-1与"模板过大"同语义)
         if rel_path not in _flat_logged:
