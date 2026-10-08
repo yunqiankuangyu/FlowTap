@@ -205,7 +205,7 @@ def _ocr_text(img):
 
 def fmt_action(action):
     """格式化动作为可读字符串"""
-    from vk_map import VK_NAME
+    from core.vk_map import VK_NAME
     if action["type"] == "key":
         name = VK_NAME.get(action["vk"], f'[{action["vk"]}]')
         return name

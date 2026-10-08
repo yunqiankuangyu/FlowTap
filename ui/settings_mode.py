@@ -248,7 +248,7 @@ def build_settings_mode(app):
 
     # ══════════ 功能设置 ══════════
 
-    from vk_map import VK_NAME
+    from core.vk_map import VK_NAME
     from PySide6.QtWidgets import QDoubleSpinBox
 
     def _make_hotkey_row(label_text, current_vk, capture_key):
@@ -668,7 +668,7 @@ def on_theme_change(app, name):
 
 def update_hotkey_label(app):
     """热键捕获完成后更新设置页标签"""
-    from vk_map import VK_NAME
+    from core.vk_map import VK_NAME
     try:
         stop_lbl = getattr(app, '_stophotkey_lbl', None)
         if stop_lbl and stop_lbl.parent():

@@ -22,7 +22,7 @@ from .widgets import (_make_btn, _tint_btn, _make_label, state_btn, spin_fill, s
                         line_flat, line_fill, ghost_btn, style_label,
                         btn_qss, card_qss, scroll_qss, tip_qss, dot_qss, set_bg, label_qss, menu_qss, menu_btn_qss, F12)
 from tasks.keyboard.keyboard_task import KeyboardTask, make_key_action, make_combo_action, make_click_action, fmt_action
-from vk_map import VK_NAME
+from core.vk_map import VK_NAME
 
 # ── 跨线程 UI 更新桥 ──────────────────────────────────
 # QTimer.singleShot(0, fn) 从工作线程调用时 timer 挂在工作线程
@@ -1193,7 +1193,7 @@ def _start_capture(app, task):
     combo = []        # 参与组合的键（按按下顺序）
 
     def _combo_text():
-        from vk_map import VK_NAME
+        from core.vk_map import VK_NAME
         names = [VK_NAME.get(vk, f"[{vk}]") for vk in combo]
         return "+".join(names) if names else "..."
 

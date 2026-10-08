@@ -141,11 +141,11 @@ class App(QMainWindow):
             log_error("hotkey_poll", e)
 
     def _stop_hotkey_name(self):
-        from vk_map import VK_NAME
+        from core.vk_map import VK_NAME
         return VK_NAME.get(self._stop_hotkey, hex(self._stop_hotkey))
 
     def _start_hotkey_name(self):
-        from vk_map import VK_NAME
+        from core.vk_map import VK_NAME
         return VK_NAME.get(self._start_hotkey, hex(self._start_hotkey))
 
     def _build_ui(self):
