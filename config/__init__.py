@@ -2,7 +2,7 @@
 config - 配置管理模块
 """
 from .themes import Colors, THEMES, DEFAULT_THEME, FONT_B, FONT_M
-from .settings import load_settings, save_settings
+from .settings import load_settings, save_settings, get_setting, DEFAULTS
 from .presets import load_presets, save_presets, delete_preset
 
 __all__ = [

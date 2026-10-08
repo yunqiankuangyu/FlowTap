@@ -23,9 +23,21 @@ def _app_dir():
 SETTINGS_FILE = os.path.join(_app_dir(), "settings.json")
 
 
+# 全部设置项默认值的唯一出处 —— 调用点别再写 0.5 / 80 / 3 这类字面量(改默认值只改这里)
+DEFAULTS = {
+    "opacity": 0.9,            # 窗口不透明度
+    "theme": DEFAULT_THEME,    # 主题名
+    "bind_process": "",        # 前台闸门绑定的进程名(空 = 不绑定)
+    "default_delay": 0.5,      # 新建动作的后延
+    "default_loop": 80,        # 新建任务的循环间隔
+    "default_runs": 3,         # 新建任务的次数
+    "start_countdown": 3,      # 启动倒计时秒数
+}
+
+
 def load_settings():
-    """加载设置"""
-    defaults = {"opacity": 0.9, "theme": DEFAULT_THEME, "bind_process": ""}
+    """加载设置(文件里没有的键用 DEFAULTS 补齐)"""
+    defaults = dict(DEFAULTS)
     try:
         with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
             defaults.update(json.load(f))
@@ -35,6 +47,11 @@ def load_settings():
     if defaults["theme"] not in THEMES:
         defaults["theme"] = DEFAULT_THEME
     return defaults
+
+
+def get_setting(key):
+    """读一项设置, 文件没写过就给 DEFAULTS 里的默认值"""
+    return load_settings().get(key, DEFAULTS.get(key))
 
 
 def save_settings(settings):
