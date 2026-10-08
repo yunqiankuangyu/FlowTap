@@ -81,14 +81,25 @@ if __name__ == "__main__":
             log_error("FATAL")
         except Exception:
             pass
+        # 致命错误日志统一写到 <root>/logs/ 下
+        try:
+            from logger import ERROR_LOG, ERROR_LATEST_LOG
+            log_hist, log_latest = ERROR_LOG, ERROR_LATEST_LOG
+        except Exception:
+            log_hist = os.path.join(project_root, "error.log")
+            log_latest = os.path.join(project_root, "error_latest.log")
         # 1. 历史日志（追加，带时间戳）
-        log_hist = os.path.join(project_root, "error.log")
-        with open(log_hist, "a", encoding="utf-8") as f:
-            f.write(f"\n{'='*40}\n[{now}]\n{tb}")
+        try:
+            with open(log_hist, "a", encoding="utf-8") as f:
+                f.write(f"\n{'='*40}\n[{now}]\n{tb}")
+        except Exception:
+            pass
         # 2. 最新日志（覆写，只保留最近一次）
-        log_latest = os.path.join(project_root, "error_latest.log")
-        with open(log_latest, "w", encoding="utf-8") as f:
-            f.write(f"[{now}]\n{tb}")
+        try:
+            with open(log_latest, "w", encoding="utf-8") as f:
+                f.write(f"[{now}]\n{tb}")
+        except Exception:
+            pass
         # 弹窗提示
         import ctypes
         ctypes.windll.user32.MessageBoxW(
