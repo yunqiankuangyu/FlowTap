@@ -111,8 +111,11 @@ def menu_qss():
 
 def menu_btn_qss():
     """下拉按钮QSS(全app下拉唯一样式正源)——尺寸/内边距/圆角与原 QComboBox 版逐项对齐
-    (padding 2px 8px、圆角 4px、ACCENT 底), 不加三角箭头(原 QComboBox 也没有)"""
-    return btn_qss(Colors.ACCENT, extra="padding: 2px 8px; text-align: left;") + f"""
+    (padding 2px 8px、圆角 4px、ACCENT 底), 不加三角箭头(原 QComboBox 也没有)
+    描边对齐 HTML .selbox: rgba(dim,.45) + radius 6px —— 有描边才像可交互控件"""
+    return btn_qss(Colors.CARD,
+                   extra=f"padding: 2px 8px; text-align: left;"
+                         f" border: 1px solid {_dim_rgba(0.45)}; border-radius: 6px;") + f"""
         QPushButton::menu-indicator {{ image: none; width: 0; height: 0; border: none; }}
     """
 
@@ -162,9 +165,24 @@ def ghost_btn(btn, hover=None, hover_fg=None):
         hover_fg = hover_fg or Colors.TEXT
     btn.setStyleSheet(btn_qss("transparent", Colors.DIM, hover, hover_fg, font=F17, radius=None))
 
+def _dim_rgba(alpha):
+    # 把 DIM 色转成 rgba 字符串(HTML .num/.selbox 的边框就是 rgba(dim, .32/.45))
+    from PySide6.QtGui import QColor
+    c = QColor(Colors.DIM)
+    return f"rgba({c.red()},{c.green()},{c.blue()},{alpha})"
+
+
 def spin_fill(spin):
-    """数字框填底样式(任务卡片循环/次数、设置页默认值)"""
-    spin.setStyleSheet(f"QDoubleSpinBox {{ background: {Colors.ACCENT}; color: {Colors.TEXT}; border: none; border-radius: 4px; padding: 0px; }} {SPIN_ARROWS}")
+    """数字框填底样式(任务卡片循环/次数、设置页默认值)
+    对齐 HTML .num: 微妙描边 + 填底 + 圆角 —— 不是 border:none 的裸框,
+    也不是 spin_flat 的透底; 有描边才能在浅底上框出可交互区域(用户实测对比过)"""
+    # 背景用 CARD 与面板同色 —— HTML .num 的 background:var(--card) 也是面板同色,
+    # 只靠 1px 描边区分可交互区; 用 ACCENT 会变成"面板里嵌的小盒子", 加上低透明
+    # 描边看不清边, 就是那种半吊子的有框感。
+    spin.setStyleSheet(
+        f"QDoubleSpinBox {{ background: {Colors.CARD}; color: {Colors.TEXT};"
+        f" border: 1px solid {_dim_rgba(0.45)}; border-radius: 5px;"
+        f" padding: 0px 5px; }} {SPIN_ARROWS}")
 
 def spin_flat(spin):
     """数字框透底样式(动作设置页/任务卡片行内输入)"""
