@@ -148,7 +148,7 @@ def build_settings_mode(app):
 
 
     # 透明度
-    v = _make_section(ap_layout, "👁 窗口透明度")
+    v = _make_section(ap_layout, "👁 窗口不透明度")   # 值义是不透明度(setWindowOpacity 0.85=85%不透明), 文案补"不"
 
     op_row = QWidget()
     set_bg(op_row, "transparent")
