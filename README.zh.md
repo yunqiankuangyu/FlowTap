@@ -63,8 +63,7 @@ FlowTap/
 ├── tools/ui_editor/         # UI 编辑器（不进 git）
 ├── ARCHITECTURE.md          # 架构说明
 ├── FlowTap*.spec            # PyInstaller 打包配置（单文件 / 单目录）
-├── settings.json            # 设置（运行时生成）
-├── presets.json             # 预设（运行时生成）
+├── userdata/                # 个人配置：settings.json + presets.json（运行时生成）
 └── 启动.bat                 # 一键启动
 ```
 

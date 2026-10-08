@@ -7,13 +7,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.settings import _app_dir
+from config.settings import USER_DIR, ensure_user_dir, migrate_legacy
 
-PRESETS_FILE = os.path.join(_app_dir(), "presets.json")
+PRESETS_FILE = os.path.join(USER_DIR, "presets.json")   # 与 settings.json 同居 userdata/
 
 
 def load_presets():
     """加载预设"""
+    migrate_legacy("presets.json")   # 旧根目录文件一次性搬进 userdata/
     try:
         with open(PRESETS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -22,6 +23,7 @@ def load_presets():
 
 def save_presets(presets):
     """保存预设"""
+    ensure_user_dir()
     with open(PRESETS_FILE, "w", encoding="utf-8") as f:
         json.dump(presets, f, ensure_ascii=False, indent=2)
 

@@ -20,7 +20,34 @@ def _app_dir():
     return _BASE_DIR
 
 
-SETTINGS_FILE = os.path.join(_app_dir(), "settings.json")
+# 个人配置统一住这里: settings.json / presets.json 都在 userdata/ 下,
+# 不跟代码、日志混在根目录(README 目录树同步)
+USER_DIR = os.path.join(_app_dir(), "userdata")
+SETTINGS_FILE = os.path.join(USER_DIR, "settings.json")
+
+
+def ensure_user_dir():
+    """个人配置目录不存在就建(新装机器第一次保存前调)"""
+    try:
+        os.makedirs(USER_DIR, exist_ok=True)
+    except Exception:
+        pass
+
+
+def migrate_legacy(filename):
+    """旧版把配置放根目录, 首次读取时一次性搬进 userdata/。
+
+    新家已有同名文件就不动(用户已在新位置改过 = 新数据优先);
+    搬不动/权限问题静默放弃, 不影响读旧文件。
+    """
+    try:
+        old = os.path.join(_app_dir(), filename)
+        new = os.path.join(USER_DIR, filename)
+        if os.path.exists(old) and not os.path.exists(new):
+            ensure_user_dir()
+            os.replace(old, new)
+    except Exception:
+        pass
 
 
 # 全部设置项默认值的唯一出处 —— 调用点别再写 0.5 / 80 / 3 这类字面量(改默认值只改这里)
@@ -37,6 +64,7 @@ DEFAULTS = {
 
 def load_settings():
     """加载设置(文件里没有的键用 DEFAULTS 补齐)"""
+    migrate_legacy("settings.json")   # 旧根目录文件一次性搬进 userdata/
     defaults = dict(DEFAULTS)
     try:
         with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
@@ -56,5 +84,6 @@ def get_setting(key):
 
 def save_settings(settings):
     """保存设置"""
+    ensure_user_dir()
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(settings, f, ensure_ascii=False, indent=2)

@@ -3,6 +3,7 @@ __pycache__/
 *.pyo
 settings.json
 presets.json
+userdata/
 logs/
 build/
 dist/
