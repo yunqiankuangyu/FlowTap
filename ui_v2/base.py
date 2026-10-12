@@ -9,7 +9,7 @@ WA_TranslucentBackground + paintEvent 里 drawRoundedRect。
 参与圆角的各层容器底色必须全是 transparent, 任一层糊上实色就会方角盖掉圆角。
 """
 from PySide6.QtWidgets import QWidget, QVBoxLayout
-from PySide6.QtCore import Qt, QRectF, QTimer
+from PySide6.QtCore import Qt, QRect, QRectF, QTimer
 from PySide6.QtGui import QPainter, QColor, QBrush
 
 from config import Colors
@@ -26,6 +26,11 @@ class V2Win(QWidget):
         self._r = radius
         self._cw, self._ch = w, h      # 卡片(可见窗体)尺寸
         self._sh = SHADOW              # 阴影带宽
+        # 两段色(可选): (标题栏高, 第二段色的 Colors 属性名), None = 整卡单色。
+        # 第二段画在标题栏**以下**(标题栏留卡片底色), 与旧版 ui/mini_mode.py 同
+        # (mini 底 ACCENT / 标题栏 CARD)。只在 paintEvent 里画, 不新增任何实底容器,
+        # 参与圆角的各层仍是透明 —— base.py 头部那条红线不破。只有迷你窗设它。
+        self._seg = None
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         # 窗口 = 卡片 + 四周阴影带; 布局边距把内容压回卡片区, 所以内容宽高仍是 w×h
@@ -63,6 +68,17 @@ class V2Win(QWidget):
                                   r + i, r + i)
             p.setBrush(QBrush(QColor(Colors.CARD)))
             p.drawRoundedRect(QRectF(s, s, cw, ch), r, r)
+            # 两段色: 第二段盖住标题栏以下的卡片(见 __init__ 的 _seg)。
+            # 分界线用轴对齐 clipRect 切 —— 直且不锯; 下缘圆角由被切的圆角矩形
+            # 自己画(AA 只发生在绘制上, 不发生在 clip 上), 所以圆角照旧保住。
+            seg = getattr(self, "_seg", None)
+            if seg:
+                bh = max(0, min(int(seg[0]), ch - 1))
+                p.save()
+                p.setClipRect(QRect(s, s + bh, cw, ch - bh), Qt.IntersectClip)
+                p.setBrush(QBrush(QColor(getattr(Colors, seg[1], Colors.CARD))))
+                p.drawRoundedRect(QRectF(s, s, cw, ch), r, r)
+                p.restore()
             p.end()
         except Exception:
             pass

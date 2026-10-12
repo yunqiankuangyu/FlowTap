@@ -2,11 +2,10 @@
 新 UI 复刻入口 —— 窗口状态机: 主窗 / 设置窗 / 迷你窗 互斥切换
 
 三个窗不是一起弹出来, 而是各就各位:
-  启动        只显示主窗
+  启动        只显示主窗(位置读 win_pos_x/y, 与迷你窗各记各的)
   点「设置」   弹出设置窗(再点一次收回)
-  点「MINI」  主窗隐藏, 迷你窗接管
-  迷你窗 ▣    还原主窗(主窗移到迷你窗所在位置, 与原版一致)
-  迷你窗 ⚙    从迷你窗直接打开设置
+  点「MINI」  主窗隐藏, 迷你窗接管(迷你窗显示读 mini_pos_x/y)
+  迷你窗 ▣    还原主窗(各记各的位置: hide 不改坐标, 主窗回自己原位, 不跟迷你窗走)
   标题栏 —    主窗收成迷你窗
 
 隔离说明: 本包不 import ui/ 下任何代码, 所有组件都是 ui_v2/ 内的独立副本,
@@ -308,7 +307,7 @@ def wire(win, setw, mini, app):
     # 窗口销毁时停轮询, 否则 QTimer 还在读全局键盘状态
     win.destroyed.connect(lambda *a: stop_hotkeys(hk))
     mini.on_restore = show_main
-    mini.on_settings = show_set
+    # 迷你窗已按旧版形态裁掉 ⚙ 设置入口(设置回主窗进), 不再挂 on_settings
     mini.on_quit = app.quit
     return top
 
@@ -341,7 +340,7 @@ def main():
     setw.hide()
     mini.hide()
 
-    # 任务数变了(主窗增删任务)让迷你窗重建 chip, 数量与主窗对得上
+    # 任务数变了(主窗增删任务)让迷你窗刷新状态行与按钮计数
     win.m._mini = mini
 
     # 录制/框选的提示层不持有窗口引用, 经 sink 中转(见 capture.set_sink)
