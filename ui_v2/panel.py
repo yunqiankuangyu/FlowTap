@@ -3,6 +3,8 @@
 
 交互原则: 增删类操作重建对应区域(行号会变, 重建才不错位); 改参数类操作只写模型,
 不重建 —— 重建会把用户正在输入的数字框清掉。
+例外: 中栏动作行已改纯陈述文案(参数编辑在右栏「动作设置」页), 右栏改值必须
+经 bind_and_refresh 显式刷中栏, 否则文案停在旧值; 刷时只带 mid 不带 right。
 
 复用清单(凡是原有组件能实现的都直接引用, 不新建近似变体):
   下拉      ui.keyboard_mode._make_menu_combo   全app下拉唯一种类
@@ -132,6 +134,20 @@ def bind(a, key, cast=None):
     return _on
 
 
+def bind_and_refresh(m, a, key, cast=None):
+    """bind 的变体 —— 回写 dict 后再重画中栏, 右栏「动作设置」页专用。
+
+    中栏改纯陈述文案后, 参数不再就地显示在控件里, 右栏改值必须显式
+    m.refresh(panes=("mid",)) 才会重画文案; 只带 mid 不带 right ——
+    right 重建会把正在编辑的 spinbox 拆掉丢焦点。回调形态: on=bind_and_refresh(m, a, "a")"""
+    _on = bind(a, key, cast)
+
+    def _o(v, *args):
+        _on(v, *args)
+        m.refresh(panes=("mid",), mini=False)
+    return _o
+
+
 def _spin(val, lo=0, hi=999, dec=1, step=0.1, on=None, fill=False):
     """fill=True 用 spin_fill(填底+微妙描边, HTML .num 同款);
     fill=False 用 spin_flat(透底无框, 行内已铺底时用)"""
@@ -255,6 +271,72 @@ def _record_click(m):
                     sx=act.get("sx"), sy=act.get("sy"))
         m.refresh(panes=("mid",), mini=False)
         m.on_toast(f"已录入坐标 ({act['x']}, {act['y']})")
+
+    m._recording = capture_click(win, on_done=_done)
+
+
+def _re_record(m, a, _reader=None):
+    """右栏「重录键位」: 录制流程同 _record_key, 但写回现有行, 不追加新行。
+
+    单键回写 key/vk(收掉 combo 字段), 多键回写 vks/name(收掉 key/vk) ——
+    三型字段互斥, 残留旧字段会让徽章与 _row_desc 走错分支。
+    _reader 同 _record_key: 测试注入假按键读取器, 正常路径不传。"""
+    from .capture import capture_keys
+    if _take_recording(m):
+        return
+    _hint(m, "按下按键，全部松开完成绑定")
+    last = {"t": ""}
+
+    def _upd(combo):
+        txt = combo_name(combo, sep=" ") or "…"
+        if txt != last["t"]:
+            last["t"] = txt
+            _hint(m, f"⏳ {txt}  (全部松开完成)", sticky=True)
+
+    def _done(combo):
+        m._recording = None
+        _hint(m, "")            # 收掉粘性回显
+        if not combo:
+            m.on_toast("未捕获到按键")
+            return
+        if len(combo) == 1:
+            # 单键存原始 vk + 可读显示名(表外键按显示名反查会录错键, 同 add_action)
+            a.pop("vks", None)
+            a.pop("name", None)
+            a["kind"] = "key"
+            a["key"] = _vk_name(combo[0])
+            a["vk"] = combo[0]
+        else:
+            a.pop("key", None)
+            a.pop("vk", None)
+            a["kind"] = "combo"
+            a["vks"] = list(combo)
+            a["name"] = combo_name(combo)
+        m.refresh(panes=("mid", "right"), mini=False)
+        m.on_toast(f"已改为 {combo_name(combo)}")
+
+    m._recording = capture_keys(on_update=_upd, on_done=_done, _reader=_reader)
+
+
+def _re_record_click(m, a):
+    """右栏「重录坐标」: 鼠标行的键位就是点击目标, 改键语义 = 重录坐标。
+
+    只回写坐标字段(x/y/sx/sy/rel), 不动 a/b —— 持续与后延是已调好的值。"""
+    from .capture import capture_click
+    if _take_recording(m):
+        return
+    win = m._main_win
+    if win is None:
+        m.on_toast("窗口未就绪, 无法重录")
+        return
+
+    def _done(act):
+        m._recording = None
+        a["x"], a["y"] = act["x"], act["y"]
+        a["rel"] = act.get("rel", False)
+        a["sx"], a["sy"] = act.get("sx"), act.get("sy")
+        m.refresh(panes=("mid", "right"), mini=False)
+        m.on_toast(f"坐标已改为 ({act['x']}, {act['y']})")
 
     m._recording = capture_click(win, on_done=_done)
 
@@ -501,7 +583,9 @@ def _rebuild_left(col, m):
     tip = QPushButton("＋ 点击添加任务")
     tip.setFont(FONT_M)
     tip.setCursor(QCursor(Qt.PointingHandCursor))
-    tip.clicked.connect(lambda: (m.add_task(), m.refresh(panes=("left",))))
+    # 全刷: add_task 已把 sel_task 指到新任务, 只刷 left 会让中栏行与右栏顶卡
+    # 停在旧任务(新任务卡已被选中, 再点它同值早退救不回来)
+    tip.clicked.connect(lambda: (m.add_task(), m.refresh()))
     al.addWidget(tip)
     al.addStretch()
     lay.addWidget(add)
@@ -908,23 +992,29 @@ def _row_tail(m, row, lay, i, g):
     return row
 
 
+def _row_desc(a):
+    """中栏陈述文案 —— 「持续 0.1s，下一行动 0.5s 后触发」。
+
+    键位/组合名由行内徽章显示, 这句只讲时序(与徽章连读即
+    「K 持续 0.1s，下一行动 0.5s 后触发」); 鼠标行用「按住」。
+    参数编辑已挪到右栏「动作设置」页, 中栏不再放 spinbox。"""
+    hold = "按住" if a.get("key") == "左键" else "持续"
+    # 1 位小数, 与右栏 spinbox 的显示口径一致(spin decimals=1)
+    return (f"{hold} {float(a.get('a', 0)):.1f}s，"
+            f"下一行动 {float(a.get('b', 0)):.1f}s 后触发")
+
+
 def _action_row(m, i, a):
     row, lay, _g = _row_base(m, i)
     # combo 行没有 key, 徽章显示 name(如 W+D) —— 定宽 28 装不下, 走自适应 + padding
     if "key" in a:
         lay.addWidget(_badge(a["key"], 46 if a["key"] == "左键" else 28))
-        hold = "按住" if a["key"] == "左键" else "持续"
     else:
         lay.addWidget(_badge(a.get("name", a["kind"]), font=FONT_B,
                              padding="0 10px"))
-        hold = "持续"
-    lay.addStretch(1)          # 弹性空隙: 把参数组推到行右端
-    for lab, key in ((hold, "a"), ("后延", "b")):
-        lay.addWidget(_make_label(lab, color=Colors.TEXT2))
-        #单位是独立标签(不可选中, 与标注字同 FONT_M), 不塞进输入框
-        lay.addWidget(_spin(a[key], 0, 999, 1, 0.1,
-                            on=bind(a, key)))
-        lay.addWidget(_make_label("s", color=Colors.DIM))
+    lay.addStretch(1)          # 弹性空隙: 把陈述句推到行右端
+    # 陈述文案, 不放输入控件 —— 参数在右栏改, 改完 bind_and_refresh 重画这句
+    lay.addWidget(_make_label(_row_desc(a), color=Colors.TEXT2))
     return _row_tail(m, row, lay, i, _g)
 
 
@@ -967,11 +1057,13 @@ def _jump_row(m, i, a):
 
 
 def _pick_row(m, i):
-    m.sel_row = i
+    # 再点一次已选中行 = 取消选中(sel_row=-1) —— 右栏回落任务设置页,
+    # 这是「未选中 → 任务设置」的唯一入口, 别把它当普通选中覆盖掉
+    m.sel_row = -1 if m.sel_row == i else i
     m.refresh(panes=("mid", "right"), mini=False)
 
 
-# ══════════ 右栏: 随中栏选中在任务设置/分支配置之间切换 ══════════
+# ══════════ 右栏: 顶卡(任务设置)常驻 + 下方 stack 随中栏选中切页 ══════════
 def build_right(m):
     col = QWidget()
     set_bg(col, "transparent")
@@ -982,6 +1074,8 @@ def build_right(m):
     stack.setStyleSheet("background: transparent")
     lay.addWidget(stack, 1)
     col._stack = stack
+    # 顶卡常驻状态: 未建时 None, _rebuild_right 按 (任务对象, 任务数) 比对换卡
+    col._top, col._top_task, col._top_n = None, None, 0
     _bind_rebuild(col, _rebuild_right)
     _rebuild_right(col, m)
     return col
@@ -993,19 +1087,39 @@ def _rebuild_right(col, m):
         w = st.widget(0)
         st.removeWidget(w)
         w.setParent(None)
-    acts = m.task()["actions"]
-    a = acts[m.sel_row] if acts else None
-    # 三个页都要建, 下标固定: 0=任务设置 1=条件配置(分支/等图像) 2=跳转配置。
+    # 顶卡(任务设置)常驻 lay 层, 不进 stack —— 只在任务对象或任务数变化时换卡:
+    # 同任务内改 rel/loop/runs 与选中行切换都不触发, 顶卡实例保持、正在编辑的
+    # 输入框焦点不丢。判身份用 `is`(并持有旧任务强引用)而不是 id() —— 旧任务被
+    # del_task 弹掉后对象可能已释放, id 会被新对象复用导致误判"没换任务"。
+    # 任务数单独比对: 「关系」下拉选项按任务数生成, 删/增非当前任务时
+    # m.task() 可能还是同一对象但选项已过期。
+    t = m.task()
+    if t is not col._top_task or len(m.tasks) != col._top_n:
+        if col._top is not None:
+            col.layout().removeWidget(col._top)
+            col._top.setParent(None)
+        col._top = _page_task(m)
+        col.layout().insertWidget(0, col._top)
+        col._top_task, col._top_n = t, len(m.tasks)
+    acts = t["actions"]
+    # 边界: sel_row 可能是 -1(二次点击取消选中), 裸下标 acts[-1] 会命中末行,
+    # 右栏误显末行参数 —— 越界一律当「无选中」, 落页0 空白(顶卡已在上方常驻)
+    a = acts[m.sel_row] if 0 <= m.sel_row < len(acts) else None
+    # 五个页都要建, 下标固定: 0=空白(未选中) 1=条件配置(分支/等图像) 2=跳转配置
+    # 3=变量配置 4=动作参数(键鼠/组合键)。任务设置不占槽 —— 它在顶卡。
     # 只 add 其中一个再 setCurrentIndex 会越界/落到空处 —— 索引按加入顺序算。
-    st.addWidget(_page_task(m))
+    st.addWidget(_page_empty())
     st.addWidget(_page_branch(m, a)
-                 if (a and a["kind"] in ("branch", "wait")) else _page_task(m))
-    st.addWidget(_page_jump(m, a) if (a and a["kind"] == "jump") else _page_task(m))
+                 if (a and a["kind"] in ("branch", "wait")) else _page_empty())
+    st.addWidget(_page_jump(m, a) if (a and a["kind"] == "jump") else _page_empty())
     st.addWidget(_page_var(m, a)
-                 if (a and a["kind"] in ("read", "varset", "cond")) else _page_task(m))
+                 if (a and a["kind"] in ("read", "varset", "cond")) else _page_empty())
+    st.addWidget(_page_action(m, a)
+                 if (a and a["kind"] in ("key", "combo")) else _page_empty())
     kind = a["kind"] if a else ""
     st.setCurrentIndex({"branch": 1, "wait": 1, "jump": 2,
-                        "read": 3, "varset": 3, "cond": 3}.get(kind, 0))
+                        "read": 3, "varset": 3, "cond": 3,
+                        "key": 4, "combo": 4}.get(kind, 0))
 
 
 def _page():
@@ -1018,6 +1132,12 @@ def _page():
     lay.setSpacing(GAP)
     lay.setSizeConstraint(QLayout.SetNoConstraint)   # 布局不反过来要求父容器变宽
     return w, lay
+
+
+def _page_empty():
+    # 空白页 —— stack 槽位占位用(未选中 / 非本类行)。任务设置已移到常驻顶卡,
+    # 占位若再放 _page_task 会在下方重复出第二张任务设置卡。
+    return _page()[0]
 
 
 def _page_task(m):
@@ -1181,5 +1301,60 @@ def _page_branch(m, a):
                                        bind(a, "pick"),
                                        size="normal"))
         lay.addWidget(c2)
+    lay.addStretch(1)
+    return w
+
+
+# ══════════ 右栏页 4: 键鼠/组合键动作的参数(中栏已改纯陈述文案) ══════════
+def _page_action(m, a):
+    """动作参数页 —— 绑定键重录 + 持续/后延。
+
+    中栏行只留陈述文案, 参数全在这页改; 数字框回调用 bind_and_refresh,
+    只刷中栏不重建本页(重建会拆掉正在输入的框丢焦点)。
+    鼠标行(key=左键)的「键」是点击目标, 改键 = 重录坐标, 不给键盘重录入口。"""
+    w, lay = _page()
+    is_click = a.get("key") == "左键"     # 鼠标行: 键位即点击目标, 改键=重录坐标
+    lay.addWidget(_make_label("动作设置", color=Colors.DIM))
+
+    # 绑定卡: 徽章显示当前键/组合名 + 重录入口
+    c1, l1 = _card()
+    hd, hl = _plain()
+    hl.setContentsMargins(0, 0, 0, 0)
+    hl.setSpacing(8)
+    if "key" in a:
+        hl.addWidget(_badge(a["key"], 46 if is_click else 28))
+    else:
+        hl.addWidget(_badge(a.get("name", a["kind"]), font=FONT_B,
+                            padding="0 10px"))
+    hl.addStretch()
+    b_rec = _make_btn("重录点击坐标" if is_click else "重录键位", height=26)
+    b_rec.clicked.connect(lambda: (_re_record_click if is_click else _re_record)(m, a))
+    hl.addWidget(b_rec)
+    l1.addWidget(hd)
+    if is_click:
+        l1.addWidget(_row_box("坐标", _make_label(
+            f"({a.get('x', 0)}, {a.get('y', 0)})"
+            + (" · 客户区" if a.get("rel") else ""),
+            color=Colors.BLUE, font=FONT_B)))
+    lay.addWidget(c1)
+
+    # 参数卡: 持续/按住 + 后延 —— 回调只写 dict 再刷中栏文案
+    lay.addWidget(_make_label("时序", color=Colors.DIM))
+    c2, l2 = _card()
+    r, rl = _plain()
+    rl.setContentsMargins(0, 0, 0, 0)
+    rl.setSpacing(8)
+    rl.addWidget(_make_label("按住" if is_click else "持续", color=Colors.TEXT2))
+    rl.addWidget(_spin(a.get("a", 0), 0, 999, 1, 0.1,
+                       on=bind_and_refresh(m, a, "a")))
+    rl.addWidget(_make_label("s", color=Colors.DIM))
+    rl.addSpacing(6)
+    rl.addWidget(_make_label("后延", color=Colors.TEXT2))
+    rl.addWidget(_spin(a.get("b", 0), 0, 999, 1, 0.1,
+                       on=bind_and_refresh(m, a, "b")))
+    rl.addWidget(_make_label("s", color=Colors.DIM))
+    rl.addStretch()
+    l2.addWidget(r)
+    lay.addWidget(c2)
     lay.addStretch(1)
     return w

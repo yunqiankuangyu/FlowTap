@@ -172,7 +172,8 @@ class WinV2(V2Win):
             card = cards[i]
             st = getattr(card, "_st", None)
             if st is not None:
-                st.setText(text)
+                #剥掉状态文本自带的●前缀, 圆点统一由下方状态灯表达
+                st.setText(text.removeprefix("● ").removeprefix("●"))
                 style_label(st, color)
             dot = getattr(card, "_dot", None)
             if dot is not None:
