@@ -26,7 +26,7 @@ from PySide6.QtGui import QCursor, QFontMetricsF, QColor
 from config import Colors, FONT_B, FONT_M
 from .widgets import (card_qss, btn_qss, dot_qss, scroll_qss, spin_flat, spin_fill,
                         flat_btn, ghost_btn, _make_btn, _make_label, style_label, tag_label,
-                        set_bg, F12)
+                        set_bg, rgba_of, F12)
 from .combo import _make_menu_combo, _mini_combo
 from .segmented import segmented_control
 from .model import _vk_name, combo_name
@@ -41,10 +41,10 @@ PICK3 = [("继续下一步", "next"), ("跳过本分支", "skip"), ("结束任�
 # 等待条件 / 超时后 —— 值即显示文本(模型里存的就是中文串), 不另造键名
 WAIT3 = [(s, s) for s in ("图像·按钮", "图像·图标", "文字内容")]
 AFTER3 = [(s, s) for s in ("跳过", "跳卡", "中止")]
-# 变量类动作的徽章: (图标, 主题色 RGB)
-_VAR_STYLE = {"read": ("🔢", "150,120,220"),
-               "varset": ("➕", "210,150,80"),
-               "cond": ("⚖", "90,170,200")}
+# 变量类动作的徽章: (图标, 徽章色 hex —— 走 rgba_of 换算)
+_VAR_STYLE = {"read": ("🔢", "#9678dc"),
+              "varset": ("➕", "#d29650"),
+              "cond": ("⚖", "#5aaac8")}
 
 
 class CardBox(QFrame):
@@ -106,7 +106,7 @@ class ActionRow(QFrame):
 def _line():
     f = QFrame()
     f.setFixedWidth(1)
-    set_bg(f, "rgba(100,116,139,0.32)")
+    set_bg(f, rgba_of(Colors.DIM, 0.32))
     return f
 
 
@@ -174,7 +174,7 @@ def _plain(kind="h"):
 def _dash():
     f = QFrame()
     f.setFixedHeight(1)
-    f.setStyleSheet("border-top: 1px dashed rgba(100,116,139,0.45); background: transparent;")
+    f.setStyleSheet(f"border-top: 1px dashed {rgba_of(Colors.DIM, 0.45)}; background: transparent;")
     return f
 
 
@@ -935,8 +935,8 @@ def _cond_row(m, i, a):
     行渲染(徽章文案取各自的 name)。
     """
     row, lay, _g = _row_base(m, i)
-    lay.addWidget(_badge(f"⑂ {a['name']}", font=FONT_M, bg="rgba(90,156,255,0.14)",
-                         color=Colors.BLUE, border="rgba(90,156,255,0.45)",
+    lay.addWidget(_badge(f"⑂ {a['name']}", font=FONT_M, bg=rgba_of(Colors.BLUE, 0.14),
+                         color=Colors.BLUE, border=rgba_of(Colors.BLUE, 0.45),
                          padding="0 10px"))
     lay.addStretch(1)
     lay.addWidget(_make_label("等待条件配置在右侧", color=Colors.DIM))
@@ -947,8 +947,8 @@ def _var_row(m, i, a):
     """变量类动作行 —— 读数 / 变量运算 / 条件分支, 参数在右栏配"""
     row, lay, _g = _row_base(m, i)
     icon, tint = _VAR_STYLE[a["kind"]]
-    lay.addWidget(_badge(f"{icon} {a['name']}", font=FONT_M, bg=f"rgba({tint},0.14)",
-                         color=Colors.TEXT, border=f"rgba({tint},0.4)",
+    lay.addWidget(_badge(f"{icon} {a['name']}", font=FONT_M, bg=rgba_of(tint, 0.14),
+                         color=Colors.TEXT, border=rgba_of(tint, 0.4),
                          padding="0 10px"))
     lay.addStretch(1)
     lay.addWidget(_make_label("配置在右侧", color=Colors.DIM))
@@ -958,8 +958,8 @@ def _var_row(m, i, a):
 def _jump_row(m, i, a):
     """跳转行 —— 目标序号在右栏配置, 行内只给徽章与说明"""
     row, lay, _g = _row_base(m, i)
-    lay.addWidget(_badge("⤴ 跳转", font=FONT_M, bg="rgba(120,120,140,0.14)",
-                         color=Colors.TEXT2, border="rgba(120,120,140,0.4)",
+    lay.addWidget(_badge("⤴ 跳转", font=FONT_M, bg=rgba_of(Colors.DIM, 0.14),
+                         color=Colors.TEXT2, border=rgba_of(Colors.DIM, 0.4),
                          padding="0 10px"))
     lay.addStretch(1)
     lay.addWidget(_make_label("跳转目标配置在右侧", color=Colors.DIM))
@@ -1151,7 +1151,7 @@ def _page_branch(m, a):
     hl.setContentsMargins(0, 0, 0, 0)
     hl.setSpacing(8)
     hl.addWidget(_make_label(a["name"], font=FONT_B))
-    hl.addWidget(tag_label("中栏选中", Colors.BLUE, border="rgba(90,156,255,0.5)",
+    hl.addWidget(tag_label("中栏选中", Colors.BLUE, border=rgba_of(Colors.BLUE, 0.5),
                            radius=4, padding="1px 6px"))
     hl.addStretch()
     l1.addWidget(hd)

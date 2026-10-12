@@ -82,7 +82,7 @@ def scroll_qss(bg="transparent"):
 def tip_qss(padding="16px 32px"):
     """全屏遮罩提示条QSS(框选/点击绑定两处共用; 半透明背景窗上QSS背景不渲染故为实色)"""
     return f"""
-        background: rgba(30, 30, 30, 220);
+        background: {rgba_of('#1e1e1e', 220)};
         color: #fff;
         border-radius: 10px;
         padding: {padding};

@@ -13,7 +13,7 @@ from PySide6.QtGui import QCursor
 from config import Colors, FONT_B, THEMES, DEFAULTS
 from .widgets import (card_qss, btn_qss, slider_qss, _make_btn,
                         _make_label, style_label, tag_label, set_bg, scroll_qss,
-                        restyle_tree, palette_now)
+                        restyle_tree, palette_now, rgba_of)
 from .segmented import segmented_control
 from .base import V2Win, apply_round_corners
 from .titlebar import attach_drag, TITLEBAR_H
@@ -69,7 +69,7 @@ class SetWin(V2Win):
 
         self.foot = QFrame()
         self.foot.setStyleSheet("background: transparent; border-top: 1px solid "
-                                f"rgba(100,116,139,0.32);")
+                                f"{rgba_of(Colors.DIM, 0.32)};")
         fl = QVBoxLayout(self.foot)
         fl.setContentsMargins(12, 8, 12, 12)
         self.wins = []      # 参与整树换肤的其它窗口(主窗/迷你窗, 接线见 main_v2.wire)
@@ -301,8 +301,8 @@ class SetWin(V2Win):
             wl.setContentsMargins(0, 0, 0, 0)
             wl.setSpacing(8)
             wl.addWidget(_make_label(lab, color=Colors.TEXT2))
-            key = tag_label("…", Colors.BLUE, bg="rgba(90,156,255,0.12)",
-                            border="rgba(90,156,255,0.4)", radius=5, padding="2px 8px")
+            key = tag_label("…", Colors.BLUE, bg=rgba_of(Colors.BLUE, 0.12),
+                            border=rgba_of(Colors.BLUE, 0.4), radius=5, padding="2px 8px")
             wl.addWidget(key)
             wl.addStretch()
             b = _make_btn("修改热键", height=28)

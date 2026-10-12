@@ -13,7 +13,8 @@ from PySide6.QtCore import Qt
 
 from config import Colors, FONT_B, FONT_M
 from .widgets import (btn_qss, dot_qss, flat_btn, F12,
-                        _make_btn, _make_label, style_label, tag_label, hit_btn, set_bg)
+                        _make_btn, _make_label, style_label, tag_label, hit_btn, set_bg,
+                        rgba_of)
 from .base import V2Win
 from .titlebar import attach_drag, MINI_TITLEBAR_H
 from .panel import _card, _restyle_card, _plain
@@ -73,8 +74,8 @@ class MiniWin(V2Win):
         bar.setFixedHeight(MINI_TITLEBAR_H)
         lay.setContentsMargins(9, 0, 4, 0)
         lay.setSpacing(6)
-        lay.addWidget(tag_label("MINI", Colors.BLUE, bg="rgba(90,156,255,0.14)",
-                                border="rgba(90,156,255,0.4)", radius=4, padding="1px 5px"))
+        lay.addWidget(tag_label("MINI", Colors.BLUE, bg=rgba_of(Colors.BLUE, 0.14),
+                                border=rgba_of(Colors.BLUE, 0.4), radius=4, padding="1px 5px"))
         lay.addWidget(_make_label("FlowTap", font=FONT_B))
         lay.addStretch()
         # ▣ = 恢复主窗, ✕ = 真正退出; 两者交由外部决定

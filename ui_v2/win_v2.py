@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
 from PySide6.QtCore import QTimer, Qt
 
 from config import Colors
-from .widgets import scroll_qss, set_bg, style_label, tip_label
+from .widgets import scroll_qss, set_bg, style_label, tip_label, rgba_of
 from .base import V2Win, SHADOW
 from .dock import Dock
 from .titlebar import build_titlebar, TITLEBAR_H
@@ -96,7 +96,7 @@ class WinV2(V2Win):
         if self._veil_box is not None:
             return
         v = QWidget(self)
-        v.setStyleSheet("background: rgba(0, 0, 0, 0.28);")
+        v.setStyleSheet(f"background: {rgba_of('#000000', 0.28)};")
         # 只盖卡片区: 盖到阴影带会把透明区糊成深色方块, 直角就露出来了
         v.setGeometry(SHADOW, SHADOW, self._cw, self._ch)
         # 遮罩只管"压暗"这一件事, 不许挡鼠标 —— 它盖住整窗(含顶栏), 一旦吃事件,

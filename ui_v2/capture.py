@@ -23,7 +23,7 @@ from PySide6.QtGui import QCursor, QFont
 from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QWidget
 
 from config import Colors, FONT_M, load_settings, get_setting
-from .widgets import tip_label
+from .widgets import tip_label, rgba_of
 from core.vk_map import VK_NAME
 
 _VK_LO, _VK_HI = 0x08, 0x100      # 扫描区间: Backspace ~ 0xFF(与旧版一致)
@@ -125,7 +125,7 @@ def capture_click(win, on_done=None, timeout_ms=15000):
     ov.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
     ov.setAttribute(Qt.WA_TranslucentBackground, True)
     ov.setAttribute(Qt.WA_ShowWithoutActivating, True)
-    ov.setStyleSheet("background: rgba(0,0,0,80);")
+    ov.setStyleSheet(f"background: {rgba_of('#000000', 80)};")
     ov.setGeometry(screen)
     ov.closeEvent = lambda e: e.ignore()
 
