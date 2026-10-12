@@ -1,44 +1,9 @@
+"""设置读写 —— 只做转发, 正源在 config.settings(与旧UI同一份文件同一套逻辑)。
+
+原先是 config/settings.py 的独立副本(落 settings_v2.json), 运行时无人用,
+谁 `from ui_v2 import load_settings` 就会静默写错文件; 现在路径与逻辑归 config
+一家, 本模块只保住包根 re-export 的导入路径(与 presets.py 同款薄转发)。
 """
-设置管理模块
-"""
-import json
-import os
-import sys
+from config.settings import SETTINGS_FILE, load_settings, save_settings
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from .themes import DEFAULT_THEME
-
-# 配置文件路径（与主程序同目录）
-_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-def _app_dir():
-    """exe 或脚本所在目录（PyInstaller 打包后 __file__ 在临时目录，必须用 argv[0]）"""
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(os.path.abspath(sys.argv[0]))
-    return _BASE_DIR
-
-
-# 新 UI 用独立配置文件, 不与旧 UI 抢同一个文件
-SETTINGS_FILE = os.path.join(_app_dir(), "settings_v2.json")
-
-
-def load_settings():
-    """加载设置"""
-    defaults = {"opacity": 0.9, "theme": DEFAULT_THEME, "bind_process": ""}
-    try:
-        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-            defaults.update(json.load(f))
-    except: pass
-    # 防止主题名失效
-    from .themes import THEMES
-    if defaults["theme"] not in THEMES:
-        defaults["theme"] = DEFAULT_THEME
-    return defaults
-
-
-def save_settings(settings):
-    """保存设置"""
-    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(settings, f, ensure_ascii=False, indent=2)
+__all__ = ["SETTINGS_FILE", "load_settings", "save_settings"]
