@@ -19,6 +19,21 @@ WIN_R = 16          # 窗口圆角半径(与 ui/app.py 的 WIN_RADIUS 同值)
 SHADOW = 16         # 阴影带宽: 窗口四周各留 16 透明区, 阴影画在这里面(卡片尺寸不变)
 
 
+def screen_rect_at(x, y):
+    """取 (x, y) 所在屏幕的可用区域, 用来把窗口坐标 clamp 回屏内。
+
+    不用 primaryScreen(): 多屏时主屏右缘与窗口所在屏无关, 据此定位会把窗口
+    放到屏幕外。QApplication.screenAt 在点不在任何屏上(拔屏/落盘坐标过期)时
+    返回 None, 那种情况退回主屏。
+    """
+    from PySide6.QtCore import QPoint
+    from PySide6.QtWidgets import QApplication
+    s = QApplication.screenAt(QPoint(x, y))
+    if s is None:
+        s = QApplication.primaryScreen()
+    return s.availableGeometry()
+
+
 class V2Win(QWidget):
     # 无边框 + 置顶 + 逐像素透明 + 自绘圆角 + 自绘阴影
     def __init__(self, w, h, radius=WIN_R):

@@ -35,22 +35,7 @@ from .win_v2 import WinV2
 from .win_set import SetWin
 from .win_mini import MiniWin
 from .window_gate import apply_round_corners
-
-
-def _screen_of(w):
-    """取窗口中心所在屏幕的可用区域。
-
-    不用 primaryScreen(): 多屏时主屏右缘与窗口所在屏无关, 据此定位会把窗口
-    放到屏幕外。QApplication.screenAt(Qt.GlobalPoint) 在无匹配时返回 None,
-    那种情况(所有屏都被拔掉的极端情况)退回主屏。
-    """
-    from PySide6.QtCore import QPoint
-    from PySide6.QtWidgets import QApplication
-    c = w.frameGeometry().center()
-    s = QApplication.screenAt(QPoint(c.x(), c.y()))
-    if s is None:
-        s = QApplication.primaryScreen()
-    return s.availableGeometry()
+from .base import screen_rect_at
 
 
 def _center_in(child, parent):
@@ -215,10 +200,16 @@ def wire(win, setw, mini, app):
         top(setw)
 
     def show_mini():
-        # 迷你窗是收起的替代形态, 落在主窗右下角(主窗隐藏, 所以是屏幕右下角)
-        g = _screen_of(win)
-        x = win.x() + win.width() - mini.width()
-        y = win.y() + 120
+        # 位置各记各的: 读上次落盘的 mini_pos_x/y(一次没拖过才按主窗右下角兜底),
+        # 不再每次按主窗重摆 —— 否则落盘值永远用不上, 主窗一动迷你窗还跟着跳。
+        # 坐标按点查屏再 clamp, 拔屏/换分辨率后不会摆到屏幕外。
+        s = load_settings()
+        if "mini_pos_x" in s and "mini_pos_y" in s:
+            x, y = int(s["mini_pos_x"]), int(s["mini_pos_y"])
+        else:
+            x = win.x() + win.width() - mini.width()
+            y = win.y() + 120
+        g = screen_rect_at(x + mini.width() // 2, y + mini.height() // 2)
         x = max(g.left(), min(x, g.right() - mini.width()))
         y = max(g.top(), min(y, g.bottom() - mini.height()))
         mini.move(x, y)
@@ -229,9 +220,8 @@ def wire(win, setw, mini, app):
         top(mini)
 
     def show_main():
-        # 原版行为: 从迷你窗恢复时, 主窗移到迷你窗所在位置(迷你窗常被拖到别处)
-        if mini.isVisible():
-            win.move(mini.x(), mini.y())
+        # 位置各记各的: 主窗 hide 不改坐标, show 出来就在自己原位, 不跟迷你窗走
+        # (旧版会 app.move(mx,my) 把主窗搬到迷你窗处, 用户已拍板改掉)
         mini.hide()
         setw.hide()
         win._unveil()

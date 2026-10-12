@@ -11,9 +11,9 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
 from PySide6.QtCore import QTimer, Qt
 
-from config import Colors
+from config import Colors, load_settings, save_settings
 from .widgets import scroll_qss, set_bg, style_label, tip_label, rgba_of
-from .base import V2Win, SHADOW
+from .base import V2Win, SHADOW, screen_rect_at
 from .dock import Dock
 from .titlebar import build_titlebar, TITLEBAR_H
 from .model import Model
@@ -46,6 +46,7 @@ class WinV2(V2Win):
     def __init__(self):
         super().__init__(WIN_W, WIN_H)
         self.setWindowTitle("FlowTap")
+        self._restore_pos()      # 启动读上次落盘的 win_pos_x/y(没存过就用 Qt 默认摆位)
         # 外部接管: 收迷你 / 退出 / 重启(必须在 _titlebar 之前就位)
         self.on_minimize = None
         self.on_quit = None
@@ -255,8 +256,42 @@ class WinV2(V2Win):
         # 引用 ui.titlebar.build_titlebar —— 拖动逻辑/按钮样式/titlebar_qss 都在
         # 那里面, 不自己重写一遍(两套标题栏实现意味着改动要同步两处)。
         # 只传自己不同的三项: 高度 36、三按钮组合与回调、固定标题。
-        return build_titlebar(
+        bar = build_titlebar(
             self, height=TITLEBAR_H, title="FlowTap",
             buttons=[("—", Colors.BLUE, lambda: self.on_minimize and self.on_minimize()),
                      ("▢", Colors.BLUE, lambda: None),      # 占位: 无最大化行为
                      ("✕", Colors.RED, lambda: self.on_quit and self.on_quit())])
+        # 拖动松手落盘 win_pos_x/y: attach_drag 是正源不改, 外面包一层只补落盘
+        # (与迷你窗 MiniWin._bar 同一套做法)。落盘只绑鼠标 release ——
+        # capture/vision_capture 的临时移窗是程序 move、不经过鼠标事件, 写不进去。
+        press, rel = bar.mousePressEvent, bar.mouseReleaseEvent
+
+        def _press(e):
+            press(e)
+            self._p0 = (self.x(), self.y())
+
+        def _rel(e):
+            rel(e)
+            if (self.x(), self.y()) != getattr(self, "_p0", None):
+                self._save_pos()
+
+        bar.mousePressEvent = _press
+        bar.mouseReleaseEvent = _rel
+        return bar
+
+    def _restore_pos(self):
+        """启动读上次拖动落盘的 win_pos_x/y(键不存在就不动 Qt 默认摆位), 摆位过屏边界 clamp"""
+        s = load_settings()
+        try:
+            x, y = int(s["win_pos_x"]), int(s["win_pos_y"])
+        except (KeyError, TypeError, ValueError):
+            return                  # 没存过 / 值坏了, 保持 Qt 默认摆位
+        g = screen_rect_at(x + self.width() // 2, y + self.height() // 2)
+        self.move(max(g.left(), min(x, g.right() - self.width())),
+                  max(g.top(), min(y, g.bottom() - self.height())))
+
+    def _save_pos(self):
+        # 标题栏拖动松手存主窗位置, 重启后由 _restore_pos 读回(与 mini_pos_x/y 同款键)
+        s = load_settings()
+        s["win_pos_x"], s["win_pos_y"] = self.x(), self.y()
+        save_settings(s)
