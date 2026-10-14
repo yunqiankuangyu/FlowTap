@@ -80,8 +80,9 @@ def _set_topmost(w, on):
 class _FollowHost(QObject):
     """挂在主窗/迷你窗上的两个职责(设置窗开着时才生效):
 
-    1. Move -> 设置窗跟着重摆: 拖动是手搬(attach_drag 里 win.move), 每步都发
-       QEvent::Move, 逐帧跟上; 只跟可见窗, 隐藏窗没有移动事件。
+    1. Move/Resize -> 设置窗跟着重摆: 拖动是手搬(attach_drag 里 win.move), 每步都发
+       QEvent::Move, 逐帧跟上; 主窗最大化/还原发 Resize, 同一条路重摆。只跟可见窗,
+       隐藏窗没有移动/尺寸事件。
     2. WindowActivate -> 把设置窗抬回最上: 顶栏可点、任务栏也能激活主窗,
        激活即抬主窗会盖住设置窗, 这里压回去 —— 置顶位不再用来保这个 Z 序,
        于是「窗口置顶=关」时设置窗能跟着主窗一起回到普通层, 不再浮在别的应用上。
@@ -92,7 +93,9 @@ class _FollowHost(QObject):
 
     def eventFilter(self, obj, ev):
         t = ev.type()
-        if t == QEvent.Move and self._setw.isVisible() and obj.isVisible():
+        # Move = 拖动手搬, 逐帧跟上; Resize = 主窗最大化/还原改几何, 同一条路跟着重摆。
+        # 只跟可见窗, 隐藏窗没有移动/尺寸事件。
+        if t in (QEvent.Move, QEvent.Resize) and self._setw.isVisible() and obj.isVisible():
             _center_in(self._setw, obj)
         elif t == QEvent.WindowActivate and self._setw.isVisible():
             self._setw.raise_()

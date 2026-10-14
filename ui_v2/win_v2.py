@@ -51,11 +51,15 @@ class WinV2(V2Win):
         self.on_minimize = None
         self.on_quit = None
         self.on_restart = None
+        self._maxed = False        # 最大化态, 标题栏图标钮切换(见 _toggle_max)
+        self._pre_max = None       # 最大化前的窗口位置, 还原时回这里
         self.m = Model()          # 运行时数据; 界面只读它并按变化重建
         self._veil_box = None     # 设置窗弹出时的压暗遮罩, 见 _veil
         self._rounds = {}         # 每任务已完成轮数(反馈用, 见 _on_status)
         outer = QVBoxLayout(self)
         # 外圈留阴影带(V2Win.__init__ 已按卡片尺寸定窗, 这里把内容压回卡片区)
+        # 存引用, 最大化时边距切 0 让卡片铺满工作区, 还原时切回(见 _do_max)
+        self._outer = outer
         outer.setContentsMargins(SHADOW, SHADOW, SHADOW, SHADOW)
         outer.setSpacing(0)
         outer.addWidget(self._titlebar())
@@ -72,8 +76,10 @@ class WinV2(V2Win):
         self.m._left, self.m._mid, self.m._right = left, mid, right
         # 三栏按 RATIO 百分比算固定宽度, 不用 addStretch 分配 ——
         # stretch 会让"内容最窄需求大"的栏多吃(实测中栏吃到 38.9%, 比例失真)。
-        # 窗口本身是 setFixedSize, 算一次就够; 余数交给末尾的 stretch 吃掉,
-        # 免得 layout 把零头摊到某一栏上。
+        # 定尺态算一次就够; 最大化/还原改了窗宽就由 resizeEvent 按同式重算这批栏。
+        # 余数交给末尾的 stretch 吃掉, 免得 layout 把零头摊到某一栏上。
+        # 存栏引用供 resizeEvent 用, 与下面循环同一组对象。
+        self._cols = (left, mid, right)
         for i, (w, p) in enumerate(zip((left, mid, right), RATIO)):
             w.setFixedWidth(int(WIN_W * p / 100))
             bl.addWidget(w)
@@ -99,7 +105,8 @@ class WinV2(V2Win):
         v = QWidget(self)
         v.setStyleSheet(f"background: {rgba_of('#000000', 0.28)};")
         # 只盖卡片区: 盖到阴影带会把透明区糊成深色方块, 直角就露出来了
-        v.setGeometry(SHADOW, SHADOW, self._cw, self._ch)
+        # 左上偏移走 _sh(最大化时为 0, 卡片贴边), 不写死 SHADOW
+        v.setGeometry(self._sh, self._sh, self._cw, self._ch)
         # 遮罩只管"压暗"这一件事, 不许挡鼠标 —— 它盖住整窗(含顶栏), 一旦吃事件,
         # 设置窗开着时顶栏就拖不动了(内容区靠 _set_panel 禁用挡住, 不需要遮罩代劳)
         v.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -234,7 +241,7 @@ class WinV2(V2Win):
         lbl.setText(text)
         lbl.adjustSize()
         lbl.move((self.width() - lbl.width()) // 2,
-                 self.height() - SHADOW - self.dock.height() - lbl.height() - 30)
+                 self.height() - self._sh - self.dock.height() - lbl.height() - 30)
         lbl.show()
         lbl.raise_()
         if not sticky:
@@ -259,8 +266,10 @@ class WinV2(V2Win):
         bar = build_titlebar(
             self, height=TITLEBAR_H, title="FlowTap",
             buttons=[("—", Colors.BLUE, lambda: self.on_minimize and self.on_minimize()),
-                     ("▢", Colors.BLUE, lambda: None),      # 占位: 无最大化行为
+                     ("", Colors.BLUE, self._toggle_max, True),
                      ("✕", Colors.RED, lambda: self.on_quit and self.on_quit())])
+        # 最大化钮本体(双态自绘图标), 切换时就地换形态用(句柄由 build_titlebar 挂到 _title_btns)
+        self._max_btn = self._title_btns[1]
         # 拖动松手落盘 win_pos_x/y: attach_drag 是正源不改, 外面包一层只补落盘
         # (与迷你窗 MiniWin._bar 同一套做法)。落盘只绑鼠标 release ——
         # capture/vision_capture 的临时移窗是程序 move、不经过鼠标事件, 写不进去。
@@ -279,6 +288,68 @@ class WinV2(V2Win):
         bar.mouseReleaseEvent = _rel
         return bar
 
+    # ── 最大化 ⇄ 还原(方案A: 无边框占满工作区, 阴影带切 0 让卡片贴边) ──
+    def _toggle_max(self):
+        if self._maxed:
+            self._undo_max()
+        else:
+            self._do_max()
+
+    def _do_max(self):
+        #先存原位(还原要用), 再关阴影带 + 解定尺 + 铺满工作区。
+        #几何一变 resizeEvent 会把 _cw/_ch、三栏宽、dock 位、遮罩一次刷齐, 这里不逐项补
+        x, y = self.x(), self.y()
+        g = screen_rect_at(x + self.width() // 2, y + self.height() // 2)
+        self._pre_max = (x, y)
+        self._maxed = True
+        #阴影带占 16px, 不切 0 的话卡片四边内缩 16, 视觉上"没铺满"; 切 0 后
+        #paintEvent 画整窗大小的卡片、dock.place 读 _sh 也跟着贴底, 全在正源一处
+        self._sh = 0
+        self._outer.setContentsMargins(0, 0, 0, 0)
+        #解 setFixedSize(min=max 锁死) —— 16777215 即 QWIDGETSIZE_MAX, 恢复仍用 setFixedSize
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(16777215, 16777215)
+        self.setGeometry(g)
+        self._sync_frame()          # 几何没变(工作区恰等于原窗)时 resizeEvent 不来, 手动对齐一次
+        self._max_btn.set_maxed(True)
+        self.update()               # 几何不变的边角情况也要按直角重画(见 base.paintEvent 的 _maxed)
+
+    def _undo_max(self):
+        #还原 = 撤阴影带切 0 + 重新定死 1024x640 + 回最大化前的位置;
+        #位置照 _restore_pos 同口径按屏 clamp(最大化中拔屏/换分辨率不会摆出界)
+        x, y = self._pre_max or (self.x(), self.y())
+        self._maxed = False
+        self._sh = SHADOW
+        self._outer.setContentsMargins(SHADOW, SHADOW, SHADOW, SHADOW)
+        self.setFixedSize(WIN_W + 2 * SHADOW, WIN_H + 2 * SHADOW)
+        g = screen_rect_at(x + WIN_W // 2, y + WIN_H // 2)
+        self.move(max(g.left(), min(x, g.right() - WIN_W - 2 * SHADOW)),
+                  max(g.top(), min(y, g.bottom() - WIN_H - 2 * SHADOW)))
+        self._sync_frame()          # 尺寸没变的边角情况同 _do_max, 手动对齐一次(幂等)
+        self._max_btn.set_maxed(False)
+        self.update()               # 圆角半径随 _maxed 回到 _r, 同样补一次重画
+
+    def _sync_frame(self):
+        #按当前窗宽对齐四件事: 自绘卡片区尺寸、三栏宽(RATIO 重算)、dock 位、遮罩几何。
+        #幂等 —— resizeEvent 与最大化/还原尾部都调, 重复跑只是同值赋一遍, 无副作用
+        self._cw = self.width() - 2 * self._sh
+        self._ch = self.height() - 2 * self._sh
+        for w, p in zip(self._cols, RATIO):
+            w.setFixedWidth(int(self._cw * p / 100))
+        dock = getattr(self, "dock", None)
+        if dock is not None:
+            dock.place(self)
+        if self._veil_box is not None:
+            self._veil_box.setGeometry(self._sh, self._sh, self._cw, self._ch)
+
+    def resizeEvent(self, e):
+        #窗宽一变就重排三栏并跟上自绘/停靠/遮罩 —— 定尺常态收不到此事件,
+        #只有最大化与还原会走这里, 集中在 _sync_frame 一处刷, 不在别处补刀。
+        #建窗早期 _cols 还没挂上(定尺触发的那次), 直接跳过, 此刻也没有栏/dock 可刷。
+        super().resizeEvent(e)
+        if getattr(self, "_cols", None) is not None:
+            self._sync_frame()
+
     def _restore_pos(self):
         """启动读上次拖动落盘的 win_pos_x/y(键不存在就不动 Qt 默认摆位), 摆位过屏边界 clamp"""
         s = load_settings()
@@ -292,6 +363,9 @@ class WinV2(V2Win):
 
     def _save_pos(self):
         # 标题栏拖动松手存主窗位置, 重启后由 _restore_pos 读回(与 mini_pos_x/y 同款键)
+        #最大化态不落盘 —— 存进去的是工作区原点, 还原/重启后小窗会摆到屏幕左上角
+        if self._maxed:
+            return
         s = load_settings()
         s["win_pos_x"], s["win_pos_y"] = self.x(), self.y()
         save_settings(s)

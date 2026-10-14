@@ -68,6 +68,11 @@ class V2Win(QWidget):
             p.setRenderHint(QPainter.Antialiasing)
             p.setPen(Qt.NoPen)
             s, cw, ch, r = self._sh, self._cw, self._ch, self._r
+            # 最大化态四角走直角: _maxed 是最大化唯一正源(win_v2._do_max/_undo_max 置位),
+            # 圆角半径的设置(设置窗拉条)全程只写 _r, 两条线互不干扰; 主窗之外的窗没有
+            # _maxed, getattr 兜住照旧按 _r 画
+            if getattr(self, "_maxed", False):
+                r = 0
             # 阴影: 由外向内叠半透明圆角矩形(靠卡片最深), 代替 DWM 投影 ——
             # DWM 的描边/投影跟它自己的小圆角(封顶8px)走, 自绘大圆角时那圈描边
             # 会从透明角里露出来("旧圆角虚影"), 所以形状和阴影全部自绘、DWM 不参与。
