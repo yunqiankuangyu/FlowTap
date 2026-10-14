@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, Q
                                QDoubleSpinBox, QLabel, QScrollArea,
                                QPushButton, QStackedWidget, QLayout, QSizePolicy)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCursor, QFontMetricsF, QColor
+from PySide6.QtGui import QCursor, QColor, QValidator
 
 from config import Colors, FONT_B, FONT_M
 from .widgets import (card_qss, btn_qss, dot_qss, scroll_qss, spin_flat, spin_fill,
@@ -117,10 +117,19 @@ def _line():
 # 另外要显式 setFixedWidth: QDoubleSpinBox 默认 minimumSizeHint 宽 117,
 # 两个框累加就把行动行顶到 380 > 中栏视口 344, 撑破中栏。
 # 单位不进输入框(进框就成了能被光标选中改写的输入文本), 调用处另接 _make_label 单位标签。
-def _fit_spin(s):
-    #宽度 = 当前文字宽 + 8 呼吸, 下限 40(框的存在感); textChanged 时重算, 大值不截断
-    fm = QFontMetricsF(s.font())
-    s.setFixedWidth(max(40, int(fm.horizontalAdvance(s.text())) + 8))
+KX_FILL = 12   # spin_fill 样式的横向开销(border 1px×2 + padding 5px×2), 不算进去文字必被裁
+HUXI = 8       # 呼吸量(文字两侧留白), 沿用原公式取 8 —— flat 档因此与改前逐像素一致
+#内层 = lineEdit 自身 frame(2×2) + 光标停末尾的占位与 ensureCursorVisible 保留边距。
+#视口只给 字宽+4 时光标一到末尾 lineEdit 就横向滚动, 首字左缘被切(真机实测 80/801/999
+#最小不裁宽恒 = 公式宽+6, 逐字符键入 8->80->801 首字段宽 14->11 即裁切签名)。
+NEICENG = 6
+
+
+def _fit_spin(s, fill=False):
+    #宽度 = 当前文字宽 + 样式横向开销(fill 档 KX_FILL, flat 档 0) + 呼吸 + 内层, 下限 40(框的存在感)
+    #文字宽走渲染方(内部 QLineEdit)的 fontMetrics, 与真机渲染同源; textChanged 时重算, 大值不截断
+    fm = s.lineEdit().fontMetrics()
+    s.setFixedWidth(max(40, int(fm.horizontalAdvance(s.text())) + (KX_FILL if fill else 0) + HUXI + NEICENG))
 
 
 def bind(a, key, cast=None):
@@ -148,17 +157,31 @@ def bind_and_refresh(m, a, key, cast=None):
     return _o
 
 
+class _IntSpin(QDoubleSpinBox):
+    #整数框(decimals=0)禁小数点: QDoubleValidator 把 "801." 判中间态照样放行,
+    #覆写 validate 在整数档把含小数点/千分位的文本直接判 Invalid, 键入与粘贴都进不来;
+    #小数档(decimals>0)走父类原逻辑, 照常能敲小数点
+    def validate(self, text, pos):
+        if self.decimals() <= 0 and (self.locale().decimalPoint() in text
+                                     or self.locale().groupSeparator() in text):
+            return (QValidator.Invalid, text, pos)
+        return super().validate(text, pos)
+
+
 def _spin(val, lo=0, hi=999, dec=1, step=0.1, on=None, fill=False):
     """fill=True 用 spin_fill(填底+微妙描边, HTML .num 同款);
     fill=False 用 spin_flat(透底无框, 行内已铺底时用)"""
-    s = QDoubleSpinBox()
+    s = _IntSpin()
     s.setRange(lo, hi)
     s.setDecimals(dec)
     s.setSingleStep(step)
     s.setValue(val)
     s.setFont(FONT_M)
-    _fit_spin(s)
-    s.textChanged.connect(lambda _t, sp=s: _fit_spin(sp))
+    #字体传到内部 QLineEdit 要等一轮事件循环, 不先显式落上, _fit 首次会按默认 9pt 量宽,
+    #量出的框比 13pt 渲染窄一截 —— 初值不裁字全靠这行
+    s.lineEdit().setFont(FONT_M)
+    _fit_spin(s, fill)
+    s.textChanged.connect(lambda _t, sp=s, f=fill: _fit_spin(sp, f))
     # 水平方向 Fixed: QDoubleSpinBox 的 minimumSizeHint 默认要 117px(给三位数+箭头),
     # 父布局按它算下限, 两个框累加就把行动行顶到 380 > 视口 344。Fixed 策略把
     # 宽度诉求交给 setFixedWidth, 父布局不再按 minimumSizeHint 预留。
@@ -1161,13 +1184,15 @@ def _page_task(m):
     rl_rel.addWidget(cm_rel, 1)
     cl.addWidget(r_rel)
 
-    # 循环 / 次数 —— 对齐 HTML: label + 整数输入框(50px/26px/居中/有边框) + 独立单位标签
+    # 循环 / 次数 —— 对齐 HTML: label + 输入框(50px/26px/居中/有边框) + 独立单位标签
+    # 循环是间隔秒数, 引擎按浮点消费(loop_interval: float), 所以 dec=1 要能敲小数点;
+    # 次数是计数, 保持整数档
     # 不用 setSuffix: HTML 的 .unit 是独立的 12px 灰色标签, 不在输入框内
     r_num, rl_num = _plain()
     rl_num.setContentsMargins(0, 0, 0, 0)
     rl_num.setSpacing(8)
     rl_num.addWidget(_make_label("循环", color=Colors.TEXT2))
-    rl_num.addWidget(_spin(t["loop"], 1, 999, 0, 1, fill=True,
+    rl_num.addWidget(_spin(t["loop"], 1, 999, 1, 1, fill=True,
                                on=bind(t, "loop")))
     rl_num.addWidget(_make_label("s", color=Colors.DIM))
     rl_num.addSpacing(6)

@@ -325,7 +325,7 @@ class SetWin(V2Win):
         wl.setSpacing(8)
         wl.addWidget(_make_label("循环间隔", color=Colors.TEXT2))
         wl.addWidget(_spin(_s5.get("default_loop", DEFAULTS["default_loop"]), 1, 999, 1, 10,
-                           lambda v: self._save(default_loop=int(v))))
+                           lambda v: self._save(default_loop=float(v))))
         wl.addWidget(_make_label("s", color=Colors.DIM))
         wl.addStretch()
         wl.addWidget(_make_label("动作后延", color=Colors.TEXT2))
