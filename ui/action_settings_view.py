@@ -9,7 +9,7 @@ from tasks.keyboard.keyboard_task import fmt_action
 from .keyboard_mode import (_fit_spin, _target_combo, _mini_combo,
                             DraggableRow, _refresh_actions as _refresh_main)
 from .widgets import (_make_btn, _make_label, _tint_btn, spin_flat, btn_qss,
-                     card_qss, F12, FONT_M, FONT_M as FONT13)
+                     card_qss, F12, FONT_M, FONT_M as FONT13, _IntSpin)
 
 RADIUS = 16
 # 页标题比正文大一号(标题级); 其余标签一律走 FONT13, 不在此处另写字号
@@ -150,7 +150,7 @@ class ActionSettingsView(QWidget):
             hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=FONT13, color=Colors.DIM)
             _ctl.addWidget(hold_label)
 
-            hold_spin = QDoubleSpinBox()
+            hold_spin = _IntSpin()
             if is_wait or is_branch:
                 hold_spin.setRange(0, 600)
                 hold_spin.setDecimals(0)
@@ -204,7 +204,7 @@ class ActionSettingsView(QWidget):
                 _ctl.addSpacing(12)
                 # 帧：防抖连续命中次数
                 _ctl.addWidget(_make_label("帧", font=FONT13, color=Colors.DIM))
-                hit_spin = QDoubleSpinBox()
+                hit_spin = _IntSpin()
                 hit_spin.setRange(1, 5)
                 hit_spin.setDecimals(0)
                 hit_spin.setSingleStep(1)

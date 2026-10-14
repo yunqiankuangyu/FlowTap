@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import Colors, FONT_B, FONT_M, load_presets, save_presets
 from .widgets import (_make_btn, _tint_btn, _make_label, state_btn, spin_fill, spin_flat,
-                        line_flat, line_fill, ghost_btn, style_label,
+                        line_flat, line_fill, ghost_btn, style_label, _IntSpin,
                         btn_qss, card_qss, scroll_qss, tip_qss, dot_qss, set_bg, label_qss, menu_qss, menu_btn_qss, F12)
 from tasks.keyboard.keyboard_task import KeyboardTask, make_key_action, make_combo_action, make_click_action, fmt_action
 from core.vk_map import VK_NAME
@@ -777,7 +777,7 @@ def create_card(app, task):
     task._loop_spin = spin
 
     # 次数限制输入框（0=无限）
-    runs_spin = QDoubleSpinBox()
+    runs_spin = _IntSpin()
     runs_spin.setRange(0, 9999)
     runs_spin.setDecimals(0)
     runs_spin.setSingleStep(1)
@@ -932,7 +932,7 @@ def _refresh_actions(app, task):
             hold_label = _make_label("超时" if (is_wait or is_branch) else "持续", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM)
             _ctl.addWidget(hold_label)
 
-            hold_spin = QDoubleSpinBox()
+            hold_spin = _IntSpin()
             if is_wait or is_branch:
                 hold_spin.setRange(0, 600)
                 hold_spin.setDecimals(0)
@@ -990,7 +990,7 @@ def _refresh_actions(app, task):
             _ctl.addSpacing(12)
             # 帧：防抖连续命中次数
             _ctl.addWidget(_make_label("帧", font=QFont("MiSans", 11, QFont.Bold), color=Colors.DIM))
-            hit_spin = QDoubleSpinBox()
+            hit_spin = _IntSpin()
             hit_spin.setRange(1, 5)
             hit_spin.setDecimals(0)
             hit_spin.setSingleStep(1)

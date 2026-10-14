@@ -3,9 +3,9 @@
 (全app的控件样式只在这一处定义, 改样式=改这里; 行内禁止手搓QSS, 一律调这里的QSS生成器或工厂)
 xxx_qss()生成器: 返回字符串, 供拼接/换色/带extra的场合; xxx_xxx()工厂: 直接设到控件上
 """
-from PySide6.QtWidgets import QPushButton, QLabel
+from PySide6.QtWidgets import QPushButton, QLabel, QDoubleSpinBox
 from PySide6.QtCore import Qt, QObject
-from PySide6.QtGui import QCursor, QFont
+from PySide6.QtGui import QCursor, QFont, QValidator
 from config import Colors, FONT_M
 
 # QSS字体串(px单位, 只写在需要QSS字体的按钮族里; 与setFont的pt体系互不混用)
@@ -170,6 +170,17 @@ def _dim_rgba(alpha):
     from PySide6.QtGui import QColor
     c = QColor(Colors.DIM)
     return f"rgba({c.red()},{c.green()},{c.blue()},{alpha})"
+
+
+class _IntSpin(QDoubleSpinBox):
+    #整数框(decimals=0)禁小数点: QDoubleValidator 把 "801." 判中间态照样放行,
+    #覆写 validate 在整数档把含小数点/千分位的文本直接判 Invalid, 键入与粘贴都进不来;
+    #小数档(decimals>0)走父类原逻辑, 照常能敲小数点
+    def validate(self, text, pos):
+        if self.decimals() <= 0 and (self.locale().decimalPoint() in text
+                                     or self.locale().groupSeparator() in text):
+            return (QValidator.Invalid, text, pos)
+        return super().validate(text, pos)
 
 
 def spin_fill(spin):

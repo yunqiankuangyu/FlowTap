@@ -15,7 +15,7 @@ from PySide6.QtGui import QFont
 
 from config import Colors, THEMES, DEFAULT_THEME, load_settings, save_settings
 from .widgets import (_make_btn, spin_fill, style_label, btn_qss, card_qss,
-                        scroll_qss, set_bg, line_fill, dot_qss, slider_qss)
+                        scroll_qss, set_bg, line_fill, dot_qss, slider_qss, _IntSpin)
 
 # 设置页专用字体：比全局小 3px
 _FB = QFont("MiSans", 11, QFont.Bold)
@@ -342,7 +342,7 @@ def build_settings_mode(app):
     cd_layout.setContentsMargins(0, 0, 0, 0)
     cd_layout.setSpacing(6)
     cd_layout.addWidget(QLabel("点击开始后等待"))
-    cd_spin = QDoubleSpinBox()
+    cd_spin = _IntSpin()
     cd_spin.setRange(0, 10); cd_spin.setDecimals(0); cd_spin.setSingleStep(1)
     cd_spin.setValue(s.get("start_countdown", 3))
     cd_spin.setFixedWidth(40); cd_spin.setFixedHeight(25)
@@ -376,7 +376,7 @@ def build_settings_mode(app):
     style_label(tol_lbl, Colors.TEXT2)
     tol_l.addWidget(tol_lbl)
     tol_l.addStretch()
-    tol_spin = QDoubleSpinBox()
+    tol_spin = _IntSpin()
     tol_spin.setRange(0, 10); tol_spin.setDecimals(0); tol_spin.setSingleStep(1)
     tol_spin.setValue(int(s.get("match_tolerance", 3)))
     # 高度用24与上方开关按钮一致(24), 宽度比开关宽以容纳数值
