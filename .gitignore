@@ -9,3 +9,4 @@ build/
 dist/
 templates/
 .hermes/
+.ruff_cache/
