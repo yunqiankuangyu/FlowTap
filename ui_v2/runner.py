@@ -74,13 +74,13 @@ def to_engine(actions):
                                       hold=a.get("a", 0))
         elif k == "wait":
             act = make_wait_image_action(
-                a.get("tpl", ""), timeout=a.get("timeout", 30),
+                a.get("tpl", ""), timeout=a.get("timeout", 0),
                 on_timeout=_AFTER.get(a.get("after", "跳过"), "skip"),
                 delay=a.get("delay", 0))
         elif k == "branch":
             # 分支的模板选项由预设配置; 这里给空 options = 没有可命中模板,
             # 引擎按 on_timeout 走, 不会崩
-            act = make_branch_action([], timeout=a.get("timeout", 30),
+            act = make_branch_action([], timeout=a.get("timeout", 0),
                                      on_timeout=_AFTER.get(a.get("after", "跳过"), "skip"),
                                      delay=a.get("delay", 0))
         elif k == "jump":
@@ -130,14 +130,14 @@ def from_engine(act, by_lid=None):
         return {"kind": "wait", "name": "等图像1", "tpl": act.get("tpl", ""),
                 "wait": "图像·按钮", "after": _AFTER_REV.get(
                     act.get("on_timeout", "skip"), "跳过"),
-                "delay": act.get("delay", 0.0), "timeout": act.get("timeout", 30),
+                "delay": act.get("delay", 0.0), "timeout": act.get("timeout", 0),
                 "run": False}
     if t == "branch":
         return {"kind": "branch", "name": "分支1",
                 "options": act.get("options", []),
                 "wait": "图像·按钮",
                 "after": _AFTER_REV.get(act.get("on_timeout", "next"), "跳过"),
-                "delay": act.get("delay", 0.0), "timeout": act.get("timeout", 30),
+                "delay": act.get("delay", 0.0), "timeout": act.get("timeout", 0),
                 "pick": "next", "run": False}
     if t == "jump":
         return {"kind": "jump", "name": "跳转", "to": None,

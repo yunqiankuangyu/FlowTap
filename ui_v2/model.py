@@ -175,7 +175,7 @@ class Model:
         """
         t = self.tasks[self.sel_task]
         w = {"kind": "wait", "name": "等图像1", "tpl": tpl, "wait": "图像·按钮",
-             "after": "跳过", "delay": delay, "timeout": 30, "run": False}
+             "after": "跳过", "delay": delay, "timeout": 0, "run": False}
         w["name"] = f"等图像{sum(1 for a in t['actions'] if a['kind'] == 'wait') + 1}"
         t["actions"].append(w)
         self.sel_row = len(t["actions"]) - 1
