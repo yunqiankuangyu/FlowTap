@@ -273,7 +273,7 @@ def add_image_wait_action(app, task, on_done):
         task.actions.append(make_wait_image_action(
             rel_path,
             threshold=0.85,
-            timeout=30,
+            timeout=0,
             delay=_ls().get("default_delay", 0.0),
         ))
 

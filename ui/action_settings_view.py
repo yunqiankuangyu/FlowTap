@@ -155,7 +155,7 @@ class ActionSettingsView(QWidget):
                 hold_spin.setRange(0, 600)
                 hold_spin.setDecimals(0)
                 hold_spin.setSingleStep(10)
-                hold_spin.setValue(action.get("timeout", 30))
+                hold_spin.setValue(action.get("timeout", 0))
                 hold_spin.setSpecialValueText("∞")
                 hold_spin.setToolTip("填 0 (∞) = 保持等待：一直等到图像出现/分支命中才继续，永不超时")
             else:
