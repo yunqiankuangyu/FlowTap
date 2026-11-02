@@ -276,6 +276,9 @@ def wire(win, setw, mini, app):
         win._unveil()
         _set_panel(False)
     setw.on_close = _on_set_close
+    # 预设导入后刷新主窗下拉: 保持当前选中(合并不删预设), 与旧UI导入同一语义
+    from .panel import refresh_preset_combo
+    setw.on_presets_changed = lambda: refresh_preset_combo(win.m, keep_current=True)
     # 主题预览要刷到所有窗 —— 设置窗换肤时把主窗/迷你窗一并整树重刷
     setw.wins = [win, mini]
     win.dock.on_item = dock_click

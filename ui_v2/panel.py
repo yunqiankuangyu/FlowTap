@@ -651,6 +651,23 @@ def _sel_preset(m, name):
         m.preset_name = name
 
 
+def refresh_preset_combo(m, keep_current=False):
+    """重建预设下拉条目(预设增删改/导入后统一走这里, 保证下拉与磁盘一致)。
+    keep_current=True: 保持当前选中名(导入用 —— 合并不删预设, 当前选中必然还在);
+    False: 落第一项(删除用, 与原内联写法行为一致)。无预设时显示占位「无预设」。"""
+    from config.presets import load_presets
+    names = list(load_presets().keys())
+    items = names or ["无预设"]
+    combo = getattr(m, "_preset_combo", None)
+    if combo is not None:
+        combo.set_items(items)   # 会静默选中第一项(不发信号)
+    if keep_current and m.preset_name in names:
+        target = m.preset_name
+    else:
+        target = items[0]
+    _sel_preset(m, target)
+
+
 def _delete_preset(m, name):
     """行内「删除」: 先弹确认, 确认后从 presets.json 删掉那条并同步下拉与 m.preset_name"""
     from PySide6.QtWidgets import QMessageBox
@@ -669,11 +686,8 @@ def _delete_preset(m, name):
     mb.exec()
     if mb.clickedButton() is not b_del:
         return
-    names = list(delete_preset(name).keys())
-    combo = getattr(m, "_preset_combo", None)
-    if combo is not None:
-        combo.set_items(names or ["无预设"])   # 会静默选中第一项(不发信号)
-    _sel_preset(m, names[0] if names else "无预设")
+    delete_preset(name)
+    refresh_preset_combo(m)   # 落第一项, 与原内联写法行为一致
     m.on_toast(f"已删除「{name}」")
     try:
         from logger import log_info

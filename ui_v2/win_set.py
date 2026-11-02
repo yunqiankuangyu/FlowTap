@@ -75,6 +75,7 @@ class SetWin(V2Win):
         self.wins = []      # 参与整树换肤的其它窗口(主窗/迷你窗, 接线见 main_v2.wire)
         self.on_top_change = None   # 窗口置顶开关的即时生效出口(接线见 main_v2.wire)
         self.on_radius_change = None   # 圆角拉条的即时生效出口(同上)
+        self.on_presets_changed = None   # 预设导入后的下拉刷新出口(同上)
         self.foot_ap = _make_btn("应用主题", height=28)
         self.foot_ap.clicked.connect(self._apply_clicked)
         fl.addWidget(self.foot_ap)
@@ -353,12 +354,31 @@ class SetWin(V2Win):
                                size="settings")
         self.segs["fix"] = sg
         cl4.addWidget(_row_box("固定位置比对", sg))
-        for _c in (c1, c2, c3, c4):
+
+        # 预设备份: 导出把预设引用的模板图(png+bbox json)一并内嵌, 导入解码写回
+        c5, cl5 = _card(title="💾 预设备备份")
+        w5, w5l = _plain()
+        w5l.setContentsMargins(0, 0, 0, 0)
+        w5l.setSpacing(8)
+        b_exp = _make_btn("导出全部预设", height=28)
+        b_imp = _make_btn("导入预设", height=28)
+        b_exp.clicked.connect(self._export_presets)
+        b_imp.clicked.connect(self._import_presets)
+        w5l.addWidget(b_exp)
+        w5l.addWidget(b_imp)
+        w5l.addStretch()
+        cl5.addWidget(w5)
+        # 结果行常驻(初始空串不占字但占一行): 本窗没有 toast, 回执只能落在这
+        self._pe_status = _make_label("", color=Colors.DIM)
+        cl5.addWidget(self._pe_status)
+
+        for _c in (c1, c2, c3, c4, c5):
             self._pin(_c)
         ca.addWidget(c1)
         ca.addWidget(c2)
         cb.addWidget(c3)
         cb.addWidget(c4)
+        cb.addWidget(c5)
         ca.addStretch()
         cb.addStretch()
         return page, cols
@@ -476,3 +496,70 @@ class SetWin(V2Win):
         if getattr(self, "on_alpha_change", None):
             self.on_alpha_change(self.alpha, op)
         self._save(opacity=round(op, 3))           # 键义=不透明度(与旧版同键同义)
+
+    # ── 预设备份: 导出内嵌模板图 / 导入解码写回(与旧UI同一套 config.presets 后端) ──
+    def _pe_hint(self, text, ok=True):
+        """结果回执落常驻状态行(本窗无 toast); 绿=成功 红=失败, 3s 后收起。
+        代际号在发回执时就自增: 连点时旧定时器到点发现代际已被接管, 当场作废"""
+        style_label(self._pe_status, Colors.GREEN if ok else Colors.RED)
+        self._pe_status.setText(text)
+        gen = self._pe_gen = getattr(self, "_pe_gen", 0) + 1
+
+        def _go():
+            if self._pe_gen == gen:
+                self._pe_status.setText("")
+        QTimer.singleShot(3000, _go)
+
+    def _export_presets(self):
+        from PySide6.QtWidgets import QFileDialog
+        from config.presets import export_data
+        import json as _json
+        path, _ = QFileDialog.getSaveFileName(self, "导出预设", "FlowTap预设.json", "JSON (*.json)")
+        if not path:
+            return
+        try:
+            data = export_data()
+            with open(path, "w", encoding="utf-8") as f:
+                _json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            from logger import log_error
+            import traceback
+            log_error("uiv2_export", traceback.format_exc())
+            self._pe_hint("✕ 导出失败", ok=False)
+            return
+        n_tpl = sum(1 for k in data.get("flowtap_templates", {}) if k.endswith(".png"))
+        msg = f"✓ 已导出 {len(data.get('flowtap_presets', {}))} 个预设"
+        if n_tpl:
+            msg += f" + {n_tpl} 张模板图"
+        self._pe_hint(msg)
+
+    def _import_presets(self):
+        from PySide6.QtWidgets import QFileDialog
+        from config.presets import load_presets, save_presets, import_split, write_templates
+        import json as _json
+        path, _ = QFileDialog.getOpenFileName(self, "导入预设", "", "JSON (*.json)")
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            incoming, tpls = import_split(data)
+            # 先写模板后落预设: 反过来一旦写图失败, 预设已指向不存在的图
+            n_written, n_skip = write_templates(tpls)
+            merged = load_presets()
+            merged.update(incoming)
+            save_presets(merged)
+        except Exception:
+            from logger import log_error
+            import traceback
+            log_error("uiv2_import", traceback.format_exc())
+            self._pe_hint("✕ 导入失败：文件格式无效", ok=False)
+            return
+        if getattr(self, "on_presets_changed", None):
+            self.on_presets_changed()   # 刷新主窗预设下拉(接线见 main_v2.wire)
+        msg = f"✓ 已导入 {len(incoming)} 个预设"
+        if n_written or n_skip:
+            msg += f"，模板 +{n_written}"
+            if n_skip:
+                msg += f"/跳过{n_skip}(已存在)"
+        self._pe_hint(msg)
