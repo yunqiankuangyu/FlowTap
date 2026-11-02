@@ -12,7 +12,6 @@
 |---------|-----------|------------|
 | v3.9.2 | PySide6 | Four matching tolerance levels, capsule UI |
 | v3.9.01 | PySide6 | New UI preset export/import embedded templates
-| v3.9.01 | PySide6 | New UI preset export/import with embedded template images
 | v3.9.1 | PySide6 | Fixed-position recognition, faster preview, snappier interface |
 | v3.9.0 | PySide6 | Read numbers, variable math, conditional branch |
 | v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
