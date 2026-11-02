@@ -45,6 +45,8 @@ def template_sigma(img):
     return float(img.std())
 #已记过"纯色拒绝"日志的模板路径(防等待循环每0.2s刷屏)
 _flat_logged = set()
+#已记过"模板文件缺失"日志的相对路径(同防刷屏, 卡住时日志一眼看出缺哪张图)
+_missing_logged = set()
 
 
 def new_template_path():
@@ -166,6 +168,10 @@ def _load_template(rel_path):
         return cached
     full = os.path.join(_app_dir(), rel_path)
     if not os.path.isfile(full):
+        if rel_path not in _missing_logged:
+            _missing_logged.add(rel_path)
+            from logger import log_info
+            log_info("tpl_missing", rel_path)
         return None
     img = _read_color(full)
     if img is None:

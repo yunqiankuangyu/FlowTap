@@ -572,25 +572,30 @@ def build_settings_mode(app):
     import json as _json
 
     def export_presets():
-        from config.presets import load_presets
+        from config.presets import export_data
         path, _ = QFileDialog.getSaveFileName(app, "导出预设", "FlowTap预设.json", "JSON (*.json)")
         if not path:
             return
+        data = export_data()
         with open(path, "w", encoding="utf-8") as f:
-            _json.dump({"flowtap_presets": load_presets()}, f, ensure_ascii=False, indent=2)
-        show_notification(app, "✓ 预设已导出")
+            _json.dump(data, f, ensure_ascii=False, indent=2)
+        n_tpl = sum(1 for k in data.get("flowtap_templates", {}) if k.endswith(".png"))
+        msg = f"✓ 已导出 {len(data.get('flowtap_presets', {}))} 个预设"
+        if n_tpl:
+            msg += f" + {n_tpl} 张模板图"
+        show_notification(app, msg)
 
     def import_presets():
-        from config.presets import load_presets, save_presets
+        from config.presets import load_presets, save_presets, import_split, write_templates
         path, _ = QFileDialog.getOpenFileName(app, "导入预设", "", "JSON (*.json)")
         if not path:
             return
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = _json.load(f)
-            incoming = data.get("flowtap_presets", data if isinstance(data, dict) else {})
-            if not isinstance(incoming, dict):
-                raise ValueError
+            incoming, tpls = import_split(data)
+            # 先写模板后落预设: 反过来一旦写图失败, 预设已指向不存在的图
+            n_written, n_skip = write_templates(tpls)
             merged = load_presets()
             merged.update(incoming)
             save_presets(merged)
@@ -602,7 +607,12 @@ def build_settings_mode(app):
                 from logger import log_error
                 import traceback
                 log_error("settings_import", traceback.format_exc())
-            show_notification(app, f"✓ 已导入 {len(incoming)} 个预设")
+            msg = f"✓ 已导入 {len(incoming)} 个预设"
+            if n_written or n_skip:
+                msg += f"，模板 +{n_written}"
+                if n_skip:
+                    msg += f"/跳过{n_skip}(已存在)"
+            show_notification(app, msg)
         except Exception:
             show_notification(app, "✕ 导入失败：文件格式无效")
 
