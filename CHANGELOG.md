@@ -10,9 +10,8 @@
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
-| v3.9.2 | PySide6 | Four matching tolerance levels, capsule UI |
 | v3.9.3 | PySide6 | Preset export/import with embedded template images; template_missing log |
-
+| v3.9.2 | PySide6 | Four matching tolerance levels, capsule UI |
 | v3.9.1 | PySide6 | Fixed-position recognition, faster preview, snappier interface |
 | v3.9.0 | PySide6 | Read numbers, variable math, conditional branch |
 | v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
@@ -37,17 +36,12 @@
 
 ## Release Notes
 
-### v3.9.2 — Image Recognition & Interface Tweaks
 ### v3.9.3 — Preset \& Template Packaging
 
 **New**
 - Preset export/import (both old UI settings page and new UI settings page) now embeds referenced template images (png + bbox json) with base64 encoding inside exported JSON.
-- Template missing log (tpl_missing) prevents wait-image loop spinning when source templates are absent locally.
-- Fix for corrupt base64 leaving 0-byte remnant blocking correct future writes.
 
-**Note**
-- Source machine templates/ directory is currently empty (2 referenced png missing); export still works and writes the key (empty dict) correctly.
-
+### v3.9.2 — Image Recognition & Interface Tweaks
 
 **New**
 - Wait-for-image actions gain an accuracy setting with four levels
