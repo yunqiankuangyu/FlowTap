@@ -10,6 +10,7 @@
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.9.4 | PySide6 | Rust-accelerated template matching; on-demand component loading |
 | v3.9.3 | PySide6 | Preset export/import with embedded template images; template_missing log |
 | v3.9.2 | PySide6 | Four matching tolerance levels, capsule UI |
 | v3.9.1 | PySide6 | Fixed-position recognition, faster preview, snappier interface |
@@ -35,6 +36,16 @@
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
 
 ## Release Notes
+
+### v3.9.4 — Rust Matching Core
+
+**Improved**
+- Template matching engine rewritten in Rust, with faster speed.
+- Heavy components now load on demand.
+
+**Fixed**
+- Action presets are now strictly validated; corrupt presets degrade safely instead of crashing.
+- Conditional-branch actions no longer show a misleading "no target" warning when sequential execution is intended.
 
 ### v3.9.3 — Preset \& Template Packaging
 
