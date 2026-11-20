@@ -70,6 +70,13 @@ if __name__ == "__main__":
         app.setQuitOnLastWindowClosed(False)  # 遮罩关闭时不退出
         window = App()
         window.show()
+        # 按需预热：只加载当前任务真正用到的组件（识图->cv2/PIL，读数->OCR）。
+        # 之后新增识图/读数节点时由 _refresh_actions 再检测触发。
+        try:
+            from engine.prewarm import ensure as _prewarm_ensure
+            _prewarm_ensure([])  # 旧 UI 启动时尚无键盘任务，等到载入预设/建节点再触发
+        except Exception:
+            pass
         sys.exit(app.exec())
     except Exception:
         from datetime import datetime

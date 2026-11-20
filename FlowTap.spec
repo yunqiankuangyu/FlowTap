@@ -3,6 +3,8 @@ from PyInstaller.utils.hooks import collect_data_files
 
 # OCR(rapidocr)在函数内延迟导入, 静态分析扫不到, 必须显式声明(只列RapidOCR实际用到的子模块, 不用collect_submodules以免牵入torch/CUDA)
 _hidden = [
+    # engine 为函数内延迟 import，静态分析扫不到，必须显式声明
+    'engine', 'engine.native_bridge', 'engine.prewarm',
     'cv2',
     'rapidocr_onnxruntime',
     'rapidocr_onnxruntime.main',
@@ -20,17 +22,21 @@ _hidden = [
 _datas = [('packaging/FlowTap.ico', 'packaging')] + collect_data_files('rapidocr_onnxruntime')
 
 a = Analysis(
-    ['main.py'],
+    #新UI入口(等价 python -m ui_v2.main_v2), 旧UI的 main.py 入口只在 main 分支的 spec 里
+    ['main_v2.py'],
     pathex=[],
-    binaries=[],
+    binaries=[('engine/bin/flowtap_core.dll', '.')],
     datas=_datas,
     hiddenimports=_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
+    #新UI打包只带 ui_v2/, 不收旧 ui/ —— config.themes 的 Colors.apply 内部 import ui.widgets,
+    # 静态分析会把整个旧UI牵进来, 而新UI运行时从不调 Colors.apply, 满足这两条前提排掉安全
     excludes=['PySide6.QtQuick', 'PySide6.QtQml', 'PySide6.QtPdf',
               'PySide6.QtNetwork', 'PySide6.QtOpenGL', 'PySide6.QtVirtualKeyboard',
-              'torch', 'torchvision', 'torchaudio', 'tensorflow', 'jax', 'llvmlite', 'IPython'],
+              'torch', 'torchvision', 'torchaudio', 'tensorflow', 'jax', 'llvmlite', 'IPython',
+              'ui', 'ui.app', 'ui.widgets'],
     noarchive=False,
     optimize=0,
 )

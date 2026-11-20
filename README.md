@@ -60,8 +60,6 @@ FlowTap/
 │   └── presets.py              # Preset storage
 ├── templates/                  # Captured template images
 ├── packaging/                  # Packaging assets (icon, installer script)
-├── tools/ui_editor/            # UI editor (not in git)
-├── ARCHITECTURE.md             # Architecture overview
 ├── FlowTap*.spec               # PyInstaller specs (one-file / one-dir)
 ├── userdata/                   # Personal config: settings.json + presets.json (generated at runtime)
 └── 启动.bat                    # One-click launcher

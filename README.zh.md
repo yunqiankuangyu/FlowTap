@@ -60,8 +60,6 @@ FlowTap/
 │   └── presets.py           # 预设存取
 ├── templates/               # 标定的模板图
 ├── packaging/               # 打包资源（图标、安装器脚本）
-├── tools/ui_editor/         # UI 编辑器（不进 git）
-├── ARCHITECTURE.md          # 架构说明
 ├── FlowTap*.spec            # PyInstaller 打包配置（单文件 / 单目录）
 ├── userdata/                # 个人配置：settings.json + presets.json（运行时生成）
 └── 启动.bat                 # 一键启动

@@ -229,7 +229,7 @@ def _action_summary(action, task=None):
             ti = next((i for i, a in enumerate(task.actions) if a.get("lid") == tgt), None)
             desc += f" → 动作{ti + 1}" if ti is not None else " → ⚠目标已失效"
         else:
-            desc += " → ⚠未设目标"
+            desc += " → 顺序继续"
     return desc
 
 def _target_combo(task, container, big=False):
@@ -255,18 +255,17 @@ def _target_combo(task, container, big=False):
     def _set_tip(_tip):
         combo.setToolTip(_tip)
     if cur and sel == 0:
-        _set_tip("⚠ 跳转目标已失效（原动作被删），当前按「顺序继续」执行，请重新选择目标")
+        _set_tip("跳转目标已失效（原动作被删），当前按「顺序继续」执行；可重新选择目标")
     elif not cur:
-        _set_tip("⚠ 未设跳转目标：条件成立也不会跳转（等同顺序继续）。请选择一个目标动作")
+        _set_tip("未设跳转目标：成立时也顺序继续（合法选择）；想让成立时跳转就选一个目标动作")
     else:
         _set_tip(combo.currentText())
-    # 选目标: 写回 + 同步警示态 + tooltip（未设目标时提示语优先于文本全文）
+    # 选目标: 写回 + 同步 tooltip（顺序继续是合法选择, 不再用警告语气）
     def _on_target_changed(_i, c=container, cb=combo):
         data = cb.currentData()
         c["target"] = data
-        warn = data is None
-        if warn:
-            cb.setToolTip("⚠ 未设跳转目标：条件成立也不会跳转（等同顺序继续）。请选择一个目标动作")
+        if data is None:
+            cb.setToolTip("未设跳转目标：成立时也顺序继续（合法选择）；想让成立时跳转就选一个目标动作")
         else:
             cb.setToolTip(cb.currentText())
     combo.currentIndexChanged.connect(_on_target_changed)
@@ -879,6 +878,13 @@ def _mini_combo(items, cur, w, h=18):
 
 def _refresh_actions(app, task):
     """刷新动作列表UI"""
+    # 按需预热：扫描全部任务，识图/读数节点出现时后台加载对应组件。
+    # 兼容旧 UI 的引擎动作格式(type=wait_image/branch/ocr_read)。
+    try:
+        from engine.prewarm import ensure as _prewarm_ensure
+        _prewarm_ensure(getattr(app, "keyboard_tasks", []))
+    except Exception:
+        pass
     while task._action_layout.count():
         item = task._action_layout.takeAt(0)
         if item.widget():
@@ -1558,6 +1564,12 @@ def load_preset(app):
                 t.loop_interval = t._preset_loop_interval
                 t._loop_spin.setValue(t.loop_interval)
 
+    # 载入预设后按需预热：整批任务里若有识图/读数节点，后台加载对应组件
+    try:
+        from engine.prewarm import ensure as _prewarm_ensure
+        _prewarm_ensure(app.keyboard_tasks)
+    except Exception:
+        pass
     show_floating_notification(app, f"已加载: {name}")
 
 def save_preset_dialog(app):

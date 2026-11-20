@@ -10,6 +10,7 @@
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.9.3 | PySide6 | Preset export/import with embedded template images; template_missing log |
 | v3.9.2 | PySide6 | Four matching tolerance levels, capsule UI |
 | v3.9.3 | PySide6 | Preset export/import with embedded template images; template_missing log |
 
@@ -36,6 +37,11 @@
 | v1 | CustomTkinter | Separate keyboard/mouse modes, basic automation |
 
 ## Release Notes
+
+### v3.9.3 — Preset \& Template Packaging
+
+**New**
+- Preset export/import (both old UI settings page and new UI settings page) now embeds referenced template images (png + bbox json) with base64 encoding inside exported JSON.
 
 ### v3.9.2 — Image Recognition & Interface Tweaks
 ### v3.9.3 — Preset \& Template Packaging
