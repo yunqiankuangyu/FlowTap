@@ -1,12 +1,29 @@
+# ── Python 缓存 ──
 __pycache__/
 *.pyc
 *.pyo
+.ruff_cache/
+
+# ── 个人配置（预设/设置由用户自己生成保存，不进仓库）──
 settings.json
 presets.json
 userdata/
+templates/
+
+# ── 运行日志 ──
 logs/
+*.log
+
+# ── 备份 / 临时文件 ──
+*.bak
+*.bak[0-9]
+*.tmp
+*.temp
+
+# ── 构建产物（可重新生成）──
 build/
 dist/
-templates/
+rust_core/target/
+
+# ── 项目私有留档（架构/设计/改造说明，非公开）──
 .hermes/
-.ruff_cache/
