@@ -295,31 +295,17 @@ def match_template(screen_gray, tpl_gray, coarse=True):
     return float(coarse_val), (cx, cy)
 
 
-def _score_at(screen_gray, tpl_gray, x, y):
-    """在画面指定位置(x,y左上角)计算模板相似度, 用TM_CCOEFF_NORMED同公式手工算(等价于该位置的matchTemplate值)"""
-    h, w = tpl_gray.shape[:2]
-    H, W = screen_gray.shape[:2]
-    if x < 0 or y < 0 or x + w > W or y + h > H:
-        return -1.0
-    win = screen_gray[y:y + h, x:x + w].astype(np.float64)
-    tpl = tpl_gray.astype(np.float64)
-    tw = tpl - tpl.mean()
-    iw = win - win.mean()
-    den = np.sqrt(float((tw * tw).sum()) * float((iw * iw).sum()))
-    if den <= 0:
-        return -1.0  # 分母0(纯色区域), 与match_template的"纯色拒绝"语义一致
-    return float((tw * iw).sum()) / den
+# ══════════ Rust 数值内核（已直接替换原 Python 实现）══════════
+# 原 _score_at / _best_in_tolerance 的 Python 双重循环已删除，不再保留备份。
+# 这里直接调用 Rust cdylib。DLL 缺失/损坏会明确报错，不静默降级——
+# 因为项目约定：重写就是把要改的地方换成 Rust，不留 Python 备份。
+from engine import native_bridge as _native_bridge
 
 
 def _best_in_tolerance(screen_gray, tpl_gray, l, t, tolerance):
-    """在容错范围内逐px微移, 取最高分(抵消1-3px的渲染抖动/DPI取整误差)"""
-    best, best_xy = -1.0, None
-    for dy in range(-tolerance, tolerance + 1):
-        for dx in range(-tolerance, tolerance + 1):
-            sc = _score_at(screen_gray, tpl_gray, l + dx, t + dy)
-            if sc > best:
-                best, best_xy = sc, (l + dx, t + dy)
-    return best, best_xy
+    """在容错范围内逐px微移, 取最高分(抵消1-3px的渲染抖动/DPI取整误差)。
+    实现已迁至 Rust；此处仅转发。"""
+    return _native_bridge.best_in_tolerance(screen_gray, tpl_gray, l, t, tolerance)
 
 
 def _resolve_bbox(bbox, ref_size, W, H):

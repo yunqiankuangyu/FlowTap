@@ -50,8 +50,30 @@ def _vk(key):
     return VK_MAP.get(key.lower(), VK_MAP.get(key, 0x87))
 
 
+# ══════════ Rust 协议校验（已直接替换）══════════
+# 动作协议校验已迁至 Rust serde 层，不留 Python 备份。
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+from engine import native_bridge as _native_bridge
+
+
 def to_engine(actions):
     """Model 动作列表 -> 引擎动作列表(按 Model 下标补 lid, 供跳转定位)"""
+    # 一律先过 Rust 校验（无开关、无 Python 备份校验器）
+    _ok, _result = _native_bridge.validate_actions(actions)
+    if _ok:
+        actions = _result
+    else:
+        # 校验失败 = 数据损坏。整批替换为空键动作，程序继续跑、不崩。
+        # 这是坏数据兜底（业务健壮性），不是"退回 Python 校验器"的备份逻辑。
+        try:
+            from logger import log_error
+            log_error("protocol", "动作校验失败, 整批降级为空键: " + str(_result))
+        except Exception:
+            pass
+        actions = [{"kind": "key", "key": "K", "a": 0, "b": 0.5}
+                   for _ in actions]
     lids = [_new_lid() for _ in actions]
     out = []
     for i, a in enumerate(actions):

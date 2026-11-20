@@ -361,11 +361,8 @@ class ActionSettingsView(QWidget):
             _rowB.addWidget(_tgt_cb)
             _rowB.addStretch(1)
             _vbox.addLayout(_rowB)
-            #未设目标时明确警示: 条件成立也不会跳, 是最易踩的坑
-            if not action.get("target"):
-                _vbox.addWidget(_make_label("⚠ 还没选目标 —— 条件成立也不会跳转（等同顺序继续），请选一个目标动作",
-                                           font=FONT13, color=Colors.RED))
-            _vbox.addWidget(_make_label("💡 成立 → 跳到所选动作；不成立 → 顺序继续下一行（不会跳过）",
+            # 顺序继续是合法选择(条件成立也不跳), 不再用红字警告打扰
+            _vbox.addWidget(_make_label("💡 成立 → 跳到所选动作（未选则顺序继续）；不成立 → 顺序继续下一行",
                                        font=FONT13, color=Colors.DIM))
 
             # ── 卡C 用法示例 ──

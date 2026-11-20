@@ -345,6 +345,15 @@ def main():
 
     top = wire(win, setw, mini, app)
     top(win)
+
+    # 按需预热：只加载当前任务真正用到的组件（识图->cv2/PIL，读数->OCR）。
+    # 界面已显示后再检测，不拖慢首屏；新增节点/载入预设时由 Model 再触发。
+    try:
+        from engine.prewarm import ensure as _prewarm_ensure
+        _prewarm_ensure(win.m.tasks)
+    except Exception:
+        pass
+
     sys.exit(app.exec())
 
 

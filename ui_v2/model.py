@@ -254,6 +254,13 @@ class Model:
         直接写 m._mid.rebuild(m) 会 AttributeError —— 所以调用点一律走这里,
         别再手写 rebuild 组合(手写组合还容易漏栏)。
         """
+        # 按需预热：每次界面重建时检测当前任务，新增/载入识图或读数节点
+        # 会在这里触发对应组件后台加载；纯扫描零开销、组件只加载一次。
+        try:
+            from engine.prewarm import ensure as _prewarm_ensure
+            _prewarm_ensure(self.tasks)
+        except Exception:
+            pass
         for name in panes:
             pane = getattr(self, "_" + name, None)
             if pane is not None and hasattr(pane, "rebuild"):

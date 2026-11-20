@@ -4,6 +4,8 @@ from PyInstaller.utils.hooks import collect_data_files
 
 # OCR(rapidocr)在函数内延迟导入, 静态分析扫不到, 必须显式声明(只列RapidOCR实际用到的子模块, 不用collect_submodules以免牵入torch/CUDA)
 _hidden = [
+    # engine 为函数内延迟 import，静态分析扫不到，必须显式声明
+    'engine', 'engine.native_bridge', 'engine.prewarm',
     'cv2',
     'rapidocr_onnxruntime',
     'rapidocr_onnxruntime.main',
@@ -24,7 +26,7 @@ a = Analysis(
     #新UI入口(等价 python -m ui_v2.main_v2), 旧UI的 main.py 入口只在 main 分支的 spec 里
     ['main_v2.py'],
     pathex=[],
-    binaries=[],
+    binaries=[('engine/bin/flowtap_core.dll', '.')],
     datas=_datas,
     hiddenimports=_hidden,
     hookspath=[],

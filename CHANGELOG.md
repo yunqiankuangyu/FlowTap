@@ -10,8 +10,8 @@
 
 | Version | Framework | Highlights |
 |---------|-----------|------------|
+| v3.9.3 | PySide6 | Preset export/import with embedded template images; template_missing log |
 | v3.9.2 | PySide6 | Four matching tolerance levels, capsule UI |
-| v3.9.01 | PySide6 | New UI preset export/import embedded templates
 | v3.9.1 | PySide6 | Fixed-position recognition, faster preview, snappier interface |
 | v3.9.0 | PySide6 | Read numbers, variable math, conditional branch |
 | v3.8.3 | PySide6 | Color template matching, reference image view, wait timeout options |
@@ -36,16 +36,12 @@
 
 ## Release Notes
 
-### v3.9.2 — Image Recognition & Interface Tweaks
-### v3.9.01 — 新 UI 设置窗预设备份导出导入 (内嵌模板图打包)
-
-**新增**
-- 新 UI (ui_v2) 设置窗功能页接入预设导出导入，导出文件内嵌模板图(base64)。
-### v3.9.01 — New UI settings preset backup card (embedded templates)
+### v3.9.3 — Preset \& Template Packaging
 
 **New**
-- Added preset export/import to new UI settings (function page) with embedded template picture packing.
-- refresh_preset_combo positive source in panel.py (no duplicate variants).
+- Preset export/import (both old UI settings page and new UI settings page) now embeds referenced template images (png + bbox json) with base64 encoding inside exported JSON.
+
+### v3.9.2 — Image Recognition & Interface Tweaks
 
 **New**
 - Wait-for-image actions gain an accuracy setting with four levels
